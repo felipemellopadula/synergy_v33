@@ -30,7 +30,7 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
     if (!inputValue.trim() || !selectedModel) return;
 
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: crypto.randomUUID(),
       content: inputValue,
       sender: 'user',
       timestamp: new Date(),
@@ -40,18 +40,46 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
     setInputValue("");
     setIsLoading(true);
 
-    // Simulate AI response
-    setTimeout(() => {
+    try {
+      const response = await fetch('https://myqgnnqltemfpzdxwybj.supabase.co/functions/v1/ai-chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: userMessage.content,
+          model: selectedModel,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to get AI response');
+      }
+
+      const data = await response.json();
+      
       const botMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        content: `Resposta simulada do ${selectedModel}. Esta é uma demonstração do chat com IA.`,
+        id: crypto.randomUUID(),
+        content: data.response,
         sender: 'bot',
         timestamp: new Date(),
         model: selectedModel,
       };
+      
       setMessages(prev => [...prev, botMessage]);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      const errorMessage: Message = {
+        id: crypto.randomUUID(),
+        content: 'Desculpe, ocorreu um erro ao processar sua mensagem. Verifique se as chaves API estão configuradas corretamente.',
+        sender: 'bot',
+        timestamp: new Date(),
+        model: selectedModel,
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   if (!isOpen) return null;
