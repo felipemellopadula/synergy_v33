@@ -72,6 +72,7 @@ const callAnthropic = async (message: string, model: string): Promise<string> =>
 
   if (!response.ok) {
     const error = await response.text();
+    console.error(`Anthropic API error: ${response.status} - ${error}`);
     throw new Error(`Anthropic API error: ${error}`);
   }
 
