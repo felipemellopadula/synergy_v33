@@ -27,8 +27,80 @@ const getApiKey = (model: string): string | null => {
   return null;
 };
 
+const performWebSearch = async (query: string): Promise<string | null> => {
+  try {
+    const searchUrl = `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`
+    const response = await fetch(searchUrl)
+    
+    if (!response.ok) {
+      throw new Error(`Search API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+    const results = []
+    
+    if (data.Abstract) {
+      results.push(`${data.Heading || 'Informação'}: ${data.Abstract}`)
+    }
+
+    if (data.RelatedTopics && data.RelatedTopics.length > 0) {
+      for (let i = 0; i < Math.min(data.RelatedTopics.length, 3); i++) {
+        const topic = data.RelatedTopics[i]
+        if (topic.Text) {
+          results.push(topic.Text)
+        }
+      }
+    }
+
+    return results.length > 0 ? results.join('\n\n') : null
+  } catch (error) {
+    console.error('Web search error:', error)
+    return null
+  }
+}
+
 const callOpenAI = async (message: string, model: string): Promise<string> => {
   const apiKey = Deno.env.get('OPENAI_API_KEY');
+  
+  // Verificar se precisa de busca na web
+  const searchCheckResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      messages: [
+        {
+          role: 'system',
+          content: 'Você determina se uma pergunta precisa de informações atualizadas da web. Responda apenas "SIM" se a pergunta requer informações recentes, atuais, notícias, preços, eventos, dados em tempo real. Responda "NÃO" para perguntas gerais, conceitos, explicações, programação, matemática, história estabelecida.'
+        },
+        {
+          role: 'user',
+          content: message
+        }
+      ],
+      max_tokens: 10,
+      temperature: 0,
+    }),
+  });
+
+  let finalMessage = message
+  
+  if (searchCheckResponse.ok) {
+    const searchCheckData = await searchCheckResponse.json()
+    const needsSearch = searchCheckData.choices[0].message.content.trim().toUpperCase() === 'SIM'
+    
+    if (needsSearch) {
+      console.log('Performing web search for:', message)
+      const searchResults = await performWebSearch(message)
+      
+      if (searchResults) {
+        finalMessage = `${message}\n\n[Informações da web encontradas]:\n${searchResults}`
+      }
+    }
+  }
   
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -38,7 +110,16 @@ const callOpenAI = async (message: string, model: string): Promise<string> => {
     },
     body: JSON.stringify({
       model,
-      messages: [{ role: 'user', content: message }],
+      messages: [
+        {
+          role: 'system',
+          content: 'Você é um assistente útil em português. Se receber informações da web, use-as para dar uma resposta mais completa e atual. Sempre responda em português.'
+        },
+        {
+          role: 'user',
+          content: finalMessage
+        }
+      ],
       max_tokens: 1000,
       temperature: 0.7,
     }),

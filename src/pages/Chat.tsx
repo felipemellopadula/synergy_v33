@@ -1,4 +1,4 @@
-import { ArrowLeft, Paperclip, Mic, Search } from "lucide-react";
+import { ArrowLeft, Paperclip, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useState, useRef } from "react";
@@ -109,39 +109,25 @@ const Chat = () => {
     }
   };
 
-  const handleWebSearch = async () => {
-    const query = prompt("Digite sua consulta para busca na web:");
-    if (!query) return;
-
-    setIsLoading(true);
+  const performWebSearch = async (query: string) => {
     try {
       const response = await supabase.functions.invoke('web-search', {
-        body: { query, numResults: 5 }
+        body: { query, numResults: 3 }
       });
 
       if (response.data?.results) {
         const searchResults = response.data.results
-          .map((result: any, index: number) => 
-            `${index + 1}. ${result.title}\n${result.content}\nFonte: ${result.url}`
+          .map((result: any) => 
+            `${result.title}: ${result.content}`
           )
           .join('\n\n');
         
-        setInputValue(prev => prev + (prev ? '\n\n' : '') + `[Resultados da busca para "${query}"]\n\n${searchResults}`);
-        
-        toast({
-          title: "Busca concluída",
-          description: `${response.data.results.length} resultados encontrados`,
-        });
+        return `[Resultados da busca na web para "${query}"]\n\n${searchResults}`;
       }
     } catch (error) {
-      toast({
-        title: "Erro",
-        description: "Não foi possível realizar a busca.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
+      console.error('Web search error:', error);
     }
+    return '';
   };
 
   const handleSendMessage = async (e: React.FormEvent) => {
@@ -328,15 +314,6 @@ const Chat = () => {
                     className={`h-8 w-8 p-0 hover:bg-muted ${isRecording ? 'text-red-500' : ''}`}
                   >
                     <Mic className="h-4 w-4" />
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleWebSearch}
-                    className="h-8 w-8 p-0 hover:bg-muted"
-                  >
-                    <Search className="h-4 w-4" />
                   </Button>
                 </div>
               </div>
