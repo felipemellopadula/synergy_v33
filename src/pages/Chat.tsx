@@ -1,12 +1,14 @@
 import { ArrowLeft, Paperclip, Mic, Globe } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ModelSelector } from "@/components/ModelSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserProfile } from "@/components/UserProfile";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTokens } from "@/hooks/useTokens";
 import { supabase } from "@/integrations/supabase/client";
 
 interface Message {
@@ -20,6 +22,8 @@ interface Message {
 const Chat = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user, profile, loading } = useAuth();
+  const { consumeTokens, getTokenCost, getModelDisplayName, tokenBalance } = useTokens();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [selectedModel, setSelectedModel] = useState('gpt-4o-mini');
@@ -30,6 +34,25 @@ const Chat = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
+
+  // Redirect to home if not authenticated
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/');
+    }
+  }, [user, loading, navigate]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!user || !profile) {
+    return null;
+  }
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
@@ -192,6 +215,12 @@ const Chat = () => {
       return;
     }
 
+    // Check and consume tokens before sending message
+    const canProceed = await consumeTokens(selectedModel, currentInput);
+    if (!canProceed) {
+      return;
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       content: currentInput,
@@ -263,7 +292,7 @@ const Chat = () => {
           <div className="flex items-center gap-3">
             <ModelSelector onModelSelect={setSelectedModel} selectedModel={selectedModel} />
             <ThemeToggle />
-            <UserProfile tokens={10000} />
+            <UserProfile />
           </div>
         </div>
       </div>
@@ -275,8 +304,9 @@ const Chat = () => {
             {messages.length === 0 ? (
               <div className="flex items-center justify-center h-[60vh] text-muted-foreground">
                 <div className="text-center">
-                  <h3 className="text-lg font-medium mb-2">Inicie uma conversa</h3>
-                  <p>Faça uma pergunta para começar a conversar com a IA</p>
+                  <h3 className="text-lg font-medium mb-2">Olá, {profile.name}!</h3>
+                  <p>Você tem {tokenBalance.toLocaleString()} tokens disponíveis</p>
+                  <p className="mt-2">Faça uma pergunta para começar a conversar com a IA</p>
                 </div>
               </div>
             ) : (
@@ -301,7 +331,7 @@ const Chat = () => {
                   >
                     <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                     {message.model && message.sender === 'bot' && (
-                      <p className="text-xs opacity-70 mt-1">{message.model}</p>
+                      <p className="text-xs opacity-70 mt-1">{getModelDisplayName(message.model)} • {getTokenCost(message.model).toLocaleString()} tokens</p>
                     )}
                   </div>
                   {message.sender === 'user' && (

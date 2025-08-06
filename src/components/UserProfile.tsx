@@ -1,39 +1,75 @@
+import { User, LogOut, Settings } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Coins, User } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface UserProfileProps {
-  userImage?: string;
-  userName?: string;
-  tokens: number;
+  tokens?: number;
 }
 
-export const UserProfile = ({ 
-  userImage, 
-  userName = "Usuário", 
-  tokens = 10000 
-}: UserProfileProps) => {
+const UserProfile = ({ tokens }: UserProfileProps) => {
+  const { user, profile, signOut } = useAuth();
+
+  if (!user || !profile) {
+    return null;
+  }
+
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
   return (
-    <div className="p-3 bg-gradient-card">
-      <div className="flex items-center gap-3">
-        <Avatar className="h-12 w-12 ring-2 ring-primary/20">
-          <AvatarImage src={userImage} alt={userName} />
-          <AvatarFallback className="bg-primary text-primary-foreground">
-            <User className="h-6 w-6" />
-          </AvatarFallback>
-        </Avatar>
-        
-        <div className="flex-1">
-          <h3 className="font-semibold text-foreground">{userName}</h3>
-          <div className="flex items-center gap-1 mt-1">
-            <Coins className="h-4 w-4 text-warning" />
-            <Badge variant="secondary" className="bg-muted text-muted-foreground">
-              {tokens.toLocaleString()} tokens
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" className="flex items-center gap-2 px-2">
+          <Avatar className="h-8 w-8">
+            <AvatarImage src={profile.avatar_url || ''} />
+            <AvatarFallback>
+              <User className="h-4 w-4" />
+            </AvatarFallback>
+          </Avatar>
+          <div className="hidden md:flex flex-col items-start">
+            <span className="text-sm font-medium">{profile.name}</span>
+            <Badge variant="secondary" className="text-xs">
+              {profile.tokens_remaining.toLocaleString()} tokens
             </Badge>
           </div>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <div className="flex items-center gap-2 p-2">
+          <Avatar className="h-10 w-10">
+            <AvatarImage src={profile.avatar_url || ''} />
+            <AvatarFallback>
+              <User className="h-5 w-5" />
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex flex-col">
+            <span className="font-medium">{profile.name}</span>
+            <span className="text-sm text-muted-foreground">{profile.email}</span>
+          </div>
         </div>
-      </div>
-    </div>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem>
+          <Settings className="mr-2 h-4 w-4" />
+          Configurações
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={handleSignOut}>
+          <LogOut className="mr-2 h-4 w-4" />
+          Sair
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
+
+export { UserProfile };

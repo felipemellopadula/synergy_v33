@@ -1,139 +1,131 @@
-import { 
-  MessageSquare, 
-  Image as ImageIcon, 
-  Video, 
-  UserCheck, 
-  Code, 
-  Sparkles,
-  Brain,
-  Zap
-} from "lucide-react";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { UserProfile } from "@/components/UserProfile";
-import { HubButton } from "@/components/HubButton";
-import { toast } from "sonner";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { MessageCircle, Sparkles, Zap, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { AuthModal } from "@/components/AuthModal";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Index = () => {
   const navigate = useNavigate();
+  const { user, loading } = useAuth();
+  const [showAuthModal, setShowAuthModal] = useState(false);
 
-  const handleToolClick = (tool: string) => {
-    if (tool === 'chat') {
+  const handleChatClick = () => {
+    if (user) {
       navigate('/chat');
     } else {
-      toast.info(`${tool} será implementado em breve!`);
+      setShowAuthModal(true);
     }
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="sticky top-0 z-40 border-b border-border bg-background/80 backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-primary">
-              <Brain className="h-6 w-6 text-white" />
-            </div>
-            <h1 className="text-2xl font-bold bg-gradient-hero bg-clip-text text-transparent">
-              AI Hub
-            </h1>
+    <div className="min-h-screen bg-background flex flex-col">
+      <header className="border-b border-border">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <MessageCircle className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">AI Chat</h1>
           </div>
-          
           <div className="flex items-center gap-4">
-            <UserProfile tokens={15750} />
             <ThemeToggle />
+            {user ? (
+              <Button onClick={() => navigate('/chat')}>
+                Ir para Chat
+              </Button>
+            ) : (
+              <Button onClick={() => setShowAuthModal(true)}>
+                Entrar
+              </Button>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <section className="py-16 px-4">
-        <div className="container mx-auto text-center">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 border border-primary/20 mb-8">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <span className="text-sm font-medium text-primary">Powered by AI</span>
-          </div>
-          
-          <h2 className="text-5xl font-bold mb-6 bg-gradient-hero bg-clip-text text-transparent">
-            Seu Hub de Inteligência Artificial
+      <main className="flex-1 container mx-auto px-4 py-16">
+        <div className="text-center mb-16">
+          <h2 className="text-4xl md:text-6xl font-bold text-foreground mb-6">
+            Converse com a <span className="text-primary">Inteligência Artificial</span>
           </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-12">
-            Acesse os melhores modelos de IA do mundo em um só lugar. 
-            Chat, geração de imagens, vídeos e muito mais.
+          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+            Experimente modelos avançados de IA como GPT-4, Claude e Grok. 
+            Cada usuário pago recebe 1 milhão de tokens para explorar.
           </p>
+          <Button 
+            size="lg" 
+            onClick={handleChatClick}
+            className="text-lg px-8 py-6"
+          >
+            <MessageCircle className="mr-2 h-5 w-5" />
+            {user ? 'Começar Chat' : 'Começar Agora'}
+          </Button>
         </div>
-      </section>
 
-      {/* Tools Grid */}
-      <section className="py-16 px-4">
-        <div className="container mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            
-            {/* Chat Tool */}
-            <HubButton
-              icon={MessageSquare}
-              title="Chat"
-              description="Converse com os melhores modelos de IA como GPT-4, Claude 4, Gemini e mais"
-              onClick={() => handleToolClick('chat')}
-              gradient="bg-gradient-primary"
-            />
+        <div className="grid md:grid-cols-3 gap-8 mb-16">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Sparkles className="h-6 w-6 text-primary" />
+                Modelos Avançados
+              </CardTitle>
+              <CardDescription>
+                Acesse GPT-4o, Claude 3.5 Sonnet, Grok e outros modelos de última geração
+              </CardDescription>
+            </CardHeader>
+          </Card>
 
-            {/* Image Generation */}
-            <HubButton
-              icon={ImageIcon}
-              title="Imagem"
-              description="Gere imagens incríveis usando Luma Ray 2 e outros modelos avançados"
-              onClick={() => handleToolClick('image')}
-              gradient="bg-gradient-to-br from-pink-500 to-purple-600"
-            />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Zap className="h-6 w-6 text-primary" />
+                Sistema de Tokens
+              </CardTitle>
+              <CardDescription>
+                1 milhão de tokens inclusos. Diferentes modelos consomem quantidades variáveis
+              </CardDescription>
+            </CardHeader>
+          </Card>
 
-            {/* Video Generation */}
-            <HubButton
-              icon={Video}
-              title="Vídeo"
-              description="Crie vídeos impressionantes com tecnologia de IA de última geração"
-              onClick={() => handleToolClick('video')}
-              gradient="bg-gradient-to-br from-blue-500 to-cyan-500"
-            />
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-6 w-6 text-primary" />
+                Busca na Web
+              </CardTitle>
+              <CardDescription>
+                Modo especial para buscar informações atualizadas diretamente da internet
+              </CardDescription>
+            </CardHeader>
+          </Card>
+        </div>
 
-            {/* Humanizer */}
-            <HubButton
-              icon={UserCheck}
-              title="Humanizar"
-              description="Torne seu conteúdo mais natural e humano com IA especializada"
-              onClick={() => handleToolClick('humanize')}
-              gradient="bg-gradient-to-br from-green-500 to-emerald-500"
-            />
-
-            {/* Code Assistant */}
-            <HubButton
-              icon={Code}
-              title="Código"
-              description="Assistente de programação inteligente para desenvolvimento de software"
-              onClick={() => handleToolClick('code')}
-              gradient="bg-gradient-to-br from-orange-500 to-red-500"
-            />
-
-            {/* AI Tools */}
-            <HubButton
-              icon={Zap}
-              title="Ferramentas"
-              description="Mais ferramentas de IA para produtividade e criatividade"
-              onClick={() => handleToolClick('tools')}
-              gradient="bg-gradient-to-br from-indigo-500 to-purple-500"
-            />
-
+        <div className="bg-muted rounded-lg p-8 text-center">
+          <h3 className="text-2xl font-bold mb-4">Custos por Modelo</h3>
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="bg-background rounded-lg p-4">
+              <h4 className="font-semibold">Modelos Premium</h4>
+              <p className="text-sm text-muted-foreground">Claude, GPT-4o, Grok</p>
+              <p className="text-lg font-bold text-primary">10.000 tokens</p>
+            </div>
+            <div className="bg-background rounded-lg p-4">
+              <h4 className="font-semibold">Modelos Rápidos</h4>
+              <p className="text-sm text-muted-foreground">GPT-4o Mini, Claude Haiku</p>
+              <p className="text-lg font-bold text-primary">2.000 tokens</p>
+            </div>
           </div>
         </div>
-      </section>
+      </main>
 
-      {/* Footer */}
-      <footer className="border-t border-border py-8 px-4 mt-16">
-        <div className="container mx-auto text-center text-muted-foreground">
-          <p>© 2024 AI Hub. Powered by cutting-edge artificial intelligence.</p>
-        </div>
-      </footer>
-
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </div>
   );
 };
