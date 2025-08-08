@@ -10,6 +10,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 interface UserProfileProps {
   tokens?: number;
@@ -17,6 +18,7 @@ interface UserProfileProps {
 
 const UserProfile = ({ tokens }: UserProfileProps) => {
   const { user, profile, signOut } = useAuth();
+  const navigate = useNavigate();
 
   if (!user || !profile) {
     return null;
@@ -58,7 +60,7 @@ const UserProfile = ({ tokens }: UserProfileProps) => {
           </div>
         </div>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>
+        <DropdownMenuItem onClick={() => navigate('/settings')}>
           <Settings className="mr-2 h-4 w-4" />
           Configurações
         </DropdownMenuItem>
