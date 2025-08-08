@@ -87,9 +87,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       const { error } = await signIn(signInData.email, signInData.password);
 
       if (error) {
+        let errorMessage = error.message;
+        
+        // Handle common authentication errors with Portuguese messages
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Email ou senha inválidos. Verifique suas credenciais.';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Confirme seu email antes de fazer login. Verifique sua caixa de entrada.';
+        } else if (error.message.includes('Too many requests')) {
+          errorMessage = 'Muitas tentativas de login. Tente novamente em alguns minutos.';
+        }
+        
         toast({
           title: "Erro no login",
-          description: error.message,
+          description: errorMessage,
           variant: "destructive",
         });
         return;
@@ -101,7 +112,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       });
 
       onClose();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Login error:', error);
       toast({
         title: "Erro",
         description: "Ocorreu um erro inesperado. Tente novamente.",
