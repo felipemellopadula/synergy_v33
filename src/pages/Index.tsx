@@ -93,81 +93,28 @@ const Index = () => {
             )}
           </a>
 
-          <div className="grid gap-6 lg:grid-cols-3">
-            {/* Starter */}
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle>Starter</CardTitle>
-                <CardDescription>Para indivíduos e pequenos projetos</CardDescription>
-                <div className="pt-4">
-                  <div className="text-3xl font-bold">
-                    R$ {annual ? "30,00" : "35,00"}
-                    <span className="text-sm font-normal text-muted-foreground"> /mês</span>
-                  </div>
-                </div>
-                <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-                  <li>Acesso a modelos básicos de I.A</li>
-                  <li>100.000 tokens por mês</li>
-                  <li>1 solicitação por vez</li>
-                  <li>Análise básica</li>
-                </ul>
-                <Button variant="outline" className="mt-6" onClick={() => setShowAuthModal(true)}>
-                  Começar agora
-                </Button>
-              </CardHeader>
-            </Card>
+          <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
+            <a href="#modelos" className="hover:text-foreground transition-colors">Soluções</a>
+            <a href="#planos" className="hover:text-foreground transition-colors">Planos</a>
+            <a href="#contato" className="hover:text-foreground transition-colors">Contato</a>
+          </nav>
 
-            {/* Professional */}
-            <Card className="bg-card border-border ring-1 ring-primary/20">
-              <CardHeader>
-                <div className="inline-flex self-start -mb-2 translate-y-[-6px] rounded-full bg-primary/10 text-primary text-xs px-3 py-1">
-                  Mais Popular
-                </div>
-                <CardTitle>Profissional</CardTitle>
-                <CardDescription>Para profissionais e pequenas equipes</CardDescription>
-                <div className="pt-4">
-                  <div className="text-3xl font-bold">
-                    R$ {annual ? "79,99" : "89,99"}
-                    <span className="text-sm font-normal text-muted-foreground"> /mês</span>
-                  </div>
-                </div>
-                <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-                  <li>Acesso a todos modelos de I.A</li>
-                  <li>1.000.000 de tokens por mês</li>
-                  <li>Até 5 solicitações ao mesmo tempo</li>
-                  <li>Prioridade no suporte</li>
-                  <li>Análises avançadas</li>
-                </ul>
-                <Button className="mt-6" onClick={() => setShowAuthModal(true)}>
-                  Começar teste gratuito
-                </Button>
-              </CardHeader>
-            </Card>
-
-            {/* Enterprise */}
-            <Card className="bg-card border-border">
-              <CardHeader>
-                <CardTitle>Empresarial</CardTitle>
-                <CardDescription>Para organizações com necessidades especiais</CardDescription>
-                <div className="pt-4">
-                  <div className="text-3xl font-bold">Sob Consulta*</div>
-                </div>
-                <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
-                  <li>Acesso a todos os modelos</li>
-                  <li>Chamadas ilimitadas</li>
-                  <li>Suporte 24/7</li>
-                  <li>Custom model fine-tuning</li>
-                  <li>Infra dedicada e SLA</li>
-                </ul>
-                <Button variant="outline" className="mt-6" onClick={() => setShowAuthModal(true)}>
-                  Entre em contato
-                </Button>
-              </CardHeader>
-            </Card>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            {user ? (
+              <Button onClick={() => navigate("/chat")} className="hidden sm:inline-flex">
+                Ir para Chat
+              </Button>
+            ) : (
+              <Button onClick={() => setShowAuthModal(true)}>Login</Button>
+            )}
           </div>
-        </section>
+        </div>
+      </header>
 
-        {/* Contato/Footer simples */}
+      <main className="flex-1">
+        {/* Conteúdo da landing (hero, modelos, recursos, planos) será reinserido aqui */}
+        {/* Footer temporariamente dentro do main */}
         <footer id="contato" className="border-t border-border">
           <div className="container mx-auto px-4 py-12">
             <div className="grid gap-8 md:grid-cols-4">
