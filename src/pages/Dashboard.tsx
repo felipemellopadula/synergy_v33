@@ -98,7 +98,7 @@ const Dashboard = () => {
       <main className="container mx-auto px-4 py-16">
         <div className="text-center mb-12">
           <h2 className="text-4xl font-bold text-foreground mb-4">
-            Bem-vindo ao <span className="text-primary">AI Platform</span>
+            Bem-vindo ao <span className="text-primary">Synergy AI</span>
           </h2>
           <p className="text-xl text-muted-foreground">
             Escolha uma das funcionalidades abaixo para começar
