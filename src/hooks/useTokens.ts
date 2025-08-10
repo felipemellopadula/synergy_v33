@@ -13,7 +13,7 @@ const MODEL_COSTS = {
   'gpt-4-turbo': 10000,
   'claude-3-haiku-20240307': 2000,
   // DeepSeek Models
-  'deepseek-chat-v3': 8000,
+  'deepseek-chat': 8000,
   'deepseek-reasoner': 12000,
   // APILLM Models
   'llama-4-scout-17b': 6000,
@@ -128,7 +128,7 @@ export const useTokens = () => {
       'gpt-4-turbo': 'GPT-4 Turbo',
       'claude-3-haiku-20240307': 'Claude 3 Haiku',
       // DeepSeek Models
-      'deepseek-chat-v3': 'DeepSeek Chat V3',
+      'deepseek-chat': 'DeepSeek Chat V3',
       'deepseek-reasoner': 'DeepSeek Reasoner',
       'llama-4-scout-17b': 'LLaMA 4 Scout 17B',
       'mixtral-8x7b-instruct': 'Mixtral 8x7b Instruct',

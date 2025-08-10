@@ -27,7 +27,7 @@ const models: Model[] = [
   { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', provider: 'Anthropic', category: 'standard' },
   
   // DeepSeek Models
-  { id: 'deepseek-chat-v3', name: 'DeepSeek Chat V3', provider: 'DeepSeek', category: 'premium' },
+  { id: 'deepseek-chat', name: 'DeepSeek Chat V3', provider: 'DeepSeek', category: 'premium' },
   { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', provider: 'DeepSeek', category: 'premium' },
   
   // APILLM Models
