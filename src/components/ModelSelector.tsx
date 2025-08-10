@@ -26,6 +26,13 @@ const models: Model[] = [
   { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', provider: 'Anthropic', category: 'fast' },
   { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', provider: 'Anthropic', category: 'standard' },
   
+  // DeepSeek Models
+  { id: 'deepseek-chat-v3', name: 'DeepSeek Chat V3', provider: 'DeepSeek', category: 'premium' },
+  { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', provider: 'DeepSeek', category: 'premium' },
+  { id: 'llama-4-scout-17b', name: 'LLaMA 4 Scout 17B', provider: 'DeepSeek', category: 'standard' },
+  { id: 'mixtral-8x7b-instruct', name: 'Mixtral 8x7b Instruct', provider: 'DeepSeek', category: 'standard' },
+  { id: 'qwen-2.5-72b-chat', name: 'Qwen 2.5 72B Chat', provider: 'DeepSeek', category: 'standard' },
+  
   // xAI Models
   { id: 'grok-beta', name: 'Grok Beta', provider: 'xAI', category: 'standard' },
   

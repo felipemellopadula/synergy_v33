@@ -12,6 +12,12 @@ const MODEL_COSTS = {
   'gpt-4o-mini': 2000,
   'gpt-4-turbo': 10000,
   'claude-3-haiku-20240307': 2000,
+  // DeepSeek Models
+  'deepseek-chat-v3': 8000,
+  'deepseek-reasoner': 12000,
+  'llama-4-scout-17b': 6000,
+  'mixtral-8x7b-instruct': 5000,
+  'qwen-2.5-72b-chat': 7000,
 } as const;
 
 export const useTokens = () => {
@@ -120,6 +126,12 @@ export const useTokens = () => {
       'gpt-4o-mini': 'GPT-4o Mini',
       'gpt-4-turbo': 'GPT-4 Turbo',
       'claude-3-haiku-20240307': 'Claude 3 Haiku',
+      // DeepSeek Models
+      'deepseek-chat-v3': 'DeepSeek Chat V3',
+      'deepseek-reasoner': 'DeepSeek Reasoner',
+      'llama-4-scout-17b': 'LLaMA 4 Scout 17B',
+      'mixtral-8x7b-instruct': 'Mixtral 8x7b Instruct',
+      'qwen-2.5-72b-chat': 'Qwen 2.5 72B Chat',
     };
     
     return displayNames[modelName] || modelName;
