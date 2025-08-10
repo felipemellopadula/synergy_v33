@@ -16,9 +16,8 @@ const MODEL_COSTS = {
   'deepseek-chat': 8000,
   'deepseek-reasoner': 12000,
   // APILLM Models
-  'llama-4-scout-17b': 6000,
-  'mixtral-8x7b-instruct': 5000,
-  'qwen-2.5-72b-chat': 7000,
+  'Llama-4-Maverick-17B-128E-Instruct-FP8': 8000,
+  'Llama-4-Scout-17B-16E-Instruct-FP8': 6000,
 } as const;
 
 export const useTokens = () => {
@@ -131,9 +130,8 @@ export const useTokens = () => {
       'deepseek-chat': 'DeepSeek Chat V3',
       'deepseek-reasoner': 'DeepSeek Reasoner',
       // APILLM Models
-      'llama-4-scout-17b': 'LLaMA 4 Scout 17B',
-      'mixtral-8x7b-instruct': 'Mixtral 8x7b Instruct',
-      'qwen-2.5-72b-chat': 'Qwen 2.5 72B Chat',
+      'Llama-4-Maverick-17B-128E-Instruct-FP8': 'Llama 4 Maverick',
+      'Llama-4-Scout-17B-16E-Instruct-FP8': 'Llama 4 Scout',
     };
     
     return displayNames[modelName] || modelName;
