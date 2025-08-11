@@ -258,7 +258,11 @@ const callAPILLM = async (message: string, model: string): Promise<string> => {
   console.log('=== APILLM DEBUG ===');
   console.log('Model requested:', model);
   console.log('API Key exists:', !!apiKey);
-  console.log('API Key length:', apiKey?.length || 0);
+  console.log('API Key first 10 chars:', apiKey?.substring(0, 10) || 'none');
+  
+  if (!apiKey) {
+    throw new Error('APILLM API key not found');
+  }
   
   const requestBody = {
     model,
@@ -278,55 +282,39 @@ const callAPILLM = async (message: string, model: string): Promise<string> => {
   
   console.log('Request body:', JSON.stringify(requestBody, null, 2));
   
-  // Try different possible endpoints for APILLM
-  let response;
-  const endpoints = [
-    'https://api.apillm.com/v1/chat/completions',
-    'https://console.apillm.com/v1/chat/completions', 
-    'https://api.apillm.com/chat/completions'
-  ];
-  
-  let lastError = '';
-  
-  for (const endpoint of endpoints) {
-    console.log('Trying endpoint:', endpoint);
-    try {
-      response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      });
-      
-      console.log(`Endpoint ${endpoint} - Status:`, response.status);
-      
-      if (response.ok) {
-        console.log(`Success with endpoint: ${endpoint}`);
-        break;
-      } else {
-        const errorText = await response.text();
-        console.log(`Endpoint ${endpoint} failed with:`, errorText);
-        lastError = errorText;
-      }
-    } catch (error) {
-      console.log(`Endpoint ${endpoint} error:`, error.message);
-      lastError = error.message;
+  try {
+    // Based on the Meta Llama API documentation, try the correct endpoint
+    const response = await fetch('https://api.llama-api.com/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('APILLM API error response:', errorText);
+      throw new Error(`APILLM API error (${response.status}): ${errorText}`);
     }
+
+    const data = await response.json();
+    console.log('APILLM response data:', JSON.stringify(data, null, 2));
+    
+    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
+      console.error('Invalid response structure:', data);
+      throw new Error('Invalid response structure from APILLM API');
+    }
+    
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error('Error calling APILLM:', error);
+    throw error;
   }
-
-  if (!response || !response.ok) {
-    console.error('All APILLM endpoints failed. Last error:', lastError);
-    throw new Error(`APILLM API error - all endpoints failed. Last error: ${lastError}`);
-  }
-
-  console.log('Response status:', response.status);
-  console.log('Response headers:', Object.fromEntries(response.headers.entries()));
-
-  const data = await response.json();
-  console.log('APILLM response data:', JSON.stringify(data, null, 2));
-  return data.choices[0].message.content;
 };
 
 serve(async (req) => {
