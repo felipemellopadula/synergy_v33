@@ -74,6 +74,15 @@ const performWebSearch = async (query: string): Promise<string | null> => {
 const callOpenAI = async (message: string, model: string, files?: Array<{name: string; type: string; data: string; pdfContent?: string}>): Promise<ReadableStream> => {
   const apiKey = Deno.env.get('OPENAI_API_KEY');
   
+  console.log('=== OPENAI DEBUG ===');
+  console.log('Model requested:', model);
+  console.log('Files count:', files?.length || 0);
+  if (files && files.length > 0) {
+    files.forEach((file, index) => {
+      console.log(`File ${index}: ${file.name}, type: ${file.type}, has pdfContent: ${!!file.pdfContent}`);
+    });
+  }
+  
   // Verificar se precisa de busca na web
   const searchCheckResponse = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
@@ -203,11 +212,16 @@ const callOpenAI = async (message: string, model: string, files?: Array<{name: s
     }),
   });
 
+  console.log('OpenAI request sent for model:', model);
+  console.log('Response status:', response.status);
+
   if (!response.ok) {
     const error = await response.text();
+    console.error('OpenAI API error:', response.status, '-', error);
     throw new Error(`OpenAI API error: ${error}`);
   }
 
+  console.log('OpenAI response received successfully');
   return response.body!;
 };
 
