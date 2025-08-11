@@ -275,11 +275,19 @@ const Chat = () => {
           setConversations((prev) => [data as any, ...prev]);
         }
       } else {
+        const currentConv = conversations.find(c => c.id === currentConversationId);
+        const shouldRename =
+          !currentConv ||
+          currentConv.title === 'Nova conversa' ||
+          (Array.isArray(currentConv.messages) && (currentConv.messages as any[]).length === 0);
+        const updatePayload: any = { messages: serial };
+        if (shouldRename && finalMessages.some(m => m.sender === 'user')) {
+          updatePayload.title = deriveTitle(finalMessages);
+        }
+
         const { data, error } = await supabase
           .from('chat_conversations')
-          .update({
-            messages: serial,
-          })
+          .update(updatePayload)
           .eq('id', currentConversationId)
           .select('*')
           .single();
@@ -522,6 +530,7 @@ const Chat = () => {
     setProcessedPdfs(new Map());
     setExpandedReasoning({});
     setIsWebSearchMode(false);
+    setMessages([]);
 
     // Create and persist a brand-new empty conversation
     setCurrentConversationId(null);
