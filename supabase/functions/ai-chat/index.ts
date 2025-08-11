@@ -123,14 +123,14 @@ const callOpenAI = async (message: string, model: string, files?: Array<{name: s
     }
   }
   
-  // Define max tokens based on model - use conservative limits
-  let maxTokens = 4096; // Safe default for all models
+  // Define max tokens based on model - set to provider maximums where known
+  let maxTokens = 8192; // Safe default
   if (model.includes('gpt-4o')) {
-    maxTokens = 4096; // Conservative limit for GPT-4o
+    maxTokens = 32768; // GPT-4o max output tokens
   } else if (model.includes('gpt-4.1')) {
-    maxTokens = 16384; // GPT-4.1 series max output
+    maxTokens = 32768; // GPT-4.1 series max output tokens
   } else if (model.includes('o4-mini')) {
-    maxTokens = 65536; // o4 mini max output
+    maxTokens = 65536; // o4-mini max output tokens
   }
 
   // Add reasoning support for o4 models
