@@ -71,7 +71,7 @@ const getCategoryColor = (category: Model['category']) => {
 
 const getProviderIcon = (provider: string) => {
   const iconMap: Record<string, string> = {
-    'Synergy': '/lovable-uploads/d230266a-9838-4146-8419-5da8be550937.png',
+    'Synergy': '/lovable-uploads/3f22acfa-6c56-4617-a7f6-cfe77f357e89.png',
     'OpenAI': '/images/logos/openai.svg',
     'Anthropic': '/images/logos/anthropic.svg',
     'Google': '/images/logos/gemini.svg',
@@ -119,11 +119,16 @@ export const ModelSelector = ({ onModelSelect, selectedModel }: ModelSelectorPro
                       <div className="flex flex-col items-start min-w-0">
                         {model.id === 'synergy-ia' ? (
                           <span className="text-sm truncate font-bold flex items-center">
-                            <img
-                              src="/lovable-uploads/d230266a-9838-4146-8419-5da8be550937.png"
-                              alt="Ícone SynergyIA"
-                              className="w-4 h-4 mr-2"
-                            />
+                            <div className="w-5 h-5 rounded-md bg-muted/50 border border-border flex items-center justify-center overflow-hidden mr-2">
+                              <img
+                                src="/lovable-uploads/3f22acfa-6c56-4617-a7f6-cfe77f357e89.png"
+                                alt="Ícone SynergyIA"
+                                className="w-3.5 h-3.5 object-contain"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            </div>
                             SynergyIA
                           </span>
                         ) : (
