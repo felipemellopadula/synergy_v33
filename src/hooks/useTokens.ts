@@ -21,6 +21,10 @@ const MODEL_COSTS = {
   'gpt-4.1-nano': 1000, // $0.2 entrada + $0.8 saída (ajuste fino)
   'o4-mini': 8000, // $4 entrada + $16 saída (ajuste fino)
   'claude-3-haiku-20240307': 2000,
+  // Google Gemini Models
+  'gemini-2.5-pro-002': 12000,
+  'gemini-2.5-flash-002': 4000,
+  'gemini-2.5-flash-lite-001': 1500,
   // DeepSeek Models
   'deepseek-chat': 8000,
   'deepseek-reasoner': 12000,
@@ -153,6 +157,10 @@ export const useTokens = () => {
       'grok-3': 'Grok 3', 
       'grok-3-mini': 'Grok 3 Mini',
       'claude-3-haiku-20240307': 'Claude 3 Haiku',
+      // Google Gemini Models
+      'gemini-2.5-pro-002': 'Gemini 2.5 Pro',
+      'gemini-2.5-flash-002': 'Gemini 2.5 Flash',
+      'gemini-2.5-flash-lite-001': 'Gemini 2.5 Flash-Lite',
       // DeepSeek Models
       'deepseek-chat': 'DeepSeek Chat V3',
       'deepseek-reasoner': 'DeepSeek Reasoner',
