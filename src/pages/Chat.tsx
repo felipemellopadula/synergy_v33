@@ -440,6 +440,7 @@ const Chat = () => {
         // If it's a PDF, include the processed content
         if (file.type === 'application/pdf') {
           const pdfContent = processedPdfs.get(file.name);
+          console.log(`PDF ${file.name} has content:`, !!pdfContent, 'length:', pdfContent?.length || 0);
           return {
             ...baseData,
             pdfContent: pdfContent || '',
@@ -449,6 +450,8 @@ const Chat = () => {
         return baseData;
       })
     );
+
+    console.log('Sending files to AI:', fileData.map(f => ({ name: f.name, type: f.type, hasPdfContent: !!(f as any).pdfContent })));
 
     const userMessage: Message = {
       id: Date.now().toString(),

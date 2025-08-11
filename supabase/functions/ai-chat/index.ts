@@ -283,7 +283,20 @@ const callAnthropic = async (message: string, model: string, files?: Array<{name
 };
 
 const callGoogleAI = async (message: string, model: string, files?: Array<{name: string; type: string; data: string; pdfContent?: string}>): Promise<string> => {
+  console.log('=== GOOGLE AI DEBUG ===');
+  console.log('Model requested:', model);
+  console.log('Files count:', files?.length || 0);
+  if (files) {
+    files.forEach((file, index) => {
+      console.log(`File ${index}: ${file.name}, type: ${file.type}, has pdfContent: ${!!file.pdfContent}`);
+      if (file.pdfContent) {
+        console.log(`PDF content length: ${file.pdfContent.length}`);
+      }
+    });
+  }
+  
   const apiKey = Deno.env.get('GOOGLE_API_KEY');
+  console.log('Google API key exists:', !!apiKey);
   
   // Gemini models have up to 2M context window and up to 8192 output tokens
   const maxOutputTokens = 8192;
@@ -338,10 +351,12 @@ const callGoogleAI = async (message: string, model: string, files?: Array<{name:
 
   if (!response.ok) {
     const error = await response.text();
+    console.error(`Google AI API error: ${response.status} - ${error}`);
     throw new Error(`Google AI API error: ${error}`);
   }
 
   const data = await response.json();
+  console.log('Google AI response received:', !!data.candidates);
   return data.candidates[0].content.parts[0].text;
 };
 
