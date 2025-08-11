@@ -57,6 +57,19 @@ const getCategoryColor = (category: Model['category']) => {
   }
 };
 
+const getProviderIcon = (provider: string) => {
+  const iconMap: Record<string, string> = {
+    'OpenAI': '/images/logos/openai.svg',
+    'Anthropic': '/images/logos/anthropic.svg', 
+    'Google': '/images/logos/google.svg',
+    'DeepSeek': '/images/logos/deepseek.svg',
+    'xAI': '/images/logos/xai.svg',
+    'Meta': '/images/logos/meta.svg',
+    'APILLM': '/images/logos/apillm.svg',
+  };
+  return iconMap[provider] || '/images/logos/openai.svg';
+};
+
 export const ModelSelector = ({ onModelSelect, selectedModel }: ModelSelectorProps) => {
   return (
     <div className="w-full max-w-sm">
@@ -72,13 +85,22 @@ export const ModelSelector = ({ onModelSelect, selectedModel }: ModelSelectorPro
               className="cursor-pointer hover:bg-accent"
             >
               <div className="flex items-center justify-between w-full">
-                <div className="flex flex-col items-start">
-                  <span className="font-medium">{model.name}</span>
-                  <span className="text-xs text-muted-foreground">{model.provider}</span>
+                <div className="flex items-center space-x-3">
+                  <div className="w-8 h-8 rounded-lg bg-background border border-border flex items-center justify-center overflow-hidden flex-shrink-0">
+                    <img 
+                      src={getProviderIcon(model.provider)} 
+                      alt={`${model.provider} logo`}
+                      className="w-6 h-6 object-contain"
+                    />
+                  </div>
+                  <div className="flex flex-col items-start min-w-0">
+                    <span className="font-medium text-sm truncate">{model.name}</span>
+                    <span className="text-xs text-muted-foreground truncate">{model.provider}</span>
+                  </div>
                 </div>
                 <Badge 
                   variant="secondary" 
-                  className={`ml-2 text-xs ${getCategoryColor(model.category)}`}
+                  className={`ml-2 text-xs flex-shrink-0 ${getCategoryColor(model.category)}`}
                 >
                   {model.category}
                 </Badge>
