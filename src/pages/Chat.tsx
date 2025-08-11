@@ -86,6 +86,13 @@ const Chat = () => {
     }
   }, [user, loading]);
 
+  // Select default model on page load if none
+  useEffect(() => {
+    if (!selectedModel) {
+      setSelectedModel('synergy-ia');
+    }
+  }, [selectedModel]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">

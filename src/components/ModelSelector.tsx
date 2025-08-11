@@ -15,6 +15,9 @@ interface Model {
 }
 
 const modelsByProvider = {
+  'Synergy': [
+    { id: 'synergy-ia', name: 'SynergyIA', provider: 'Synergy', category: 'premium' as const },
+  ],
   'OpenAI': [
     { id: 'gpt-5', name: 'GPT-5', provider: 'OpenAI', category: 'premium' as const },
     { id: 'gpt-5-mini', name: 'GPT-5 Mini', provider: 'OpenAI', category: 'standard' as const },
@@ -68,6 +71,7 @@ const getCategoryColor = (category: Model['category']) => {
 
 const getProviderIcon = (provider: string) => {
   const iconMap: Record<string, string> = {
+    'Synergy': '/lovable-uploads/d230266a-9838-4146-8419-5da8be550937.png',
     'OpenAI': '/images/logos/openai.svg',
     'Anthropic': '/images/logos/anthropic.svg',
     'Google': '/images/logos/gemini.svg',
@@ -111,7 +115,18 @@ export const ModelSelector = ({ onModelSelect, selectedModel }: ModelSelectorPro
                         />
                       </div>
                       <div className="flex flex-col items-start min-w-0">
-                        <span className="font-medium text-sm truncate">{model.name}</span>
+                        {model.id === 'synergy-ia' ? (
+                          <span className="text-sm truncate font-bold flex items-center">
+                            <img
+                              src="/lovable-uploads/d230266a-9838-4146-8419-5da8be550937.png"
+                              alt="Ícone SynergyIA"
+                              className="w-4 h-4 mr-2"
+                            />
+                            SynergyIA
+                          </span>
+                        ) : (
+                          <span className="font-medium text-sm truncate">{model.name}</span>
+                        )}
                       </div>
                     </div>
                     <Badge

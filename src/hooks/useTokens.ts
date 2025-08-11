@@ -5,6 +5,8 @@ import { useToast } from '@/hooks/use-toast';
 
 // Model token costs
 const MODEL_COSTS = {
+  // Synergy model
+  'synergy-ia': 5000,
   // Claude 4 models (Anthropic)
   'claude-opus-4-20250514': 15000,
   'claude-sonnet-4-20250514': 10000,
@@ -142,6 +144,8 @@ export const useTokens = () => {
 
   const getModelDisplayName = useCallback((modelName: string): string => {
     const displayNames: Record<string, string> = {
+      // Synergy
+      'synergy-ia': 'SynergyIA',
       // OpenAI Models
       'gpt-5': 'GPT-5',
       'gpt-5-mini': 'GPT-5 Mini', 
