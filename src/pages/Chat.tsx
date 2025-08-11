@@ -19,6 +19,16 @@ interface Message {
   model?: string;
 }
 
+interface ChatConversation {
+  id: string;
+  user_id: string;
+  title: string;
+  messages: any[];
+  is_favorite: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 const Chat = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -383,7 +393,7 @@ const Chat = () => {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => navigate('/')}
+              onClick={() => navigate('/dashboard')}
               className="flex items-center gap-2 hover:bg-muted"
             >
               <ArrowLeft className="h-4 w-4" />
