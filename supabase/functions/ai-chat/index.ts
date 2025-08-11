@@ -375,15 +375,37 @@ const callXAI = async (message: string, model: string, files?: Array<{name: stri
   // Grok models have up to 128k context and can output up to 4096 tokens
   const maxTokens = 4096;
   
+  // Prepare content with file support
+  let finalMessage = message;
+  
+  if (files && files.length > 0) {
+    console.log('Processing files for XAI:', files.length);
+    const fileContents = [];
+    
+    for (const file of files) {
+      if (file.type.includes('pdf') && file.pdfContent) {
+        fileContents.push(`[Conteúdo do PDF: ${file.name}]\n\n${file.pdfContent}`);
+      } else if (file.type.includes('pdf') || file.type.includes('word') || file.type.includes('document')) {
+        fileContents.push(`[Arquivo anexado: ${file.name}]\nNota: Por favor, extraia o texto do documento e envie novamente.`);
+      } else if (file.type.startsWith('image/')) {
+        fileContents.push(`[Imagem anexada: ${file.name}]\nNota: Grok ainda não suporta análise de imagens.`);
+      }
+    }
+    
+    if (fileContents.length > 0) {
+      finalMessage = `${message}\n\n${fileContents.join('\n\n')}`;
+    }
+  }
+  
   const requestBody = {
     messages: [
       {
         role: 'system',
-        content: 'Você é um assistente útil em português. Sempre responda em português.'
+        content: 'Você é um assistente útil em português. Sempre responda em português. Se receber conteúdo de PDFs, analise-os completamente e forneça informações detalhadas.'
       },
       {
         role: 'user', 
-        content: message
+        content: finalMessage
       }
     ],
     model,
@@ -434,6 +456,28 @@ const callDeepSeek = async (message: string, model: string, files?: Array<{name:
   // DeepSeek models can handle up to 8192 output tokens
   const maxTokens = 8192;
   
+  // Prepare content with file support
+  let finalMessage = message;
+  
+  if (files && files.length > 0) {
+    console.log('Processing files for DeepSeek:', files.length);
+    const fileContents = [];
+    
+    for (const file of files) {
+      if (file.type.includes('pdf') && file.pdfContent) {
+        fileContents.push(`[Conteúdo do PDF: ${file.name}]\n\n${file.pdfContent}`);
+      } else if (file.type.includes('pdf') || file.type.includes('word') || file.type.includes('document')) {
+        fileContents.push(`[Arquivo anexado: ${file.name}]\nNota: Por favor, extraia o texto do documento e envie novamente.`);
+      } else if (file.type.startsWith('image/')) {
+        fileContents.push(`[Imagem anexada: ${file.name}]\nNota: DeepSeek ainda não suporta análise de imagens.`);
+      }
+    }
+    
+    if (fileContents.length > 0) {
+      finalMessage = `${message}\n\n${fileContents.join('\n\n')}`;
+    }
+  }
+  
   const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -445,11 +489,11 @@ const callDeepSeek = async (message: string, model: string, files?: Array<{name:
       messages: [
         {
           role: 'system',
-          content: 'Você é um assistente útil em português. Sempre responda em português.'
+          content: 'Você é um assistente útil em português. Sempre responda em português. Se receber conteúdo de PDFs, analise-os completamente e forneça informações detalhadas.'
         },
         {
           role: 'user',
-          content: message
+          content: finalMessage
         }
       ],
       max_tokens: maxTokens,
@@ -491,16 +535,38 @@ const callAPILLM = async (message: string, model: string, files?: Array<{name: s
   // Llama-4 models can handle up to 4096 output tokens
   const maxTokens = 4096;
   
+  // Prepare content with file support
+  let finalMessage = message;
+  
+  if (files && files.length > 0) {
+    console.log('Processing files for APILLM:', files.length);
+    const fileContents = [];
+    
+    for (const file of files) {
+      if (file.type.includes('pdf') && file.pdfContent) {
+        fileContents.push(`[Conteúdo do PDF: ${file.name}]\n\n${file.pdfContent}`);
+      } else if (file.type.includes('pdf') || file.type.includes('word') || file.type.includes('document')) {
+        fileContents.push(`[Arquivo anexado: ${file.name}]\nNota: Por favor, extraia o texto do documento e envie novamente.`);
+      } else if (file.type.startsWith('image/')) {
+        fileContents.push(`[Imagem anexada: ${file.name}]\nNota: APILLM ainda não suporta análise de imagens.`);
+      }
+    }
+    
+    if (fileContents.length > 0) {
+      finalMessage = `${message}\n\n${fileContents.join('\n\n')}`;
+    }
+  }
+  
   const requestBody = {
     model: apiModel,
     messages: [
       {
         role: 'system',
-        content: 'Você é um assistente útil em português. Sempre responda em português.'
+        content: 'Você é um assistente útil em português. Sempre responda em português. Se receber conteúdo de PDFs, analise-os completamente e forneça informações detalhadas.'
       },
       {
         role: 'user',
-        content: message
+        content: finalMessage
       }
     ],
     max_tokens: maxTokens,
