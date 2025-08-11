@@ -22,6 +22,7 @@ interface AuthContextType {
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, name: string, phone?: string) => Promise<{ error: any }>;
   signInWithGoogle: () => Promise<{ error: any }>;
+  signInWithFacebook: () => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   updateProfile: (updates: Partial<Profile>) => Promise<{ error: any }>;
   refreshProfile: () => Promise<void>;
@@ -54,13 +55,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return name || 'Usuário';
   };
 
-  // Helper: extract avatar URL from Google/Supabase metadata
+  // Helper: extract avatar URL from OAuth/Supabase metadata
   const extractAvatarFromUser = (u?: User | null): string | null => {
     if (!u) return null;
     const md: any = u.user_metadata || {};
     const identities: any[] = (u as any).identities || [];
-    const googleIdentity = identities.find((i: any) => i.provider === 'google');
-    const fromIdentity = googleIdentity?.identity_data?.avatar_url || googleIdentity?.identity_data?.picture;
+    const facebook = identities.find((i: any) => i.provider === 'facebook');
+    const google = identities.find((i: any) => i.provider === 'google');
+    const fromIdentity =
+      facebook?.identity_data?.avatar_url ||
+      facebook?.identity_data?.picture ||
+      google?.identity_data?.avatar_url ||
+      google?.identity_data?.picture;
     return md.avatar_url || md.picture || fromIdentity || null;
   };
 
@@ -230,6 +236,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return { error };
   };
 
+  const signInWithFacebook = async () => {
+    const redirectUrl = `${window.location.origin}/dashboard`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'facebook',
+      options: {
+        redirectTo: redirectUrl,
+      }
+    });
+    return { error };
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
   };
@@ -257,6 +274,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signIn,
     signUp,
     signInWithGoogle,
+    signInWithFacebook,
     signOut,
     updateProfile,
     refreshProfile,
