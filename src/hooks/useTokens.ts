@@ -8,7 +8,7 @@ const MODEL_COSTS = {
   // Claude 4 models (Anthropic)
   'claude-opus-4-1-20250805': 15000,
   'claude-sonnet-4-20250514': 10000,
-  'grok-beta': 10000,
+  'grok-2-1212': 10000,
   'gpt-5': 12000,
   'gpt-5-mini': 3000,
   'gpt-5-nano': 1000,
@@ -135,7 +135,7 @@ export const useTokens = () => {
       'gpt-5-nano': 'GPT-5 Nano',
       'claude-opus-4-1-20250805': 'Claude Opus 4.1',
       'claude-sonnet-4-20250514': 'Claude Sonnet 4',
-      'grok-beta': 'Grok',
+      'grok-2-1212': 'Grok 2',
       'claude-3-haiku-20240307': 'Claude 3 Haiku',
       // DeepSeek Models
       'deepseek-chat': 'DeepSeek Chat V3',

@@ -33,7 +33,7 @@ const modelsByProvider = {
     { id: 'Llama-4-Scout-17B-16E-Instruct-FP8', name: 'Llama 4 Scout', provider: 'APILLM', category: 'standard' as const },
   ],
   'xAI': [
-    { id: 'grok-beta', name: 'Grok Beta', provider: 'xAI', category: 'standard' as const },
+    { id: 'grok-2-1212', name: 'Grok 2', provider: 'xAI', category: 'premium' as const },
   ],
   'Google': [
     { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash', provider: 'Google', category: 'fast' as const },
