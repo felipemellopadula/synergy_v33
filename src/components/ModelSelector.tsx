@@ -62,7 +62,7 @@ const getProviderIcon = (provider: string) => {
   const iconMap: Record<string, string> = {
     'OpenAI': '/images/logos/openai.svg',
     'Anthropic': '/images/logos/anthropic.svg',
-    'Google': '/images/logos/google.svg',
+    'Google': '/images/logos/gemini.svg',
     'DeepSeek': '/images/logos/deepseek.svg',
     'xAI': '/images/logos/xai.svg',
     'Meta': '/images/logos/meta.svg',
