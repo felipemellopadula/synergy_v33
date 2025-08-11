@@ -6,15 +6,20 @@ import { useToast } from '@/hooks/use-toast';
 // Model token costs
 const MODEL_COSTS = {
   // Claude 4 models (Anthropic)
-  'claude-opus-4-1-20250805': 15000,
+  'claude-opus-4-20250514': 15000,
   'claude-sonnet-4-20250514': 10000,
+  'claude-3-5-haiku-20241022': 2500,
   'grok-4-0709': 15000,
   'grok-3': 10000,
   'grok-3-mini': 3000,
-  'gpt-4.1-2025-04-14': 12000,
-  'o3-2025-04-16': 20000,
-  'o4-mini-2025-04-16': 5000,
-  'gpt-4.1-mini-2025-04-14': 3000,
+  // OpenAI Models baseado na documentação oficial
+  'gpt-5': 25000, // $1.25 entrada + $10 saída (média)
+  'gpt-5-mini': 5625, // $0.25 entrada + $2 saída (média)
+  'gpt-5-nano': 1125, // $0.05 entrada + $0.4 saída (média)
+  'gpt-4.1': 15000, // $3 entrada + $12 saída (ajuste fino)
+  'gpt-4.1-mini': 4000, // $0.8 entrada + $3.2 saída (ajuste fino)
+  'gpt-4.1-nano': 1000, // $0.2 entrada + $0.8 saída (ajuste fino)
+  'o4-mini': 8000, // $4 entrada + $16 saída (ajuste fino)
   'claude-3-haiku-20240307': 2000,
   // DeepSeek Models
   'deepseek-chat': 8000,
@@ -133,12 +138,17 @@ export const useTokens = () => {
 
   const getModelDisplayName = useCallback((modelName: string): string => {
     const displayNames: Record<string, string> = {
-      'gpt-4.1-2025-04-14': 'GPT-4.1',
-      'o3-2025-04-16': 'o3 Reasoning',
-      'o4-mini-2025-04-16': 'o4 Mini',
-      'gpt-4.1-mini-2025-04-14': 'GPT-4.1 Mini',
-      'claude-opus-4-1-20250805': 'Claude Opus 4.1',
+      // OpenAI Models
+      'gpt-5': 'GPT-5',
+      'gpt-5-mini': 'GPT-5 Mini', 
+      'gpt-5-nano': 'GPT-5 Nano',
+      'gpt-4.1': 'GPT-4.1',
+      'gpt-4.1-mini': 'GPT-4.1 Mini',
+      'gpt-4.1-nano': 'GPT-4.1 Nano', 
+      'o4-mini': 'o4 Mini',
+      'claude-opus-4-20250514': 'Claude Opus 4',
       'claude-sonnet-4-20250514': 'Claude Sonnet 4',
+      'claude-3-5-haiku-20241022': 'Claude 3.5 Haiku',
       'grok-4-0709': 'Grok 4',
       'grok-3': 'Grok 3', 
       'grok-3-mini': 'Grok 3 Mini',

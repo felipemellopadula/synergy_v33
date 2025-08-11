@@ -16,14 +16,18 @@ interface Model {
 
 const modelsByProvider = {
   'OpenAI': [
-    { id: 'gpt-4.1-2025-04-14', name: 'GPT-4.1', provider: 'OpenAI', category: 'premium' as const },
-    { id: 'o3-2025-04-16', name: 'o3', provider: 'OpenAI', category: 'premium' as const },
-    { id: 'o4-mini-2025-04-16', name: 'o4 Mini', provider: 'OpenAI', category: 'fast' as const },
-    { id: 'gpt-4.1-mini-2025-04-14', name: 'GPT-4.1 Mini', provider: 'OpenAI', category: 'fast' as const },
+    { id: 'gpt-5', name: 'GPT-5', provider: 'OpenAI', category: 'premium' as const },
+    { id: 'gpt-5-mini', name: 'GPT-5 Mini', provider: 'OpenAI', category: 'standard' as const },
+    { id: 'gpt-5-nano', name: 'GPT-5 Nano', provider: 'OpenAI', category: 'fast' as const },
+    { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI', category: 'premium' as const },
+    { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', provider: 'OpenAI', category: 'standard' as const },
+    { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', provider: 'OpenAI', category: 'fast' as const },
+    { id: 'o4-mini', name: 'o4 Mini', provider: 'OpenAI', category: 'fast' as const },
   ],
   'Anthropic': [
-    { id: 'claude-opus-4-1-20250805', name: 'Claude Opus 4.1', provider: 'Anthropic', category: 'premium' as const },
+    { id: 'claude-opus-4-20250514', name: 'Claude Opus 4', provider: 'Anthropic', category: 'premium' as const },
     { id: 'claude-sonnet-4-20250514', name: 'Claude Sonnet 4', provider: 'Anthropic', category: 'premium' as const },
+    { id: 'claude-3-5-haiku-20241022', name: 'Claude 3.5 Haiku', provider: 'Anthropic', category: 'fast' as const },
   ],
   'DeepSeek': [
     { id: 'deepseek-chat', name: 'DeepSeek Chat V3', provider: 'DeepSeek', category: 'premium' as const },
