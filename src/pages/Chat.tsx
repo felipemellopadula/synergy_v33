@@ -642,7 +642,7 @@ const Chat = () => {
       {/* Body */}
       <div className="flex-1 flex min-h-0">
         {/* Conversations Sidebar */}
-        <aside className="w-72 border-r border-border bg-background hidden md:flex md:flex-col">
+        <aside className="w-72 border-r border-border bg-background hidden md:flex md:flex-col min-h-0">
           <div className="p-3">
             <input
               placeholder="Pesquisar conversas..."
