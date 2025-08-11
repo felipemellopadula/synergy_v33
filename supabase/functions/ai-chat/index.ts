@@ -200,7 +200,7 @@ const callOpenAI = async (message: string, model: string, files?: Array<{name: s
     body: JSON.stringify({
       model,
       messages,
-      max_completion_tokens: maxTokens,
+      max_tokens: maxTokens,
       stream: true, // Enable streaming
       // Add reasoning options for o4 models  
       ...(model.includes('o4') ? {
