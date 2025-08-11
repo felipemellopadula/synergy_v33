@@ -16,9 +16,10 @@ interface Model {
 
 const modelsByProvider = {
   'OpenAI': [
-    { id: 'gpt-5', name: 'GPT-5', provider: 'OpenAI', category: 'premium' as const },
-    { id: 'gpt-5-mini', name: 'GPT-5 Mini', provider: 'OpenAI', category: 'fast' as const },
-    { id: 'gpt-5-nano', name: 'GPT-5 Nano', provider: 'OpenAI', category: 'fast' as const },
+    { id: 'gpt-4.1-2025-04-14', name: 'GPT-4.1', provider: 'OpenAI', category: 'premium' as const },
+    { id: 'o3-2025-04-16', name: 'o3', provider: 'OpenAI', category: 'premium' as const },
+    { id: 'o4-mini-2025-04-16', name: 'o4 Mini', provider: 'OpenAI', category: 'fast' as const },
+    { id: 'gpt-4.1-mini-2025-04-14', name: 'GPT-4.1 Mini', provider: 'OpenAI', category: 'fast' as const },
   ],
   'Anthropic': [
     { id: 'claude-opus-4-1-20250805', name: 'Claude Opus 4.1', provider: 'Anthropic', category: 'premium' as const },
@@ -33,7 +34,9 @@ const modelsByProvider = {
     { id: 'Llama-4-Scout-17B-16E-Instruct-FP8', name: 'Llama 4 Scout', provider: 'APILLM', category: 'standard' as const },
   ],
   'xAI': [
-    { id: 'grok-2-1212', name: 'Grok 2', provider: 'xAI', category: 'premium' as const },
+    { id: 'grok-4-0709', name: 'Grok 4', provider: 'xAI', category: 'premium' as const },
+    { id: 'grok-3', name: 'Grok 3', provider: 'xAI', category: 'standard' as const },
+    { id: 'grok-3-mini', name: 'Grok 3 Mini', provider: 'xAI', category: 'fast' as const },
   ],
   'Google': [
     { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash', provider: 'Google', category: 'fast' as const },

@@ -8,10 +8,13 @@ const MODEL_COSTS = {
   // Claude 4 models (Anthropic)
   'claude-opus-4-1-20250805': 15000,
   'claude-sonnet-4-20250514': 10000,
-  'grok-2-1212': 10000,
-  'gpt-5': 12000,
-  'gpt-5-mini': 3000,
-  'gpt-5-nano': 1000,
+  'grok-4-0709': 15000,
+  'grok-3': 10000,
+  'grok-3-mini': 3000,
+  'gpt-4.1-2025-04-14': 12000,
+  'o3-2025-04-16': 20000,
+  'o4-mini-2025-04-16': 5000,
+  'gpt-4.1-mini-2025-04-14': 3000,
   'claude-3-haiku-20240307': 2000,
   // DeepSeek Models
   'deepseek-chat': 8000,
@@ -130,12 +133,15 @@ export const useTokens = () => {
 
   const getModelDisplayName = useCallback((modelName: string): string => {
     const displayNames: Record<string, string> = {
-      'gpt-5': 'GPT-5',
-      'gpt-5-mini': 'GPT-5 Mini',
-      'gpt-5-nano': 'GPT-5 Nano',
+      'gpt-4.1-2025-04-14': 'GPT-4.1',
+      'o3-2025-04-16': 'o3 Reasoning',
+      'o4-mini-2025-04-16': 'o4 Mini',
+      'gpt-4.1-mini-2025-04-14': 'GPT-4.1 Mini',
       'claude-opus-4-1-20250805': 'Claude Opus 4.1',
       'claude-sonnet-4-20250514': 'Claude Sonnet 4',
-      'grok-2-1212': 'Grok 2',
+      'grok-4-0709': 'Grok 4',
+      'grok-3': 'Grok 3', 
+      'grok-3-mini': 'Grok 3 Mini',
       'claude-3-haiku-20240307': 'Claude 3 Haiku',
       // DeepSeek Models
       'deepseek-chat': 'DeepSeek Chat V3',

@@ -17,7 +17,7 @@ interface ChatRequest {
 }
 
 const getApiKey = (model: string): string | null => {
-  if (model.includes('gpt-5')) {
+  if (model.includes('gpt-4.1') || model.includes('o3') || model.includes('o4')) {
     return Deno.env.get('OPENAI_API_KEY');
   }
   if (model.includes('claude')) {
@@ -114,11 +114,13 @@ const callOpenAI = async (message: string, model: string, files?: Array<{name: s
   }
   
   // Define max tokens based on model
-  let maxTokens = 100000; // GPT-5 can handle up to 100k output tokens
-  if (model.includes('gpt-5-mini')) {
-    maxTokens = 65536; // GPT-5 Mini max output
-  } else if (model.includes('gpt-5-nano')) {
-    maxTokens = 32768; // GPT-5 Nano max output
+  let maxTokens = 100000; // Default for most models
+  if (model.includes('o3')) {
+    maxTokens = 100000; // o3 can handle up to 100k output tokens
+  } else if (model.includes('o4-mini')) {
+    maxTokens = 65536; // o4 mini max output
+  } else if (model.includes('gpt-4.1')) {
+    maxTokens = 16384; // GPT-4.1 max output
   }
 
   // Add reasoning support for o3 models
@@ -188,8 +190,8 @@ const callOpenAI = async (message: string, model: string, files?: Array<{name: s
         reasoning_effort: 'medium',
         include_reasoning: true 
       } : {}),
-      // Remove temperature for GPT-5 models as they only support default (1)
-      ...(model.includes('gpt-5') ? {} : { temperature: 0.7 }),
+      // Remove temperature for newer models as they may only support default (1)
+      ...(model.includes('gpt-4.1') || model.includes('o3') || model.includes('o4') ? {} : { temperature: 0.7 }),
     }),
   });
 
@@ -537,7 +539,7 @@ serve(async (req) => {
     let response: string;
 
     // Route to appropriate API based on model
-    if (model.includes('gpt-5') || model.includes('o3')) {
+    if (model.includes('gpt-4.1') || model.includes('o3') || model.includes('o4')) {
       console.log('Routing to OpenAI');
       response = await callOpenAI(message, model, files);
     } else if (model.includes('claude')) {
@@ -546,7 +548,7 @@ serve(async (req) => {
     } else if (model.includes('gemini')) {
       console.log('Routing to Google AI');
       response = await callGoogleAI(message, model, files);
-    } else if (model.includes('grok') || model === 'grok-2-1212') {
+    } else if (model.includes('grok') || model === 'grok-4-0709' || model === 'grok-3' || model === 'grok-3-mini') {
       console.log('Routing to XAI/Grok');
       response = await callXAI(message, model);
     } else if (model.includes('deepseek')) {
@@ -558,7 +560,7 @@ serve(async (req) => {
     } else {
       console.log('Using default OpenAI model for:', model);
       // Default to OpenAI with a valid model
-      response = await callOpenAI(message, 'gpt-5-mini', files);
+      response = await callOpenAI(message, 'gpt-4.1-mini-2025-04-14', files);
     }
 
     console.log('Response generated successfully, length:', response?.length || 0);
