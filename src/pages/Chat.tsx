@@ -662,7 +662,7 @@ const Chat = () => {
                                  className="group relative h-6 w-6 flex items-center justify-center hover:bg-muted rounded"
                                  onClick={(e) => { e.stopPropagation(); toggleFavoriteConversation(c); }}
                                >
-                                 <Star className="h-4 w-4 transition-colors text-yellow-500" fill="currentColor" strokeWidth={0} />
+                                 <Star className="h-4 w-4 transition-colors transform-none text-yellow-500" fill="currentColor" strokeWidth={0} />
                                </button>
                               <button 
                                 className="group relative h-6 w-6 flex items-center justify-center hover:bg-muted rounded" 
@@ -687,11 +687,11 @@ const Chat = () => {
                                  className="group relative h-6 w-6 flex items-center justify-center hover:bg-muted rounded"
                                  onClick={(e) => { e.stopPropagation(); toggleFavoriteConversation(c); }}
                                >
-                                 <Star
-                                   className={`h-4 w-4 transition-colors ${c.is_favorite ? 'text-yellow-500' : ''}`}
-                                   fill={c.is_favorite ? 'currentColor' : 'none'}
-                                   strokeWidth={c.is_favorite ? 0 : 2}
-                                 />
+                                  <Star
+                                    className={`h-4 w-4 transition-colors transform-none ${c.is_favorite ? 'text-yellow-500' : 'text-muted-foreground group-hover:text-yellow-500'}`}
+                                    fill={c.is_favorite ? 'currentColor' : 'none'}
+                                    strokeWidth={c.is_favorite ? 0 : 2}
+                                  />
                                </button>
                               <button 
                                 className="group relative h-6 w-6 flex items-center justify-center hover:bg-muted rounded" 
@@ -742,7 +742,7 @@ const Chat = () => {
                     className="group relative h-6 w-6 flex items-center justify-center hover:bg-muted rounded"
                     onClick={(e) => { e.stopPropagation(); toggleFavoriteConversation(c); }}
                   >
-                    <Star className="h-4 w-4 transition-colors text-yellow-500" fill="currentColor" strokeWidth={0} />
+                    <Star className="h-4 w-4 transition-colors transform-none text-yellow-500" fill="currentColor" strokeWidth={0} />
                   </button>
                   <button 
                     className="group relative h-6 w-6 flex items-center justify-center hover:bg-muted rounded" 
@@ -767,7 +767,7 @@ const Chat = () => {
                     onClick={(e) => { e.stopPropagation(); toggleFavoriteConversation(c); }}
                   >
                     <Star
-                      className={`h-4 w-4 transition-colors ${c.is_favorite ? 'text-yellow-500' : ''}`}
+                      className={`h-4 w-4 transition-colors transform-none ${c.is_favorite ? 'text-yellow-500' : 'text-muted-foreground group-hover:text-yellow-500'}`}
                       fill={c.is_favorite ? 'currentColor' : 'none'}
                       strokeWidth={c.is_favorite ? 0 : 2}
                     />
