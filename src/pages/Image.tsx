@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -50,6 +50,7 @@ const ImagePage = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [images, setImages] = useState<GeneratedImage[]>([]);
+  const storageErrorShown = useRef(false);
   
   // Hook para encontrar as informações da qualidade/tamanho selecionado
   const selectedQualityInfo = useMemo(() => QUALITY_SETTINGS.find(q => q.id === quality)!, [quality]);
@@ -72,8 +73,21 @@ const ImagePage = () => {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(images.slice(0, MAX_IMAGES)));
-  }, [images]);
+    try {
+      const payload = JSON.stringify(images.slice(0, MAX_IMAGES));
+      localStorage.setItem(STORAGE_KEY, payload);
+    } catch (err) {
+      console.warn("Falha ao salvar imagens no localStorage:", err);
+      if (!storageErrorShown.current) {
+        toast({
+          title: "Armazenamento local cheio",
+          description: "Não foi possível salvar as imagens localmente. Elas continuarão disponíveis nesta sessão.",
+          variant: "destructive",
+        });
+        storageErrorShown.current = true;
+      }
+    }
+  }, [images, toast]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
