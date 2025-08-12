@@ -101,45 +101,40 @@ const ImagePage = () => {
 
       const taskUUID = crypto.randomUUID();
 
-      // --- CRIAÇÃO DO BODY CORRIGIDO ---
-      // 4. Montamos o `body` com a estrutura correta que a função Supabase espera.
-      const body: any = {
-        ...MODEL_CONFIG, // Usa a configuração base
-        taskType: selectedFile ? "imageVariation" : "imageInference",
-        taskUUID,
-        positivePrompt: prompt,
-        width: selectedQualityInfo.width,
-        height: selectedQualityInfo.height,
-        steps: selectedQualityInfo.steps,
-        numberResults: 1,
-        outputType: ["dataURI"], // Apenas dataURI é necessário para o front-end
-        outputFormat: "PNG",
-      };
-
-      if (inputImageBase64) {
-        body.image = inputImageBase64;
-      }
+// --- CRIAÇÃO DO BODY CORRIGIDO ---
+// 4. Montamos o `body` com a estrutura que a Edge Function espera.
+const body: any = {
+  model,
+  positivePrompt: prompt,
+  width: selectedQualityInfo.width,
+  height: selectedQualityInfo.height,
+  numberResults: 1,
+  outputFormat: "PNG",
+  ...(inputImageBase64 ? { inputImage: inputImageBase64, strength: 0.8 } : {}),
+};
 
       // A chamada para a função Supabase permanece a mesma
       const { data, error } = await supabase.functions.invoke('generate-image', { body });
       if (error) throw error;
 
-      // A resposta da função Supabase deve conter 'imageDataURI'
-      const imageDataURI = data.imageDataURI as string;
-      if (!imageDataURI) throw new Error('A API não retornou uma imagem. Verifique o log da função Supabase.');
+// Monta data URI a partir do retorno da Edge Function
+const base64 = data?.image as string | undefined;
+const format = (data?.format as string | undefined) || 'webp';
+const imageDataURI = base64 ? `data:image/${format};base64,${base64}` : undefined;
+if (!imageDataURI) throw new Error('A API não retornou uma imagem. Verifique o log da função Supabase.');
 
-      const img: GeneratedImage = {
-        id: taskUUID,
-        prompt,
-        originalPrompt: prompt,
-        detailedPrompt: prompt,
-        url: imageDataURI,
-        timestamp: new Date().toISOString(),
-        quality: quality,
-        width: selectedQualityInfo.width,
-        height: selectedQualityInfo.height,
-        model: model,
-      };
+const img: GeneratedImage = {
+  id: taskUUID,
+  prompt,
+  originalPrompt: prompt,
+  detailedPrompt: prompt,
+  url: imageDataURI,
+  timestamp: new Date().toISOString(),
+  quality: quality,
+  width: selectedQualityInfo.width,
+  height: selectedQualityInfo.height,
+  model: model,
+};
 
       setImages(prev => [img, ...prev].slice(0, MAX_IMAGES));
       toast({ title: 'Imagem gerada', description: 'Sua imagem está pronta!' });
