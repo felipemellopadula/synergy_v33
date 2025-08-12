@@ -208,7 +208,7 @@ const Index = () => {
                       <span className="text-sm">Marca Dois</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Stars className="h-4 w-4 hover:text-primary transition-colors" />
+                      <Stars className="h-4 w-4 hover:text-primary" />
                       <span className="text-sm">Marca Três</span>
                     </div>
                   </div>
