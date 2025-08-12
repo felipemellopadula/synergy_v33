@@ -40,8 +40,8 @@ const Dashboard = () => {
       title: 'Imagem',
       description: 'Criação de imagens',
       color: 'bg-green-500',
-      available: false,
-      onClick: () => {}
+      available: true,
+      onClick: () => navigate('/image')
     },
     {
       id: 'humanize',

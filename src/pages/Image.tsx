@@ -1,0 +1,186 @@
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { Download, Image as ImageIcon, Share2 } from "lucide-react";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { downloadImage, shareImage, GeneratedImage } from "@/utils/imageUtils";
+
+const SIZES = [
+  { id: "1024x1024", label: "Quadrado 1024x1024", w: 1024, h: 1024 },
+  { id: "1536x1024", label: "Paisagem 1536x1024", w: 1536, h: 1024 },
+  { id: "1024x1536", label: "Retrato 1024x1536", w: 1024, h: 1536 },
+];
+
+const MODELS = [
+  { id: "gpt-image-1", label: "ChatGPT Image (gpt-image-1)" },
+];
+
+const MAX_IMAGES = 12;
+
+const ImagePage = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const [prompt, setPrompt] = useState("");
+  const [model, setModel] = useState<string>(MODELS[0].id);
+  const [size, setSize] = useState<string>(SIZES[0].id);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [images, setImages] = useState<GeneratedImage[]>([]);
+
+  const sizeInfo = useMemo(() => SIZES.find(s => s.id === size)!, [size]);
+
+  useEffect(() => {
+    document.title = "Gerar Imagens com IA | Synergy AI";
+    const desc = "Crie imagens com o modelo gpt-image-1 da OpenAI. Escolha a resolução e faça download ou compartilhe.";
+    let meta = document.querySelector('meta[name="description"]');
+    if (!meta) {
+      meta = document.createElement("meta");
+      meta.setAttribute("name", "description");
+      document.head.appendChild(meta);
+    }
+    meta.setAttribute("content", desc);
+    let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "canonical";
+      document.head.appendChild(link);
+    }
+    link.href = `${window.location.origin}/image`;
+  }, []);
+
+  const generate = async () => {
+    if (!prompt.trim()) {
+      toast({ title: "Escreva um prompt", description: "Descreva o que deseja gerar.", variant: "destructive" });
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-image', {
+        body: { prompt, size }
+      });
+      if (error) throw error;
+      const b64 = data?.image as string | undefined;
+      if (!b64) throw new Error('Falha ao gerar a imagem');
+      const dataUrl = `data:image/png;base64,${b64}`;
+      const img: GeneratedImage = {
+        id: `${Date.now()}`,
+        prompt,
+        originalPrompt: prompt,
+        detailedPrompt: prompt,
+        url: dataUrl,
+        timestamp: new Date().toISOString(),
+        quality: 'high',
+        width: sizeInfo.w,
+        height: sizeInfo.h,
+        model,
+      };
+      setImages(prev => [img, ...prev].slice(0, MAX_IMAGES));
+      toast({ title: 'Imagem gerada', description: 'Sua imagem está pronta!' });
+    } catch (e: any) {
+      console.error(e);
+      toast({ title: 'Erro ao gerar', description: e?.message || 'Tente novamente.', variant: 'destructive' });
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleDownload = (img: GeneratedImage) => downloadImage(img, toast);
+  const handleShare = (img: GeneratedImage) => shareImage(img, toast);
+
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-10">
+        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <ImageIcon className="h-7 w-7 text-primary" />
+            <h1 className="text-2xl font-bold text-foreground">Synergy Imagem</h1>
+          </div>
+          <div className="flex items-center gap-3">
+            <ThemeToggle />
+            <Button variant="outline" onClick={() => navigate('/dashboard')}>Voltar ao Dashboard</Button>
+          </div>
+        </div>
+      </header>
+
+      <main className="container mx-auto px-4 py-8">
+        <section className="max-w-5xl mx-auto mb-8">
+          <Card>
+            <CardContent className="pt-6 space-y-4">
+              <div className="grid lg:grid-cols-12 gap-4 items-end">
+                <div className="lg:col-span-7">
+                  <Label htmlFor="prompt">Descreva o que você quer ver</Label>
+                  <Textarea id="prompt" placeholder="Ex: retrato fotorealista de um astronauta com nebulosas ao fundo, iluminação cinematográfica" value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+                </div>
+                <div className="lg:col-span-2">
+                  <Label>Modelo</Label>
+                  <Select value={model} onValueChange={setModel}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Modelo" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {MODELS.map(m => (
+                        <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="lg:col-span-2">
+                  <Label>Resolução</Label>
+                  <Select value={size} onValueChange={setSize}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Tamanho" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SIZES.map(s => (
+                        <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="lg:col-span-1">
+                  <Button className="w-full" onClick={generate} disabled={isGenerating}>
+                    {isGenerating ? 'Gerando...' : 'Gerar'}
+                  </Button>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                As imagens são geradas usando o modelo OpenAI gpt-image-1. Tamanhos suportados: 1024x1024, 1536x1024, 1024x1536.
+              </p>
+            </CardContent>
+          </Card>
+        </section>
+
+        {images.length > 0 && (
+          <section className="max-w-7xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+              {images.map((img) => (
+                <Card key={img.id}>
+                  <CardContent className="p-0">
+                    <img src={img.url} alt={`Imagem gerada: ${img.prompt}`} className="w-full h-auto object-cover" loading="lazy" />
+                    <div className="p-4 flex items-center justify-between gap-2">
+                      <Button variant="outline" className="gap-2" onClick={() => handleDownload(img)}>
+                        <Download className="h-4 w-4" /> Baixar
+                      </Button>
+                      <Button variant="outline" className="gap-2" onClick={() => handleShare(img)}>
+                        <Share2 className="h-4 w-4" /> Compartilhar
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </section>
+        )}
+      </main>
+    </div>
+  );
+};
+
+export default ImagePage;
