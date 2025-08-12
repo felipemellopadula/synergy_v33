@@ -1,4 +1,3 @@
-```tsx
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -305,4 +304,3 @@ const ImagePage = () => {
 };
 
 export default ImagePage;
-```
