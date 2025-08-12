@@ -31,8 +31,8 @@ const Dashboard = () => {
       title: 'Vídeo',
       description: 'Geração de vídeos',
       color: 'bg-purple-500',
-      available: false,
-      onClick: () => {}
+      available: true,
+      onClick: () => navigate('/video')
     },
     {
       id: 'image',
