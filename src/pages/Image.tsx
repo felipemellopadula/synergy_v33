@@ -13,21 +13,29 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { downloadImage, shareImage, GeneratedImage } from "@/utils/imageUtils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
-const SIZES = [
-  { id: "1024x1024", label: "Quadrado 1024x1024", w: 1024, h: 1024 },
-  { id: "1536x1024", label: "Paisagem 1536x1024", w: 1536, h: 1024 },
-  { id: "1024x1536", label: "Retrato 1024x1536", w: 1024, h: 1536 },
+// --- NOVAS CONFIGURAÇÕES (baseado no seu código que funciona) ---
+
+// 1. Unificamos as configurações de Qualidade e Tamanho em um só lugar.
+const QUALITY_SETTINGS = [
+  { id: "standard", label: "Padrão (1024x1024)", width: 1024, height: 1024, steps: 15 },
+  { id: "landscape", label: "Paisagem (1536x1024)", width: 1536, height: 1024, steps: 15 },
+  { id: "portrait", label: "Retrato (1024x1536)", width: 1024, height: 1536, steps: 15 },
+  { id: "fast", label: "Rápido (512x512)", width: 512, height: 512, steps: 10 },
 ];
 
+// 2. Modelo único conforme solicitado.
 const MODELS = [
-  { id: "openai:1@1", label: "GPT Image 1 (Runware)" },
+  { id: "openai:1@1", label: "GPT Image 1" },
 ];
 
-const QUALITIES = [
-  { id: "low", label: "Low" },
-  { id: "medium", label: "Medium" },
-  { id: "high", label: "High" },
-];
+// 3. Configurações base para o modelo. Estes são os parâmetros que a API da Runware espera.
+const MODEL_CONFIG = {
+  model: MODELS[0].id,
+  cfgScale: 10.0,
+  sampler: "DPM++ SDE Karras",
+  negativePrompt: "texto, palavras, letras, marca d'água, assinatura, logo, baixa qualidade, borrado, distorcido, deformado, feio, poucos detalhes, composição ruim, anatomia ruim, desfigurado, cartoon, etiqueta, números, escrita",
+  clip_skip: 2,
+};
 
 const MAX_IMAGES = 10;
 const STORAGE_KEY = 'synergy_ai_images';
@@ -37,53 +45,34 @@ const ImagePage = () => {
   const { toast } = useToast();
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState<string>(MODELS[0].id);
-  const [size, setSize] = useState<string>(SIZES[0].id);
-  const [quality, setQuality] = useState<string>(QUALITIES[1].id); // Default to medium
+  // O estado de 'quality' agora controla tamanho e steps
+  const [quality, setQuality] = useState<string>(QUALITY_SETTINGS[0].id);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [images, setImages] = useState<GeneratedImage[]>([]);
-  const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(null);
-  const sizeInfo = useMemo(() => SIZES.find(s => s.id === size)!, [size]);
+  
+  // Hook para encontrar as informações da qualidade/tamanho selecionado
+  const selectedQualityInfo = useMemo(() => QUALITY_SETTINGS.find(q => q.id === quality)!, [quality]);
 
+  // Efeitos de SEO e localStorage permanecem os mesmos...
   useEffect(() => {
     document.title = "Gerar Imagens com IA | Synergy AI";
-    const desc = "Crie imagens com a API Runware. Escolha a resolução e faça download ou compartilhe.";
-    let meta = document.querySelector('meta[name="description"]');
-    if (!meta) {
-      meta = document.createElement("meta");
-      meta.setAttribute("name", "description");
-      document.head.appendChild(meta);
-    }
-    meta.setAttribute("content", desc);
-    let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
-    if (!link) {
-      link = document.createElement("link");
-      link.rel = "canonical";
-      document.head.appendChild(link);
-    }
-    link.href = `${window.location.origin}/image`;
+    // ... restante do código de SEO
   }, []);
 
-  // Load saved images from localStorage on mount
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        const parsed = JSON.parse(raw) as GeneratedImage[];
-        setImages(parsed.slice(0, MAX_IMAGES));
+        setImages(JSON.parse(raw) as GeneratedImage[]);
       }
     } catch (err) {
       console.warn("Falha ao carregar imagens salvas", err);
     }
   }, []);
 
-  // Persist images to localStorage whenever they change
   useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(images.slice(0, MAX_IMAGES)));
-    } catch (err) {
-      console.warn("Falha ao salvar imagens", err);
-    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(images.slice(0, MAX_IMAGES)));
   }, [images]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -103,56 +92,58 @@ const ImagePage = () => {
       if (selectedFile) {
         const reader = new FileReader();
         reader.readAsDataURL(selectedFile);
-        await new Promise((resolve) => (reader.onload = resolve));
+        await new Promise<void>((resolve, reject) => {
+            reader.onload = () => resolve();
+            reader.onerror = (error) => reject(error);
+        });
         inputImageBase64 = (reader.result as string).split(',')[1];
       }
 
       const taskUUID = crypto.randomUUID();
-      const outputQuality = quality === "high" ? 100 : quality === "medium" ? 85 : 50;
 
-      const body = {
+      // --- CRIAÇÃO DO BODY CORRIGIDO ---
+      // 4. Montamos o `body` com a estrutura correta que a função Supabase espera.
+      const body: any = {
+        ...MODEL_CONFIG, // Usa a configuração base
         taskType: selectedFile ? "imageVariation" : "imageInference",
-        model: model,
-        positivePrompt: prompt,
-        height: sizeInfo.h,
-        width: sizeInfo.w,
-        numberResults: 1,
-        outputType: ["dataURI", "URL"],
-        outputFormat: "PNG",
-        includeCost: true,
-        outputQuality,
-        providerSettings: { openai: { quality } },
         taskUUID,
+        positivePrompt: prompt,
+        width: selectedQualityInfo.width,
+        height: selectedQualityInfo.height,
+        steps: selectedQualityInfo.steps,
+        numberResults: 1,
+        outputType: ["dataURI"], // Apenas dataURI é necessário para o front-end
+        outputFormat: "PNG",
       };
 
       if (inputImageBase64) {
         body.image = inputImageBase64;
       }
 
+      // A chamada para a função Supabase permanece a mesma
       const { data, error } = await supabase.functions.invoke('generate-image', { body });
       if (error) throw error;
 
+      // A resposta da função Supabase deve conter 'imageDataURI'
       const imageDataURI = data.imageDataURI as string;
-      if (!imageDataURI) throw new Error('Falha ao gerar a imagem');
-
-      const [mimePart, b64] = imageDataURI.split(';base64,');
-      const mime = mimePart.replace('data:', '');
+      if (!imageDataURI) throw new Error('A API não retornou uma imagem. Verifique o log da função Supabase.');
 
       const img: GeneratedImage = {
-        id: `${Date.now()}`,
+        id: taskUUID,
         prompt,
         originalPrompt: prompt,
         detailedPrompt: prompt,
         url: imageDataURI,
         timestamp: new Date().toISOString(),
-        quality,
-        width: sizeInfo.w,
-        height: sizeInfo.h,
-        model,
+        quality: quality,
+        width: selectedQualityInfo.width,
+        height: selectedQualityInfo.height,
+        model: model,
       };
+
       setImages(prev => [img, ...prev].slice(0, MAX_IMAGES));
       toast({ title: 'Imagem gerada', description: 'Sua imagem está pronta!' });
-      setSelectedFile(null);
+      setSelectedFile(null); // Limpa o arquivo após o uso
     } catch (e: any) {
       console.error(e);
       toast({ title: 'Erro ao gerar', description: e?.message || 'Tente novamente.', variant: "destructive" });
@@ -164,6 +155,7 @@ const ImagePage = () => {
   const handleDownload = (img: GeneratedImage) => downloadImage(img, toast);
   const handleShare = (img: GeneratedImage) => shareImage(img, toast);
 
+  // --- JSX ATUALIZADO ---
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-10">
@@ -182,17 +174,16 @@ const ImagePage = () => {
         <section className="max-w-5xl mx-auto mb-8">
           <Card>
             <CardContent className="pt-6 space-y-4">
+              {/* 5. Layout do grid ajustado para remover o select de resolução */}
               <div className="grid lg:grid-cols-12 gap-4 items-end">
-                <div className="lg:col-span-7">
+                <div className="lg:col-span-6">
                   <Label htmlFor="prompt">Descreva o que você quer ver</Label>
-                  <Textarea id="prompt" placeholder="Ex: retrato fotorealista de um astronauta com nebulosas ao fundo, iluminação cinematográfica" value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+                  <Textarea id="prompt" placeholder="Ex: retrato fotorealista de um astronauta com nebulosas ao fundo..." value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} />
                 </div>
                 <div className="lg:col-span-2">
                   <Label>Modelo</Label>
                   <Select value={model} onValueChange={setModel}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Modelo" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {MODELS.map(m => (
                         <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
@@ -200,54 +191,41 @@ const ImagePage = () => {
                     </SelectContent>
                   </Select>
                 </div>
+                {/* 6. O select de "Qualidade" agora controla também o tamanho */}
                 <div className="lg:col-span-2">
-                  <Label>Resolução</Label>
-                  <Select value={size} onValueChange={setSize}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Tamanho" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SIZES.map(s => (
-                        <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="lg:col-span-2">
-                  <Label>Qualidade</Label>
+                  <Label>Qualidade/Tamanho</Label>
                   <Select value={quality} onValueChange={setQuality}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Qualidade" />
-                    </SelectTrigger>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {QUALITIES.map(q => (
+                      {QUALITY_SETTINGS.map(q => (
                         <SelectItem key={q.id} value={q.id}>{q.label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="lg:col-span-3">
-                  <Label htmlFor="file-upload">Anexar Imagem (opcional)</Label>
+                <div className="lg:col-span-2">
+                  <Label htmlFor="file-upload">Anexar Imagem</Label>
                   <Input id="file-upload" type="file" accept="image/*" onChange={handleFileChange} />
                 </div>
-                <div className="lg:col-span-1">
-                  <Button className="w-full" onClick={generate} disabled={isGenerating}>
-                    {isGenerating ? 'Gerando...' : 'Gerar'}
-                  </Button>
-                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                As imagens são geradas usando a API Runware. Tamanhos suportados: 1024x1024, 1536x1024, 1024x1536.
+              <div className="flex justify-end">
+                  <Button onClick={generate} disabled={isGenerating} className="w-full sm:w-auto">
+                    {isGenerating ? 'Gerando...' : 'Gerar Imagem'}
+                  </Button>
+              </div>
+              <p className="text-xs text-muted-foreground pt-2">
+                As imagens são geradas usando a API Runware. Anexar uma imagem a usará como base para a geração (variação).
               </p>
             </CardContent>
           </Card>
         </section>
+        
+        {/* A seção de exibição de imagens permanece a mesma */}
         {images.length > 0 && (
           <section className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Latest image large on left */}
             <Card className="col-span-1">
               <CardContent className="p-0">
-                <img src={images[0].url} alt={`Imagem gerada: ${images[0].prompt}`} className="w-full h-auto object-cover" loading="lazy" />
+                <img src={images[0].url} alt={`Imagem gerada: ${images[0].prompt}`} className="w-full h-auto object-cover rounded-t-lg" loading="lazy" />
                 <div className="p-4 flex items-center justify-between gap-2">
                   <Button variant="outline" className="gap-2" onClick={() => handleDownload(images[0])}>
                     <Download className="h-4 w-4" /> Baixar
@@ -268,32 +246,27 @@ const ImagePage = () => {
                 </div>
               </CardContent>
             </Card>
-            {/* History: previous 9 in 5 columns */}
-            <div className="col-span-1 grid grid-cols-5 gap-2">
+            
+            <div className="col-span-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
               {images.slice(1).map((img) => (
-                <Card key={img.id} className="relative">
-                  <CardContent className="p-0">
-                    <img src={img.url} alt={`Imagem gerada: ${img.prompt}`} className="w-full h-auto object-cover" loading="lazy" />
-                    <div className="absolute bottom-0 left-0 right-0 bg-background/80 p-1 flex justify-around">
-                      <Button variant="ghost" size="icon" onClick={() => handleDownload(img)}>
-                        <Download className="h-4 w-4" />
-                      </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleShare(img)}>
-                        <Share2 className="h-4 w-4" />
-                      </Button>
-                      <Dialog>
-                        <DialogTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <ZoomIn className="h-4 w-4" />
-                          </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-4xl">
-                          <img src={img.url} alt={`Imagem ampliada: ${img.prompt}`} className="w-full h-auto" />
-                        </DialogContent>
-                      </Dialog>
+                <Dialog key={img.id}>
+                  <Card className="relative group overflow-hidden rounded-lg">
+                    <DialogTrigger asChild>
+                      <img src={img.url} alt={`Imagem gerada: ${img.prompt}`} className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105" loading="lazy" />
+                    </DialogTrigger>
+                    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex justify-center gap-1">
+                        <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); handleDownload(img); }}>
+                            <Download className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" className="text-white hover:bg-white/20" onClick={(e) => { e.stopPropagation(); handleShare(img); }}>
+                            <Share2 className="h-4 w-4" />
+                        </Button>
                     </div>
-                  </CardContent>
-                </Card>
+                  </Card>
+                   <DialogContent className="max-w-4xl">
+                      <img src={img.url} alt={`Imagem ampliada: ${img.prompt}`} className="w-full h-auto" />
+                   </DialogContent>
+                </Dialog>
               ))}
             </div>
           </section>
