@@ -1,6 +1,3 @@
-Claro, aqui está o código completo e ajustado. Você pode copiar e colar este código diretamente no seu arquivo `VideoPage.tsx`.
-
-```tsx
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -306,4 +303,3 @@ const VideoPage = () => {
 };
 
 export default VideoPage;
-```
