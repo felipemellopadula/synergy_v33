@@ -9,8 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Download, Link2, Share2, VideoIcon, RotateCcw, Upload, Play, Pause, Maximize } from "lucide-react";
+import { Download, Link2, Share2, VideoIcon, RotateCcw, Upload, Play, Pause, Maximize, PanelLeft, ArrowLeft } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 
 const RESOLUTIONS = [
   { id: "16:9-480p", label: "16:9 (Wide / Landscape) - 480p", w: 864, h: 480 },
@@ -106,6 +107,7 @@ const VideoPage = () => {
   const [uploadingStart, setUploadingStart] = useState(false);
   const [uploadingEnd, setUploadingEnd] = useState(false);
   const [savedVideos, setSavedVideos] = useState<string[]>([]);
+  const videoPlayerRef = useRef<HTMLVideoElement>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem('savedVideos');
@@ -229,6 +231,15 @@ const VideoPage = () => {
     if (pollRef.current) window.clearTimeout(pollRef.current);
   }, []);
 
+  const handleDownload = (url: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'synergy-video.mp4';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
   const handleShare = async (url: string) => {
     if ((navigator as any).share) {
       try {
@@ -240,9 +251,45 @@ const VideoPage = () => {
     }
   };
 
+  const handleOpenInNewTab = (url: string) => {
+    window.open(url, '_blank');
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border">
+      {/* Header - Mobile */}
+      <header className="md:hidden border-b border-border sticky top-0 z-10 bg-background/80 backdrop-blur">
+        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <h1 className="text-xl font-bold">Gerador de Vídeo</h1>
+          </div>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon">
+                  <PanelLeft className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right">
+                <SheetHeader>
+                  <SheetTitle>Opções</SheetTitle>
+                </SheetHeader>
+                <div className="flex flex-col gap-4 mt-4">
+                  <Button onClick={() => navigate('/dashboard')}>Voltar ao Dashboard</Button>
+                  <Button variant="outline">Histórico</Button>
+                </div>
+              </SheetContent>
+            </Sheet>
+          </div>
+        </div>
+      </header>
+      
+      {/* Header - Desktop */}
+      <header className="hidden md:block border-b border-border sticky top-0 z-10 bg-background/80 backdrop-blur">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <VideoIcon className="h-7 w-7 text-primary" />
@@ -254,8 +301,143 @@ const VideoPage = () => {
           </div>
         </div>
       </header>
+
       <main className="container mx-auto px-4 py-8">
-        <div className="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+        {/* Layout para mobile e tablet */}
+        <div className="md:hidden flex flex-col gap-8">
+          {/* Seção do Vídeo */}
+          <Card>
+            <CardContent className="space-y-4 pt-6">
+              {videoUrl ? (
+                <div className="space-y-4">
+                  <video controls className="w-full rounded-md border border-border" src={videoUrl} />
+                  <div className="flex gap-3 flex-wrap justify-center">
+                    <Button onClick={() => handleDownload(videoUrl)}><Download className="h-4 w-4 mr-2" /> Baixar</Button>
+                    <Button variant="outline" onClick={() => handleShare(videoUrl)}><Share2 className="h-4 w-4 mr-2" /> Compartilhar</Button>
+                    <Button variant="outline" onClick={() => handleOpenInNewTab(videoUrl)}>
+                      <Link2 className="h-4 w-4 mr-2" /> Abrir em nova aba
+                    </Button>
+                  </div>
+                </div>
+              ) : taskUUID ? (
+                <div className="min-h-[300px] grid place-items-center text-center text-muted-foreground">
+                  <div>
+                    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mx-auto mb-2"></div>
+                    <p>Processando</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="min-h-[300px] grid place-items-center text-center text-muted-foreground">
+                  <div>
+                    <VideoIcon className="h-10 w-10 mx-auto mb-2" />
+                    <p>Nenhum vídeo gerado ainda. Preencha os campos e clique em "Gerar Vídeo".</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Painel de Controle do Usuário */}
+          <Card>
+            <CardContent className="space-y-6 pt-6">
+              <div>
+                <Label htmlFor="prompt">Descrição (prompt)</Label>
+                <Textarea id="prompt" placeholder="Descreva a cena, movimentos de câmera, estilo..." value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <Label>Resolução</Label>
+                  <Select value={resolution} onValueChange={setResolution}>
+                    <SelectTrigger><SelectValue placeholder="Selecione a resolução" /></SelectTrigger>
+                    <SelectContent>
+                      {RESOLUTIONS.map(r => (
+                        <SelectItem key={r.id} value={r.id}>{r.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Duração</Label>
+                  <Select value={String(duration)} onValueChange={(v) => setDuration(Number(v))}>
+                    <SelectTrigger><SelectValue placeholder="Duração (s)" /></SelectTrigger>
+                    <SelectContent>
+                      {DURATIONS.map(d => (
+                        <SelectItem key={d} value={String(d)}>{d} segundos</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Formato</Label>
+                  <Select value={outputFormat} onValueChange={setOutputFormat}>
+                    <SelectTrigger><SelectValue placeholder="Selecione o formato" /></SelectTrigger>
+                    <SelectContent>
+                      {FORMATS.map(f => (
+                        <SelectItem key={f} value={f}>{f.toUpperCase()}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch id="camera-fixed" checked={cameraFixed} onCheckedChange={setCameraFixed} />
+                  <Label htmlFor="camera-fixed">Camera Fixed</Label>
+                </div>
+              </div>
+              <div>
+                <Label>Frame Inicial (opcional)</Label>
+                <div className="border border-border rounded-md p-2 text-center cursor-pointer hover:bg-accent/10">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    id="start-upload-mobile"
+                    onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0], true)}
+                  />
+                  <Label htmlFor="start-upload-mobile" className="cursor-pointer flex flex-col items-center">
+                    <Upload className="h-6 w-6 mb-1" />
+                    Drag Or Upload Image
+                  </Label>
+                </div>
+                <Input placeholder="URL da imagem" value={frameStartUrl} onChange={(e) => setFrameStartUrl(e.target.value)} className="mt-2" />
+              </div>
+              <div>
+                <Label>Frame Final (opcional)</Label>
+                <div className="border border-border rounded-md p-2 text-center cursor-pointer hover:bg-accent/10">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    id="end-upload-mobile"
+                    onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0], false)}
+                  />
+                  <Label htmlFor="end-upload-mobile" className="cursor-pointer flex flex-col items-center">
+                    <Upload className="h-6 w-6 mb-1" />
+                    Drag Or Upload Image
+                  </Label>
+                </div>
+                <Input placeholder="URL da imagem" value={frameEndUrl} onChange={(e) => setFrameEndUrl(e.target.value)} className="mt-2" />
+              </div>
+              <Button className="w-full" onClick={startGeneration} disabled={isSubmitting || !prompt}>
+                {isSubmitting ? <RotateCcw className="h-4 w-4 mr-2 animate-spin" /> : null}
+                Gerar Vídeo
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Histórico */}
+          <div>
+            <h2 className="text-xl font-bold mb-4">Vídeos Salvos</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {savedVideos.map((url, index) => (
+                <SavedVideo key={index} url={url} />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Layout para desktop */}
+        <div className="hidden md:grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          {/* Painel de Controle do Usuário */}
           <Card className="lg:col-span-1 lg:row-span-2">
             <CardContent className="space-y-6 pt-6">
               <div>
@@ -311,10 +493,10 @@ const VideoPage = () => {
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      id="start-upload"
+                      id="start-upload-desktop"
                       onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0], true)}
                     />
-                    <Label htmlFor="start-upload" className="cursor-pointer flex flex-col items-center">
+                    <Label htmlFor="start-upload-desktop" className="cursor-pointer flex flex-col items-center">
                       <Upload className="h-6 w-6 mb-1" />
                       Drag Or Upload Image
                     </Label>
@@ -330,10 +512,10 @@ const VideoPage = () => {
                       type="file"
                       accept="image/*"
                       className="hidden"
-                      id="end-upload"
+                      id="end-upload-desktop"
                       onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0], false)}
                     />
-                    <Label htmlFor="end-upload" className="cursor-pointer flex flex-col items-center">
+                    <Label htmlFor="end-upload-desktop" className="cursor-pointer flex flex-col items-center">
                       <Upload className="h-6 w-6 mb-1" />
                       Drag Or Upload Image
                     </Label>
@@ -349,7 +531,9 @@ const VideoPage = () => {
               </Button>
             </CardContent>
           </Card>
-          <Card className="lg:col-span-2 lg:row-span-1 lg:col-start-2">
+
+          {/* Seção do Vídeo e Histórico - Desktop */}
+          <Card className="lg:col-span-2 lg:row-span-1">
             <CardContent className="pt-6">
               {videoUrl ? (
                 <div className="space-y-4">
@@ -381,6 +565,7 @@ const VideoPage = () => {
               )}
             </CardContent>
           </Card>
+          
           <div className="lg:col-span-2 lg:col-start-2">
             <h2 className="text-xl font-bold mb-4">Vídeos Salvos</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
