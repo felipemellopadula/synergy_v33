@@ -34,8 +34,7 @@ serve(async (req) => {
         model: 'gpt-image-1',
         prompt,
         size,
-        n: 1,
-        response_format: 'b64_json',
+        n: 1
       }),
     });
 
