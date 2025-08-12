@@ -1,3 +1,14 @@
+Ok, entendido. A ideia é simplificar o botão de anexo de arquivo para que ele mostre apenas o texto "Escolha o arquivo", sem exibir o nome do arquivo selecionado.
+
+Isso é feito com um truque comum em CSS/HTML: escondemos o input de arquivo padrão (que é difícil de estilizar) e usamos uma Label com a aparência de um botão para ativá-lo.
+
+Fiz essa alteração no seu código.
+
+Código Completo com Botão de Arquivo Simplificado
+Copie e cole este código. A única mudança está no JSX, na parte do painel de controle onde fica o botão de anexo.
+
+TypeScript
+
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -75,6 +86,8 @@ const ImagePage = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setSelectedFile(e.target.files[0]);
+    } else {
+      setSelectedFile(null);
     }
   };
 
@@ -148,7 +161,7 @@ const ImagePage = () => {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <ImageIcon className="h-7 w-7 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Synergy Image</h1>
+            <h1 className="text-2xl font-bold text-foreground">Synergy Imagem</h1>
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
@@ -159,7 +172,6 @@ const ImagePage = () => {
 
       <main className="container mx-auto px-4 py-8">
         
-        {/* Seção do Painel de Controle - Ocupa a largura total do container */}
         <section className="max-w-7xl mx-auto mb-6">
             <Card>
               <CardContent className="pt-6 space-y-4">
@@ -190,10 +202,28 @@ const ImagePage = () => {
                       </SelectContent>
                     </Select>
                   </div>
+
+                  {/* --- ALTERAÇÃO AQUI --- */}
                   <div className="md:col-span-2">
-                    <Label htmlFor="file-upload">Anexar Imagem</Label>
-                    <Input id="file-upload" type="file" accept="image/*" onChange={handleFileChange} />
+                    <Label>Anexar Imagem</Label>
+                    {/* O input real fica escondido, mas funcional */}
+                    <Input
+                        id="file-upload"
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="sr-only" // sr-only é melhor para acessibilidade
+                    />
+                    {/* Esta Label funciona como o botão customizado */}
+                    <Label
+                        htmlFor="file-upload"
+                        className="mt-2 flex h-10 w-full cursor-pointer items-center justify-center rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground ring-offset-background hover:bg-accent hover:text-accent-foreground"
+                    >
+                        Escolha o arquivo
+                    </Label>
                   </div>
+                  {/* --- FIM DA ALTERAÇÃO --- */}
+
                 </div>
                 <div className="flex justify-end">
                     <Button onClick={generate} disabled={isGenerating} className="w-full sm:w-auto">
@@ -204,9 +234,7 @@ const ImagePage = () => {
             </Card>
         </section>
 
-        {/* Seção de Conteúdo da Imagem - Grid para imagem principal e histórico */}
         <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Coluna da Esquerda: Imagem Principal ou Loading */}
           <div className="lg:col-span-3">
             <Card className="w-full h-full min-h-[512px] flex items-center justify-center">
               {isGenerating ? (
@@ -248,7 +276,6 @@ const ImagePage = () => {
             </Card>
           </div>
 
-          {/* Coluna da Direita: Histórico */}
           <div className="lg:col-span-2">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {images.slice(1).map((img) => (
