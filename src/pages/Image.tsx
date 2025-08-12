@@ -13,7 +13,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { downloadImage, shareImage, GeneratedImage } from "@/utils/imageUtils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
-// As configurações de modelo e qualidade permanecem as mesmas
+// Configurações de modelo e qualidade permanecem as mesmas
 const QUALITY_SETTINGS = [
   { id: "standard", label: "Padrão (1024x1024)", width: 1024, height: 1024, steps: 15 },
   { id: "landscape", label: "Paisagem (1536x1024)", width: 1536, height: 1024, steps: 15 },
@@ -156,62 +156,63 @@ const ImagePage = () => {
           </div>
         </div>
       </header>
+
+      {/* --- ESTRUTURA PRINCIPAL DO LAYOUT --- */}
       <main className="container mx-auto px-4 py-8">
-        <section className="max-w-5xl mx-auto mb-8">
-          <Card>
-            <CardContent className="pt-6 space-y-4">
-              <div className="grid lg:grid-cols-12 gap-4 items-end">
-                <div className="lg:col-span-6">
-                  <Label htmlFor="prompt">Descreva o que você quer ver</Label>
-                  <Textarea id="prompt" placeholder="Ex: retrato fotorealista de um astronauta..." value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} />
+        {/* Usamos um grid único para alinhar todos os elementos da página */}
+        <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+          {/* Coluna da Esquerda: Contém o painel de controle e a imagem principal */}
+          <div className="lg:col-span-3 flex flex-col gap-6">
+            {/* 1. Painel de Controle */}
+            <Card>
+              <CardContent className="pt-6 space-y-4">
+                <div className="grid lg:grid-cols-12 gap-4 items-end">
+                  <div className="lg:col-span-6">
+                    <Label htmlFor="prompt">Descreva o que você quer ver</Label>
+                    <Textarea id="prompt" placeholder="Ex: retrato fotorealista de um astronauta..." value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} />
+                  </div>
+                  <div className="lg:col-span-2">
+                    <Label>Modelo</Label>
+                    <Select value={model} onValueChange={setModel}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {MODELS.map(m => (
+                          <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="lg:col-span-2">
+                    <Label>Qualidade/Tamanho</Label>
+                    <Select value={quality} onValueChange={setQuality}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {QUALITY_SETTINGS.map(q => (
+                          <SelectItem key={q.id} value={q.id}>{q.label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="lg:col-span-2">
+                    <Label htmlFor="file-upload">Anexar Imagem</Label>
+                    <Input id="file-upload" type="file" accept="image/*" onChange={handleFileChange} />
+                  </div>
                 </div>
-                <div className="lg:col-span-2">
-                  <Label>Modelo</Label>
-                  <Select value={model} onValueChange={setModel}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {MODELS.map(m => (
-                        <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="flex justify-end">
+                    <Button onClick={generate} disabled={isGenerating} className="w-full sm:w-auto">
+                      {isGenerating ? 'Gerando...' : 'Gerar Imagem'}
+                    </Button>
                 </div>
-                <div className="lg:col-span-2">
-                  <Label>Qualidade/Tamanho</Label>
-                  <Select value={quality} onValueChange={setQuality}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {QUALITY_SETTINGS.map(q => (
-                        <SelectItem key={q.id} value={q.id}>{q.label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="lg:col-span-2">
-                  <Label htmlFor="file-upload">Anexar Imagem</Label>
-                  <Input id="file-upload" type="file" accept="image/*" onChange={handleFileChange} />
-                </div>
-              </div>
-              <div className="flex justify-end">
-                  <Button onClick={generate} disabled={isGenerating} className="w-full sm:w-auto">
-                    {isGenerating ? 'Gerando...' : 'Gerar Imagem'}
-                  </Button>
-              </div>
-              <p className="text-xs text-muted-foreground pt-2">
-                As imagens são geradas usando a API Runware. Anexar uma imagem a usará como base para a geração (variação).
-              </p>
-            </CardContent>
-          </Card>
-        </section>
-        
-        {/* --- NOVA ESTRUTURA DE LAYOUT DAS IMAGENS --- */}
-        <section className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-5 gap-6">
-          
-          {/* Coluna da Esquerda (Imagem Principal ou Loading) */}
-          <div className="lg:col-span-3">
+                <p className="text-xs text-muted-foreground pt-2">
+                  As imagens são geradas usando a API Runware. Anexar uma imagem a usará como base para a geração (variação).
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* 2. Imagem Principal ou Loading */}
             <Card className="w-full h-full min-h-[512px] flex items-center justify-center">
               {isGenerating ? (
-                // Estado de Carregamento
                 <div className="flex flex-col items-center gap-4 text-muted-foreground">
                   <svg className="animate-spin h-10 w-10" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -220,7 +221,6 @@ const ImagePage = () => {
                   <span className="text-lg font-medium">Processando...</span>
                 </div>
               ) : images.length > 0 ? (
-                // Exibe a imagem mais recente
                 <CardContent className="p-0">
                   <img src={images[0].url} alt={`Imagem gerada: ${images[0].prompt}`} className="w-full h-auto object-cover rounded-t-lg" loading="eager" />
                   <div className="p-4 flex items-center justify-between gap-2 border-t">
@@ -243,7 +243,6 @@ const ImagePage = () => {
                   </div>
                 </CardContent>
               ) : (
-                // Placeholder inicial
                 <div className="flex flex-col items-center gap-2 text-muted-foreground">
                     <ImageIcon className="h-12 w-12" />
                     <span className="text-lg font-medium">Sua imagem aparecerá aqui</span>
@@ -252,8 +251,8 @@ const ImagePage = () => {
             </Card>
           </div>
 
-          {/* Coluna da Direita (Histórico) */}
-          <div className="lg:col-span-2">
+          {/* Coluna da Direita: Histórico. O `lg:row-span-2` faz com que ocupe a altura dos 2 cards da esquerda */}
+          <div className="lg:col-span-2 lg:row-span-2">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               {images.slice(1).map((img) => (
                 <Dialog key={img.id}>
@@ -277,7 +276,8 @@ const ImagePage = () => {
               ))}
             </div>
           </div>
-        </section>
+
+        </div>
       </main>
     </div>
   );
