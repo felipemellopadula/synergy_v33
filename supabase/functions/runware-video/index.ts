@@ -47,16 +47,30 @@ serve(async (req) => {
         outputFormat = "MP4",
       } = body;
 
-      const ALLOWED_MODELS = new Set([
-        "google:veo-3@fast",
-        "minimax:1@1",
-        "klingai:5@3",
-      ]);
-      const normalizeModel = (input?: string): string => {
-        if (typeof input === "string" && ALLOWED_MODELS.has(input)) return input;
-        if (input?.startsWith("google:veo-3")) return "google:veo-3@fast";
-        // Fallback seguro
-        return "minimax:1@1";
+      // Resolve AIR do modelo dinamicamente (suporta nomes amigáveis e AIR direto)
+      const resolveModelAIR = async (input?: string): Promise<string> => {
+        if (typeof input === 'string' && input.includes(':') && input.includes('@')) return input;
+        const guess = (input || '').toLowerCase();
+        if (guess.includes('kling')) return 'klingai:5@3';
+        if (guess.includes('hailuo') || guess.includes('minimax')) return 'minimax:hailuo@2';
+        if (guess.includes('veo')) return 'google:veo-3@fast';
+        if (guess.includes('seed') || guess.includes('seedance') || guess.includes('bytedance')) {
+          try {
+            const msUUID = crypto.randomUUID();
+            const searchTasks = [
+              { taskType: 'authentication', apiKey: RUNWARE_API_KEY },
+              { taskType: 'modelSearch', taskUUID: msUUID, search: input || 'seedance lite', visibility: 'all', limit: 10 },
+            ];
+            const sr = await fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(searchTasks) });
+            const js = await sr.json();
+            const results = js?.data?.[0]?.results || [];
+            const pick = results.find((r: any) => String(r.air || '').startsWith('bytedance:')) || results[0];
+            if (pick?.air) return pick.air;
+          } catch (e) {
+            console.error('[runware-video] modelSearch failed:', e);
+          }
+        }
+        return 'klingai:5@3';
       };
 
       if (!positivePrompt || !width || !height) {
@@ -67,16 +81,14 @@ serve(async (req) => {
       }
 
       const taskUUID = crypto.randomUUID();
+      const resolvedModel = await resolveModelAIR(modelId || model);
 
       const tasks: any[] = [
-        {
-          taskType: "authentication",
-          apiKey: RUNWARE_API_KEY,
-        },
+        { taskType: "authentication", apiKey: RUNWARE_API_KEY },
         {
           taskType: "videoInference",
           taskUUID,
-          model: normalizeModel(modelId || model),
+          model: resolvedModel,
           positivePrompt,
           duration,
           width,
@@ -89,6 +101,7 @@ serve(async (req) => {
         },
       ];
 
+      console.log("[runware-video] start -> resolvedModel", resolvedModel);
       console.log("[runware-video] start -> tasks:", tasks);
 
 
