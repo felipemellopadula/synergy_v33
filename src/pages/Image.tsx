@@ -148,7 +148,7 @@ const ImagePage = () => {
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-2">
             <ImageIcon className="h-7 w-7 text-primary" />
-            <h1 className="text-2xl font-bold text-foreground">Synergy Imagem</h1>
+            <h1 className="text-2xl font-bold text-foreground">Synergy Image</h1>
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
