@@ -20,7 +20,7 @@ const SIZES = [
 ];
 
 const MODELS = [
-  { id: "gpt-image-1", label: "ChatGPT Image (gpt-image-1)" },
+  { id: "runware:100@1", label: "Runware (runware:100@1)" },
 ];
 
 const QUALITIES = [
@@ -109,7 +109,7 @@ const ImagePage = () => {
 
       const body: any = {
         taskType: selectedFile ? "imageVariation" : "imageInference", // Assume "imageVariation" for image input
-        model: "runware:100@1",
+        model: model,
         positivePrompt: prompt,
         height: sizeInfo.h,
         width: sizeInfo.w,
