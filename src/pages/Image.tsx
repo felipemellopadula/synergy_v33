@@ -12,7 +12,6 @@ import { Download, Image as ImageIcon, Share2, ZoomIn } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { downloadImage, shareImage, GeneratedImage } from "@/utils/imageUtils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
-import { saveImageBlob, loadImageBlobUrl, pruneImages } from "@/utils/imageStore";
 
 // Configurações de modelo e qualidade permanecem as mesmas
 const QUALITY_SETTINGS = [
@@ -47,43 +46,19 @@ const ImagePage = () => {
   }, []);
 
   useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const raw = localStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const parsed = JSON.parse(raw) as any[];
-          // Support legacy format (with url) and new meta-only format
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            const first = parsed[0] as any;
-            if (first && typeof first.url === 'string' && first.url.startsWith('data:image')) {
-              // Legacy data URLs – still load but do not rewrite here
-              setImages(parsed as GeneratedImage[]);
-            } else {
-              const rebuilt: GeneratedImage[] = [];
-              for (const meta of parsed) {
-                const url = await loadImageBlobUrl(meta.id);
-                if (!url) continue;
-                rebuilt.push({ ...(meta as Omit<GeneratedImage, 'url'>), url } as GeneratedImage);
-              }
-              if (!cancelled) setImages(rebuilt.slice(0, MAX_IMAGES));
-            }
-          }
-        }
-      } catch (err) {
-        console.warn("Falha ao carregar imagens salvas", err);
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        setImages(JSON.parse(raw) as GeneratedImage[]);
       }
-    })();
-    return () => { cancelled = true; };
+    } catch (err) {
+      console.warn("Falha ao carregar imagens salvas", err);
+    }
   }, []);
 
   useEffect(() => {
     try {
-      const meta = images.slice(0, MAX_IMAGES).map(({ url, ...rest }) => rest);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(meta));
-      // Clean up blobs not referenced anymore
-      const keepIds = meta.map((m: any) => m.id);
-      pruneImages(keepIds).catch((e) => console.warn('Falha ao podar imagens do IndexedDB', e));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(images.slice(0, MAX_IMAGES)));
     } catch (err) {
       console.warn("Falha ao salvar imagens no localStorage:", err);
       if (!storageErrorShown.current) {
@@ -143,15 +118,11 @@ const ImagePage = () => {
       const imageDataURI = base64 ? `data:image/${format};base64,${base64}` : undefined;
       if (!imageDataURI) throw new Error('A API não retornou uma imagem. Verifique o log da função Supabase.');
 
-      const blob = await saveImageBlob(taskUUID, imageDataURI);
-      const objectUrl = URL.createObjectURL(blob);
-
       const img: GeneratedImage = {
         id: taskUUID,
         prompt,
         originalPrompt: prompt,
-        detailedPrompt: prompt,
-        url: objectUrl,
+        url: imageDataURI,
         timestamp: new Date().toISOString(),
         quality: quality,
         width: selectedQualityInfo.width,
@@ -220,19 +191,15 @@ const ImagePage = () => {
                       </SelectContent>
                     </Select>
                   </div>
-
-                  {/* --- ALTERAÇÃO AQUI --- */}
                   <div className="md:col-span-2">
                     <Label>Anexar Imagem</Label>
-                    {/* O input real fica escondido, mas funcional */}
                     <Input
                         id="file-upload"
                         type="file"
                         accept="image/*"
                         onChange={handleFileChange}
-                        className="sr-only" // sr-only é melhor para acessibilidade
+                        className="sr-only"
                     />
-                    {/* Esta Label funciona como o botão customizado */}
                     <Label
                         htmlFor="file-upload"
                         className="mt-2 flex h-10 w-full cursor-pointer items-center justify-center rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground ring-offset-background hover:bg-accent hover:text-accent-foreground"
@@ -240,8 +207,6 @@ const ImagePage = () => {
                         Escolha o arquivo
                     </Label>
                   </div>
-                  {/* --- FIM DA ALTERAÇÃO --- */}
-
                 </div>
                 <div className="flex justify-end">
                     <Button onClick={generate} disabled={isGenerating} className="w-full sm:w-auto">
@@ -295,7 +260,8 @@ const ImagePage = () => {
           </div>
 
           <div className="lg:col-span-2">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+            {/* --- ALTERAÇÃO PARA MOBILE AQUI --- */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {images.slice(1).map((img) => (
                 <Dialog key={img.id}>
                   <Card className="relative group overflow-hidden rounded-lg aspect-square">
