@@ -50,15 +50,15 @@ serve(async (req) => {
         "bytedance:seedance@1",
         "google:veo-3@fast",
         "minimax:hailuo@2",
-        "klingai:2@1",
+        "klingai:5@3",
       ]);
       const normalizeModel = (input?: string): string => {
         if (typeof input === "string" && ALLOWED_MODELS.has(input)) return input;
         if (input?.startsWith("bytedance:seedance")) return "bytedance:seedance@1";
         if (input?.startsWith("google:veo-3")) return "google:veo-3@fast";
         if (input?.startsWith("minimax:hailuo")) return "minimax:hailuo@2";
-        if (input?.startsWith("klingai")) return "klingai:2@1";
-        return "bytedance:seedance@1";
+        if (input?.startsWith("klingai")) return "klingai:5@3";
+        return "klingai:5@3";
       };
 
       if (!positivePrompt || !width || !height) {
@@ -91,8 +91,8 @@ serve(async (req) => {
       ];
 
       const frameImages: any[] = [];
-      if (frameStartUrl) frameImages.push({ inputImageURL: frameStartUrl, frame: "first" });
-      if (frameEndUrl) frameImages.push({ inputImageURL: frameEndUrl, frame: "last" });
+      if (frameStartUrl) frameImages.push({ inputImage: frameStartUrl, frame: "first" });
+      if (frameEndUrl) frameImages.push({ inputImage: frameEndUrl, frame: "last" });
       if (frameImages.length > 0) {
         tasks[1].frameImages = frameImages;
       }

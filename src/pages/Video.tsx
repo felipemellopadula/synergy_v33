@@ -15,8 +15,7 @@ const MODEL_MAP: Record<string, string> = {
   // Correção: remover sufixo inválido "-lite" para AIR id válido
   "seedance-1-lite": "bytedance:seedance@1",
   "minimax-hailuo-02": "minimax:hailuo@2",
-  // Ajuste para um identificador plausível
-  "klingai-2-1-pro": "klingai:2@1",
+  "klingai-2-1-pro": "klingai:5@3",
 };
 
 const RESOLUTIONS = [
