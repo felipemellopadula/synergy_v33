@@ -14,7 +14,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 const RESOLUTIONS = [
   { id: "16:9-480p", label: "16:9 (Wide / Landscape) - 480p", w: 864, h: 480 },
 ];
-const DURATIONS = [5, 10];
+const DURATIONS = [5,10];
 const FORMATS = ["mp4", "webm", "mov"];
 const MAX_VIDEOS = 12;
 const SavedVideo = ({ url }: { url: string }) => {
@@ -290,7 +290,7 @@ const VideoPage = () => {
                     <span className="text-sm">Carregar Imagem</span>
                   </label>
                   <Input type="file" accept="image/*" className="hidden" id="start-upload" onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0], true)} />
-                  <Input placeholder="Ou cole a URL aqui" className="mt-2" value={frameStartUrl} onChange={(e) => setFrameStartUrl(e.target.value)} />
+                  <Input placeholder="Ou cole a URL aqui" value={frameStartUrl} onChange={(e) => setFrameStartUrl(e.target.value)} className="mt-2" />
                   {uploadingStart && <p className="text-sm text-muted-foreground mt-1">Enviando...</p>}
                 </div>
                 <div>
@@ -300,7 +300,7 @@ const VideoPage = () => {
                     <span className="text-sm">Carregar Imagem</span>
                   </label>
                   <Input type="file" accept="image/*" className="hidden" id="end-upload" onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0], false)} />
-                  <Input placeholder="Ou cole a URL aqui" className="mt-2" value={frameEndUrl} onChange={(e) => setFrameEndUrl(e.target.value)} />
+                  <Input placeholder="Ou cole a URL aqui" value={frameEndUrl} onChange={(e) => setFrameEndUrl(e.target.value)} className="mt-2" />
                   {uploadingEnd && <p className="text-sm text-muted-foreground mt-1">Enviando...</p>}
                 </div>
               </div>
