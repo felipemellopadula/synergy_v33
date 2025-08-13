@@ -75,14 +75,12 @@ const Chat = () => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  // Redirect to home if not authenticated
   useEffect(() => {
     if (!loading && !user) {
       navigate('/');
     }
   }, [user, loading, navigate]);
 
-  // Load user conversations when authenticated
   useEffect(() => {
     if (!loading && user) {
       (async () => {
@@ -99,14 +97,12 @@ const Chat = () => {
     }
   }, [user, loading]);
 
-  // Auto scroll to bottom when messages change and handle scroll button visibility
   useEffect(() => {
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages]);
 
-  // Handle scroll detection for scroll-to-bottom button
   useEffect(() => {
     const chatContainer = chatContainerRef.current;
     if (!chatContainer) return;
@@ -125,7 +121,6 @@ const Chat = () => {
     }
   };
 
-  // Select default model on page load if none
   useEffect(() => {
     if (!selectedModel) {
       setSelectedModel('synergy-ia');
@@ -149,7 +144,6 @@ const Chat = () => {
     if (files.length === 0) return;
 
     for (const file of files) {
-      // Validate file types and sizes
       const isValidType = file.type.startsWith('image/') ||
         file.type.includes('pdf') ||
         file.type.includes('word') ||
@@ -157,25 +151,17 @@ const Chat = () => {
         file.name.endsWith('.doc') ||
         file.name.endsWith('.docx');
 
-      const isValidSize = file.size <= 50 * 1024 * 1024; // 50MB limit for PDFs
+      const isValidSize = file.size <= 50 * 1024 * 1024;
 
-      if (!isValidType) {
+      if (!isValidType || !isValidSize) {
         continue;
       }
 
-      if (!isValidSize) {
-        continue;
-      }
-
-      // Add file to attached files first
       setAttachedFiles(prev => [...prev, file]);
 
-      // Process PDF files in background
       if (file.type === 'application/pdf') {
-
         try {
           const result = await PdfProcessor.processPdf(file);
-
           if (result.success) {
             setProcessedPdfs(prev => new Map(prev).set(file.name, result.content || ''));
           } else {
@@ -185,7 +171,6 @@ const Chat = () => {
               variant: "destructive",
             });
           }
-
         } catch (error) {
           console.error('Erro ao processar PDF:', error);
           toast({
@@ -197,7 +182,6 @@ const Chat = () => {
       }
     }
 
-    // Reset the input after processing all files to allow re-uploading the same files
     if (event.target) {
       event.target.value = '';
     }
@@ -220,7 +204,6 @@ const Chat = () => {
       mediaRecorder.start();
       setIsRecording(true);
 
-      // Enforce max 30s recording
       if (recordingTimeoutRef.current) {
         clearTimeout(recordingTimeoutRef.current);
       }
