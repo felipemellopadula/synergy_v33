@@ -60,7 +60,7 @@ const Write = () => {
     console.log('⏳ Loading iniciado...');
     
     try {
-      console.log('🌐 Fazendo fetch para:', '/functions/v1/write-content');
+      console.log('🌐 Fazendo fetch para:', 'https://myqgnnqltemfpzdxwybj.supabase.co/functions/v1/write-content');
       
       const requestBody = {
         prompt,
@@ -70,7 +70,7 @@ const Write = () => {
       };
       console.log('📦 Body da requisição:', requestBody);
       
-      const response = await fetch('/functions/v1/write-content', {
+      const response = await fetch('https://myqgnnqltemfpzdxwybj.supabase.co/functions/v1/write-content', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
