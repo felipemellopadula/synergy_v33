@@ -281,7 +281,7 @@ const ImagePage = () => {
                                         <button
                                           type="button"
                                           onClick={() => setSelectedFile(null)}
-                                          className="absolute -top-2 -right-2 inline-flex items-center justify-center h-6 w-6 rounded-full border bg-background text-foreground shadow hover:bg-accent"
+                                          className="absolute top-1 right-1 inline-flex items-center justify-center h-6 w-6 rounded-full border bg-background text-foreground shadow hover:bg-accent"
                                           aria-label="Remover imagem anexada"
                                         >
                                           <X className="h-4 w-4" />
