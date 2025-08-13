@@ -70,6 +70,11 @@ const Chat = () => {
   const recordingTimeoutRef = useRef<number | null>(null);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
+  
+  // Debug: Log conversations state changes
+  useEffect(() => {
+    console.log('Conversations state updated:', conversations.length, conversations);
+  }, [conversations]);
   const [expandedReasoning, setExpandedReasoning] = useState<{ [key: string]: boolean }>({});
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -84,14 +89,21 @@ const Chat = () => {
   useEffect(() => {
     if (!loading && user) {
       (async () => {
+        console.log('Carregando conversas para usuário:', user.id);
         const { data, error } = await supabase
           .from('chat_conversations')
           .select('*')
           .order('updated_at', { ascending: false });
+        
+        console.log('Resultado da query:', { data, error, count: data?.length });
+        
         if (error) {
           console.error('Erro ao carregar conversas:', error);
         } else if (data) {
+          console.log('Conversas carregadas:', data);
           setConversations(data as any);
+        } else {
+          console.log('Nenhuma conversa encontrada');
         }
       })();
     }
@@ -706,7 +718,14 @@ const Chat = () => {
                     </span>
                   </button>
                 ))}
-                <div className="pt-3 pb-2 text-xs text-muted-foreground">Recentes</div>
+                <div className="pt-3 pb-2 text-xs text-muted-foreground">
+                  Recentes ({conversations.filter(c => !c.is_favorite).length})
+                </div>
+                {conversations.length === 0 && (
+                  <div className="py-2 text-xs text-muted-foreground">
+                    Nenhuma conversa encontrada. Console: {JSON.stringify({ total: conversations.length, user: !!user })}
+                  </div>
+                )}
                 {conversations.filter(c => !c.is_favorite).map((c) => (
                   <button key={c.id} onClick={() => openConversation(c)} className={`w-full text-left px-3 py-2 mb-1 rounded flex items-center justify-between hover:bg-muted ${currentConversationId === c.id ? 'bg-muted' : ''}`}>
                     <span className="truncate text-sm">{c.title}</span>
