@@ -1,4 +1,6 @@
 import { ArrowLeft, Paperclip, Mic, Globe, Star, Trash2, Plus, ChevronDown, ChevronUp, Copy, Menu, ArrowUp, ArrowDown } from "lucide-react";
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
@@ -891,12 +893,14 @@ const Chat = () => {
                              )}
                            </div>
                          )}
-                         <p className="text-sm whitespace-pre-wrap">
-                           {message.content}
-                           {message.isStreaming && (
-                             <span className="inline-block w-2 h-4 bg-current ml-1 animate-pulse" />
-                           )}
-                         </p>
+                          <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-headings:font-semibold prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-ul:text-foreground prose-ol:text-foreground prose-li:text-foreground prose-blockquote:text-foreground">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {message.content}
+                            </ReactMarkdown>
+                            {message.isStreaming && (
+                              <span className="inline-block w-2 h-4 bg-current ml-1 animate-pulse" />
+                            )}
+                          </div>
                         {message.model && message.sender === 'bot' && (
                           <p className="text-xs opacity-70 mt-1">
                             {getModelDisplayName(message.model)} • {getTokenCost(message.model).toLocaleString()} tokens
@@ -1021,14 +1025,14 @@ const Chat = () => {
                     </DropdownMenu>
                   </div>
 
-                  {/* Textarea with padding for buttons */}
-                  <Textarea
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    placeholder={isWebSearchMode ? "Digite para buscar na web..." : "Pergunte alguma coisa"}
-                    disabled={isLoading}
-                    className="w-full pl-12 pr-20 py-3 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-primary resize-none min-h-[44px] max-h-32"
-                    rows={1}
+                   {/* Textarea with padding for buttons */}
+                   <Textarea
+                     value={inputValue}
+                     onChange={(e) => setInputValue(e.target.value)}
+                     placeholder={isWebSearchMode ? "Digite para buscar na web..." : "Pergunte alguma coisa"}
+                     disabled={isLoading}
+                     className="w-full pl-12 pr-24 py-3 rounded-lg border bg-background focus:outline-none focus:ring-2 focus:ring-primary resize-none min-h-[44px] max-h-32"
+                     rows={1}
                     style={{
                       height: 'auto',
                       minHeight: '44px'
@@ -1069,36 +1073,36 @@ const Chat = () => {
                     }}
                   />
                   
-                  {/* Right side buttons - Mic and Send */}
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={isRecording ? stopRecording : startRecording}
-                            className={`h-8 w-8 p-0 hover:bg-muted rounded-full ${isRecording ? 'text-red-500' : ''}`}
-                          >
-                            <Mic className="h-4 w-4" />
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Grave uma mensagem de até 30s
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                    
-                    <Button 
-                      type="submit" 
-                      disabled={isLoading || (!inputValue.trim() && attachedFiles.length === 0)}
-                      size="sm"
-                      className="h-8 w-8 p-0 rounded-full"
-                    >
-                      <ArrowUp className="h-4 w-4" />
-                    </Button>
-                  </div>
+                   {/* Right side buttons - Mic and Send */}
+                   <div className="absolute right-3 top-1/2 -translate-y-1/2 flex gap-1">
+                     <TooltipProvider>
+                       <Tooltip>
+                         <TooltipTrigger asChild>
+                           <Button
+                             type="button"
+                             variant="ghost"
+                             size="sm"
+                             onClick={isRecording ? stopRecording : startRecording}
+                             className={`h-8 w-8 p-0 hover:bg-muted rounded-full ${isRecording ? 'text-red-500' : ''}`}
+                           >
+                             <Mic className="h-4 w-4" />
+                           </Button>
+                         </TooltipTrigger>
+                         <TooltipContent>
+                           Grave uma mensagem de até 30s
+                         </TooltipContent>
+                       </Tooltip>
+                     </TooltipProvider>
+                     
+                     <Button 
+                       type="submit" 
+                       disabled={isLoading || (!inputValue.trim() && attachedFiles.length === 0)}
+                       size="sm"
+                       className="h-8 w-8 p-0 rounded-full bg-primary hover:bg-primary/90"
+                     >
+                       <ArrowUp className="h-4 w-4 text-primary-foreground" />
+                     </Button>
+                   </div>
                 </div>
               </form>
               {attachedFiles.length > 0 && (
