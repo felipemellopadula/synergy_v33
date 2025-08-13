@@ -85,27 +85,40 @@ export const shareImage = async (image: GeneratedImage, toast: ToastFunction): P
     const blob = dataURIToBlob(image.url);
     const file = new File([blob], `synergy-image-${Date.now()}.png`, { type: blob.type });
 
-    const shareData = {
+    const shareData: any = {
       title: "Imagem Gerada por IA",
       text: image.prompt,
       files: [file],
     };
 
-    // Verifica se o navegador suporta o compartilhamento de arquivos
-    if (navigator.canShare && navigator.canShare(shareData)) {
-      await navigator.share(shareData);
-    } else {
-      // Fallback: Tenta compartilhar apenas a URL (não vai funcionar para data: URI em todos os apps)
-      // Um fallback melhor é copiar para a área de transferência, mas a API de Share é o foco.
-      // A lógica original de copiar a URL não é útil para data: URI, então focamos no share do arquivo.
-      throw new Error("O compartilhamento de arquivos não é suportado neste navegador.");
+    const canShareFiles = typeof (navigator as any).canShare === 'function' && (navigator as any).canShare(shareData);
+
+    if ((navigator as any).share && canShareFiles) {
+      await (navigator as any).share(shareData);
+      return;
     }
+
+    // Fallback 1: copiar imagem para a área de transferência
+    const clipboard = (navigator as any).clipboard;
+    const ClipboardItemCtor = (window as any).ClipboardItem;
+    if (clipboard && typeof clipboard.write === 'function' && ClipboardItemCtor) {
+      const item = new ClipboardItemCtor({ [blob.type]: blob });
+      await clipboard.write([item]);
+      toast({ title: "Imagem copiada", description: "A imagem foi copiada para a área de transferência.", variant: "default" });
+      return;
+    }
+
+    // Fallback 2: abrir imagem em nova aba
+    const objUrl = URL.createObjectURL(blob);
+    window.open(objUrl, "_blank", "noopener,noreferrer");
+    setTimeout(() => URL.revokeObjectURL(objUrl), 30000);
+    toast({ title: "Compartilhar indisponível", description: "Abrimos a imagem em uma nova aba para você partilhar manualmente.", variant: "default" });
   } catch (error: any) {
     // Ignora o erro "AbortError" que acontece quando o usuário fecha a janela de compartilhamento
-    if (error.name === 'AbortError') {
-        return;
+    if (error?.name === 'AbortError') {
+      return;
     }
-    
+
     console.error("Erro ao compartilhar:", error);
     toast({ title: "Erro ao Partilhar", description: "Não foi possível partilhar a imagem.", variant: "destructive" });
   }

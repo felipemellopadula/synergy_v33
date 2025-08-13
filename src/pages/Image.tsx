@@ -166,7 +166,6 @@ const ImagePage = () => {
         id: taskUUID,
         prompt,
         originalPrompt: prompt,
-        detailedPrompt: prompt,
         url: imageDataURI, // A imagem recém-gerada sempre está em alta resolução no state
         timestamp: new Date().toISOString(),
         quality: quality,
