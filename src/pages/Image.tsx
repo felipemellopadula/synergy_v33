@@ -13,7 +13,6 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { downloadImage, shareImage, GeneratedImage } from "@/utils/imageUtils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
-// Configurações de modelo e qualidade permanecem as mesmas
 const QUALITY_SETTINGS = [
   { id: "standard", label: "Padrão (1024x1024)", width: 1024, height: 1024, steps: 15 },
   { id: "landscape", label: "Paisagem (1536x1024)", width: 1536, height: 1024, steps: 15 },
@@ -21,9 +20,16 @@ const QUALITY_SETTINGS = [
   { id: "fast", label: "Rápido (512x512)", width: 512, height: 512, steps: 10 },
 ];
 
+// --- ALTERAÇÃO AQUI ---
+// Adicionamos os novos modelos à lista.
+// ATENÇÃO: Verifique os IDs na documentação da Runware!
 const MODELS = [
   { id: "openai:1@1", label: "GPT Image 1" },
+  { id: "runware:seedream-3.0@1", label: "Seedream 3.0" }, // ID de exemplo, verifique o correto
+  { id: "qwen:qwen-image@1", label: "Qwen-Image" },     // ID de exemplo, verifique o correto
 ];
+// --- FIM DA ALTERAÇÃO ---
+
 
 const MAX_IMAGES = 10;
 const STORAGE_KEY = 'synergy_ai_images';
@@ -32,7 +38,7 @@ const ImagePage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState<string>(MODELS[0].id);
+  const [model, setModel] = useState<string>(MODELS[0].id); // Inicia com o primeiro modelo da lista
   const [quality, setQuality] = useState<string>(QUALITY_SETTINGS[0].id);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -101,7 +107,7 @@ const ImagePage = () => {
       const taskUUID = crypto.randomUUID();
 
       const body: any = {
-        model,
+        model, // O modelo selecionado pelo usuário no state já é usado aqui
         positivePrompt: prompt,
         width: selectedQualityInfo.width,
         height: selectedQualityInfo.height,
@@ -169,8 +175,9 @@ const ImagePage = () => {
                     <Label htmlFor="prompt">Descreva o que você quer ver</Label>
                     <Textarea id="prompt" placeholder="Ex: retrato fotorealista de um astronauta..." value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} />
                   </div>
-                  <div className="md:col-span-1">
+                  <div className="md:col-span-2">
                     <Label>Modelo</Label>
+                    {/* Este Select agora mostrará os 3 modelos */}
                     <Select value={model} onValueChange={setModel}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
@@ -191,7 +198,7 @@ const ImagePage = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="md:col-span-2">
+                  <div className="md:col-span-1">
                     <Label>Anexar Imagem</Label>
                     <Input
                         id="file-upload"
@@ -260,7 +267,6 @@ const ImagePage = () => {
           </div>
 
           <div className="lg:col-span-2">
-            {/* --- ALTERAÇÃO PARA MOBILE AQUI --- */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
               {images.slice(1).map((img) => (
                 <Dialog key={img.id}>
