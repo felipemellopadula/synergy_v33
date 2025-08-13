@@ -121,6 +121,39 @@ export type Database = {
           },
         ]
       }
+      user_images: {
+        Row: {
+          created_at: string
+          format: string | null
+          height: number | null
+          id: string
+          image_path: string
+          prompt: string | null
+          user_id: string
+          width: number | null
+        }
+        Insert: {
+          created_at?: string
+          format?: string | null
+          height?: number | null
+          id?: string
+          image_path: string
+          prompt?: string | null
+          user_id: string
+          width?: number | null
+        }
+        Update: {
+          created_at?: string
+          format?: string | null
+          height?: number | null
+          id?: string
+          image_path?: string
+          prompt?: string | null
+          user_id?: string
+          width?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

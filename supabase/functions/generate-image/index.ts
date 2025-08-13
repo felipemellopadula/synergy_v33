@@ -1,8 +1,12 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { encode as b64encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const RUNWARE_API_KEY = Deno.env.get('RUNWARE_API_KEY');
+const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,6 +29,21 @@ serve(async (req) => {
         JSON.stringify({ error: 'Parâmetros inválidos: prompt ausente' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+
+    // Obter usuário autenticado a partir do JWT para vincular a imagem
+    const authHeader = req.headers.get('Authorization') ?? '';
+    let userId: string | null = null;
+    if (SUPABASE_URL && SUPABASE_ANON_KEY && authHeader) {
+      try {
+        const supabaseAuth = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+          global: { headers: { Authorization: authHeader } },
+        });
+        const { data: { user } } = await supabaseAuth.auth.getUser();
+        userId = user?.id ?? null;
+      } catch (e) {
+        console.warn('Não foi possível obter o usuário:', e);
+      }
     }
 
     // Resolver dimensões
@@ -112,6 +131,27 @@ serve(async (req) => {
     else if (imageURL.endsWith('.png')) format = 'png';
     else if (imageURL.endsWith('.jpg')) format = 'jpg';
     else if (imageURL.endsWith('.jpeg')) format = 'jpeg';
+
+    // Salvar no Storage e registrar no banco se o usuário estiver autenticado
+    if (userId && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
+      try {
+        const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+        const ext = (format || 'webp').toLowerCase();
+        const path = `user-images/${userId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
+        const contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
+        const upload = await supabaseAdmin.storage.from('images').upload(path, new Uint8Array(ab), { contentType });
+        if (upload.error) {
+          console.error('Erro upload Storage:', upload.error);
+        } else {
+          const { error: insertErr } = await supabaseAdmin
+            .from('user_images')
+            .insert({ user_id: userId, image_path: path, prompt, width, height, format: ext });
+          if (insertErr) console.error('Erro ao inserir user_images:', insertErr);
+        }
+      } catch (e) {
+        console.error('Falha ao salvar imagem do usuário:', e);
+      }
+    }
 
     return new Response(
       JSON.stringify({ image: b64, url: imageURL, width, height, format }),
