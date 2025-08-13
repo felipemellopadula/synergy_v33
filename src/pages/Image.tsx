@@ -32,8 +32,8 @@ const ImagePage = () => {
     const navigate = useNavigate();
     const { toast } = useToast();
     const [prompt, setPrompt] = useState("");
-    const [model, setModel] = useState(MODELS[0].id);
-    const [quality, setQuality] = useState(QUALITY_SETTINGS[0].id);
+    const [model, setModel] = useState(MODELS\[0].id);
+    const [quality, setQuality] = useState(QUALITY_SETTINGS\[0].id);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -73,7 +73,7 @@ const ImagePage = () => {
                     quality: dbImg.quality || 'standard',
                     width: dbImg.width || 1024,
                     height: dbImg.height || 1024,
-                    model: dbImg.model || MODELS[0].id,
+                    model: dbImg.model || MODELS\[0].id,
                 }));
                 setImages(formattedImages);
             }
@@ -83,8 +83,8 @@ const ImagePage = () => {
     }, [toast]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-      if (e.target.files && e.target.files[0]) {
-        setSelectedFile(e.target.files[0]);
+      if (e.target.files && e.target.files\[0]) {
+        setSelectedFile(e.target.files\[0]);
       } else {
         setSelectedFile(null);
       }
@@ -233,31 +233,31 @@ const ImagePage = () => {
                             ) : images.length > 0 ? (
                                 <div className="w-full">
                                     <div className="aspect-square relative">
-                                        <img src={images[0].url} alt={`Imagem gerada: ${images[0].prompt}`} className="w-full h-full object-cover" loading="eager" />
+                                        <img src={images\[0].url} alt={`Imagem gerada: ${images\[0].prompt}`} className="w-full h-full object-cover" loading="eager" />
                                         {/* Botões sobrepostos em telas maiores (sm e acima) */}
                                         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent hidden sm:flex items-center justify-between gap-2">
-                                            <Button variant="outline" className="gap-2 flex-1 bg-background/80" onClick={() => handleDownload(images[0])}><Download className="h-4 w-4" /> Baixar</Button>
-                                            <Button variant="outline" className="gap-2 flex-1 bg-background/80" onClick={() => handleShare(images[0])}><Share2 className="h-4 w-4" /> Compartilhar</Button>
+                                            <Button variant="outline" className="gap-2 flex-1 bg-purple-500 text-white" onClick={() => handleDownload(images\[0])}><Download className="h-4 w-4" /> Baixar</Button>
+                                            <Button variant="outline" className="gap-2 flex-1 bg-background/80" onClick={() => handleShare(images\[0])}><Share2 className="h-4 w-4" /> Compartilhar</Button>
                                             <Dialog>
                                                 <DialogTrigger asChild>
                                                     <Button variant="outline" className="gap-2 flex-1 bg-background/80"><ZoomIn className="h-4 w-4" /> Ampliar</Button>
                                                 </DialogTrigger>
                                                 <DialogContent className="max-w-4xl">
-                                                    <img src={images[0].url} alt={`Imagem ampliada: ${images[0].prompt}`} className="w-full h-auto" />
+                                                    <img src={images\[0].url} alt={`Imagem ampliada: ${images\[0].prompt}`} className="w-full h-auto" />
                                                 </DialogContent>
                                             </Dialog>
                                         </div>
                                     </div>
                                     {/* Botões abaixo da imagem apenas em telas pequenas (mobile) */}
                                     <div className="sm:hidden flex flex-col items-stretch gap-2 p-4 border-t">
-                                        <Button variant="outline" className="gap-2 w-full" onClick={() => handleDownload(images[0])}><Download className="h-4 w-4" /> Baixar</Button>
-                                        <Button variant="outline" className="gap-2 w-full" onClick={() => handleShare(images[0])}><Share2 className="h-4 w-4" /> Compartilhar</Button>
+                                        <Button variant="outline" className="gap-2 w-full bg-purple-500 text-white" onClick={() => handleDownload(images\[0])}><Download className="h-4 w-4" /> Baixar</Button>
+                                        <Button variant="outline" className="gap-2 w-full" onClick={() => handleShare(images\[0])}><Share2 className="h-4 w-4" /> Compartilhar</Button>
                                         <Dialog>
                                             <DialogTrigger asChild>
                                                 <Button variant="outline" className="gap-2 w-full"><ZoomIn className="h-4 w-4" /> Ampliar</Button>
                                             </DialogTrigger>
                                             <DialogContent className="max-w-4xl">
-                                                <img src={images[0].url} alt={`Imagem ampliada: ${images[0].prompt}`} className="w-full h-auto" />
+                                                <img src={images\[0].url} alt={`Imagem ampliada: ${images\[0].prompt}`} className="w-full h-auto" />
                                             </DialogContent>
                                         </Dialog>
                                     </div>
@@ -274,7 +274,7 @@ const ImagePage = () => {
                     <div className="lg:col-span-2">
                         <div className="grid grid-cols-3 gap-3">
                             {Array.from({ length: 9 }).map((_, index) => {
-                                const img = images[index + 1];
+                                const img = images\[index + 1];
                                 if (img) {
                                     return (
                                         <Dialog key={img.id}>
