@@ -1,22 +1,12 @@
-Excelente! Você encontrou os JSONs corretos, e isso resolve todo o mistério. Muito obrigado por compartilhar, isso nos dá a resposta exata.
+Peço desculpas pelo erro! Você está certíssimo.
 
-O Diagnóstico Final
-O problema era exatamente o que suspeitávamos: os ids dos modelos que estávamos usando no código eram apenas exemplos e não os ids oficiais que a API da Runware espera.
+O problema aconteceu porque eu incluí o texto da minha resposta (a explicação) dentro do bloco de código. Quando você copiou e colou, esse texto foi para o topo do seu arquivo Image.tsx, o que causa o erro de sintaxe.
 
-Os JSONs que você enviou mostram os identificadores corretos que sua Edge Function precisa enviar para a Runware:
+O arquivo .tsx só pode conter código, ele não entende texto normal como "Excelente! Você encontrou...". A primeira linha do seu arquivo deve ser sempre import ....
 
-Para o Qwen-Image: O id correto é runware:108@1.
+Abaixo está o código correto e limpo, sem nenhum texto extra. Pode copiar e colar este bloco inteiro que agora vai funcionar perfeitamente.
 
-Para o Seedream 3.0: O id correto é bytedance:3@1.
-
-O erro acontecia porque nosso código enviava ids inválidos, e a API da Runware rejeitava a requisição.
-
-A Solução
-Agora, tudo o que precisamos fazer é atualizar a lista MODELS no seu código com esses ids corretos. Eu já fiz isso para você no código completo abaixo.
-
-Com esses ids oficiais, a seleção de modelos deve funcionar perfeitamente.
-
-Código Completo com os IDs Finais e Corretos
+Código Correto e Limpo para Image.tsx
 TypeScript
 
 import { useEffect, useMemo, useState, useRef } from "react";
@@ -41,15 +31,12 @@ const QUALITY_SETTINGS = [
   { id: "fast", label: "Rápido (512x512)", width: 512, height: 512, steps: 10 },
 ];
 
-// --- CORREÇÃO FINAL COM OS IDs OFICIAIS ---
-// Atualizamos a lista com os IDs corretos que você encontrou.
+// IDs oficiais e corretos para os modelos da Runware
 const MODELS = [
   { id: "openai:1@1", label: "Gpt-Image 1" },
   { id: "bytedance:3@1", label: "Seedream 3.0" },
   { id: "runware:108@1", label: "Qwen-Image" },
 ];
-// --- FIM DA CORREÇÃO ---
-
 
 const MAX_IMAGES = 10;
 const STORAGE_KEY = 'synergy_ai_images';
