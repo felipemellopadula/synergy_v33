@@ -66,6 +66,16 @@ serve(async (req) => {
 
     const taskUUID = crypto.randomUUID();
 
+    // Montar payload para Runware, evitando "strength" em GPT-Image-1
+    const attach: any = {};
+    if (body.inputImage) {
+      attach.inputImage = body.inputImage;
+      // "strength" NÃO é suportado na arquitetura gpt_image_1 (GPT-Image-1)
+      if (model !== 'openai:1@1' && typeof body.strength === 'number') {
+        attach.strength = body.strength;
+      }
+    }
+
     const tasks: any[] = [
       { taskType: 'authentication', apiKey: RUNWARE_API_KEY },
       {
@@ -77,8 +87,7 @@ serve(async (req) => {
         model,
         numberResults,
         outputFormat,
-        // Se veio imagem base64 para variação, repassar
-        ...(body.inputImage ? { inputImage: body.inputImage, strength: typeof body.strength === 'number' ? body.strength : 0.8 } : {}),
+        ...attach,
       },
     ];
 
