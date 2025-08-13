@@ -246,56 +246,37 @@ const VideoPage = () => {
     const title = "Vídeo Gerado por IA";
     const text = (promptText || "Veja este vídeo que criei!").slice(0, 280);
 
-    const openSharePage = () => {
-      const u = new URL(window.location.origin + "/share");
-      u.searchParams.set("title", title);
-      u.searchParams.set("text", text);
-      u.searchParams.set("url", url);
-      window.open(u.toString(), "_blank", "noopener,noreferrer");
-    };
-
     try {
-      const inIframe = window.top !== window.self;
+      // 1) Tenta abrir o menu nativo diretamente (na mesma página)
+      if (navigator.share) {
+        await navigator.share({ title, text, url });
+        return;
+      }
 
-      // Se não estiver em iframe, tentamos o Web Share nativo primeiro
-      if (!inIframe) {
-        // Tenta compartilhar como arquivo (Web Share Level 2)
-        const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
-        if (res.ok) {
-          const blob = await res.blob();
-          const extGuess = (blob.type?.split('/')?.[1] || '').split(';')[0] || (outputFormat || 'mp4');
-          const file = new File([blob], `synergy-video-${Date.now()}.${extGuess}`, { type: blob.type || `video/${outputFormat || 'mp4'}` });
-          const canShareFiles = (navigator as any).canShare?.({ files: [file] });
-          if (canShareFiles) {
-            await (navigator as any).share({ title, text, files: [file] });
-            return;
-          }
-        }
-        // Se suportar share com URL, usa também
-        if (navigator.share) {
-          await navigator.share({ title, text, url });
+      // 2) Se não houver suporte a share de URL, tenta share de arquivo (alguns navegadores dão suporte)
+      const res = await fetch(url, { mode: 'cors', credentials: 'omit' });
+      if (res.ok) {
+        const blob = await res.blob();
+        const extGuess = (blob.type?.split('/')?.[1] || '').split(';')[0] || (outputFormat || 'mp4');
+        const file = new File([blob], `synergy-video-${Date.now()}.${extGuess}`, { type: blob.type || `video/${outputFormat || 'mp4'}` });
+        const canShareFiles = (navigator as any).canShare?.({ files: [file] });
+        if (canShareFiles && (navigator as any).share) {
+          await (navigator as any).share({ title, text, files: [file] });
           return;
         }
       }
 
-      // Caso esteja em iframe ou não suporte share, abre uma nova aba dedicada para compartilhar (top-level)
-      openSharePage();
+      // 3) Fallback final: copiar link
+      await navigator.clipboard.writeText(url);
+      toast({ title: 'Link Copiado', description: 'Seu navegador não suporta compartilhamento nativo aqui. Link copiado.', variant: 'default' });
     } catch (error) {
       console.error('Erro ao partilhar:', error);
       try {
         await navigator.clipboard.writeText(url);
-        toast({
-          title: 'Link Copiado',
-          description: 'Não foi possível abrir o compartilhamento, mas copiamos o link para você.',
-          variant: 'default',
-        });
+        toast({ title: 'Link Copiado', description: 'Não foi possível abrir o compartilhamento, copiamos o link para você.', variant: 'default' });
       } catch (copyError) {
         console.error('Erro ao copiar o link:', copyError);
-        toast({
-          title: 'Erro',
-          description: 'Não foi possível partilhar ou copiar o link.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Erro', description: 'Não foi possível partilhar ou copiar o link.', variant: 'destructive' });
       }
     }
   };
