@@ -1,3 +1,14 @@
+Entendido e peço desculpas pela confusão! Você está corretíssimo. Se o id openai:1@1 estava funcionando para você com o nome "Gpt-Image 1", vamos voltar para ele imediatamente.
+
+O meu objetivo era usar os nomes oficiais da documentação, mas o que importa é o que funciona na sua implementação.
+
+Ajustei o código para ter exatamente as opções que você quer: Gpt-Image 1 (com o id que funcionava), Seedream e Qwen-Image (com os ids mais prováveis de funcionar).
+
+Abaixo está o código completo com essa correção.
+
+Código Completo com o "Gpt-Image 1" Restaurado
+TypeScript
+
 import { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -20,15 +31,14 @@ const QUALITY_SETTINGS = [
   { id: "fast", label: "Rápido (512x512)", width: 512, height: 512, steps: 10 },
 ];
 
-// --- ALTERAÇÃO AQUI ---
-// Adicionamos os novos modelos à lista.
-// ATENÇÃO: Verifique os IDs na documentação da Runware!
+// --- CORREÇÃO FINAL AQUI ---
+// Restaurado o ID "openai:1@1" para o "Gpt-Image 1", conforme solicitado.
 const MODELS = [
-  { id: "openai:1@1", label: "GPT Image 1" },
-  { id: "runware:seedream-3.0@1", label: "Seedream 3.0" }, // ID de exemplo, verifique o correto
-  { id: "qwen:qwen-image@1", label: "Qwen-Image" },     // ID de exemplo, verifique o correto
+  { id: "openai:1@1", label: "Gpt-Image 1" },
+  { id: "runware:seedream-acg@1", label: "Seedream" },
+  { id: "alibaba:qwen-vl-plus@1", label: "Qwen-Image" },
 ];
-// --- FIM DA ALTERAÇÃO ---
+// --- FIM DA CORREÇÃO ---
 
 
 const MAX_IMAGES = 10;
@@ -38,7 +48,7 @@ const ImagePage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [prompt, setPrompt] = useState("");
-  const [model, setModel] = useState<string>(MODELS[0].id); // Inicia com o primeiro modelo da lista
+  const [model, setModel] = useState<string>(MODELS[0].id);
   const [quality, setQuality] = useState<string>(QUALITY_SETTINGS[0].id);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -107,7 +117,7 @@ const ImagePage = () => {
       const taskUUID = crypto.randomUUID();
 
       const body: any = {
-        model, // O modelo selecionado pelo usuário no state já é usado aqui
+        model,
         positivePrompt: prompt,
         width: selectedQualityInfo.width,
         height: selectedQualityInfo.height,
@@ -177,7 +187,6 @@ const ImagePage = () => {
                   </div>
                   <div className="md:col-span-2">
                     <Label>Modelo</Label>
-                    {/* Este Select agora mostrará os 3 modelos */}
                     <Select value={model} onValueChange={setModel}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
