@@ -75,7 +75,7 @@ const ImagePage = () => {
           }
 
           // Converte o Data URI de volta para um arquivo para poder comprimir
-          const imageFile = await imageCompression.dataUrltoFile(img.url, `${img.id}.jpg`);
+          const imageFile = await imageCompression.getFilefromDataUrl(img.url, `${img.id}.jpg`);
 
           // Opções de compressão: cria um thumbnail pequeno
           const options = {
@@ -166,6 +166,7 @@ const ImagePage = () => {
         id: taskUUID,
         prompt,
         originalPrompt: prompt,
+        detailedPrompt: prompt,
         url: imageDataURI, // A imagem recém-gerada sempre está em alta resolução no state
         timestamp: new Date().toISOString(),
         quality: quality,
