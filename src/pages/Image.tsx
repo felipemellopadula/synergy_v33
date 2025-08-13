@@ -8,9 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Download, Image as ImageIcon, Share2, ZoomIn } from "lucide-react";
+import { Download, Image as ImageIcon, Share2, ZoomIn, Loader2 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { downloadImage, shareImage, GeneratedImage } from "@/utils/imageUtils";
+import { downloadImage, shareImage, GeneratedImage, dataURIToBlob } from "@/utils/imageUtils";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
 const QUALITY_SETTINGS = [
@@ -20,15 +20,14 @@ const QUALITY_SETTINGS = [
   { id: "fast", label: "Rápido (512x512)", width: 512, height: 512, steps: 10 },
 ];
 
-// --- ALTERAÇÃO AQUI: Modelos Qwen e Seedream adicionados de volta ---
 const MODELS = [
   { id: "openai:1@1", label: "Gpt-Image 1" },
   { id: "bytedance:3@1", label: "Seedream 3.0" },
   { id: "runware:108@1", label: "Qwen-Image" },
 ];
 
-const MAX_IMAGES = 10;
-const STORAGE_KEY = 'synergy_ai_images';
+// 1 imagem principal + 9 no histórico
+const MAX_IMAGES_TO_FETCH = 10; 
 
 const ImagePage = () => {
   const navigate = useNavigate();
@@ -38,54 +37,65 @@ const ImagePage = () => {
   const [quality, setQuality] = useState(QUALITY_SETTINGS[0].id);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false); // Feedback para o usuário
   const [images, setImages] = useState<GeneratedImage[]>([]);
-  const storageErrorShown = useRef(false);
   const selectedQualityInfo = useMemo(() => QUALITY_SETTINGS.find(q => q.id === quality)!, [quality]);
 
   useEffect(() => {
     document.title = "Gerar Imagens com IA | Synergy AI";
   }, []);
 
+  // --- BUSCA O HISTÓRICO DO BANCO DE DADOS AO CARREGAR A PÁGINA ---
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        setImages(JSON.parse(raw) as GeneratedImage[]);
+    const fetchUserImages = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log("Usuário não logado, não é possível buscar histórico.");
+        return;
       }
-    } catch (err) {
-      console.warn("Falha ao carregar imagens salvas", err);
-    }
-  }, []);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(images.slice(0, MAX_IMAGES)));
-    } catch (err) {
-      console.warn("Falha ao salvar imagens no localStorage:", err);
-      if (!storageErrorShown.current) {
-        toast({
-          title: "Armazenamento local cheio",
-          description: "Não foi possível salvar as imagens localmente.",
-          variant: "destructive",
-        });
-        storageErrorShown.current = true;
+      const { data, error } = await supabase
+        .from('generated_images')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(MAX_IMAGES_TO_FETCH);
+
+      if (error) {
+        console.error("Erro ao buscar histórico:", error);
+        toast({ title: "Erro", description: "Não foi possível carregar seu histórico.", variant: "destructive" });
+      } else if (data) {
+        const formattedImages = data.map(dbImg => ({
+          id: dbImg.id,
+          prompt: dbImg.prompt,
+          originalPrompt: dbImg.prompt,
+          detailedPrompt: dbImg.prompt,
+          url: dbImg.image_url,
+          timestamp: dbImg.created_at,
+          quality: dbImg.quality || 'standard',
+          width: dbImg.width || 1024,
+          height: dbImg.height || 1024,
+          model: dbImg.model || MODELS[0].id,
+        }));
+        setImages(formattedImages);
       }
-    }
-  }, [images, toast]);
+    };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
-    } else {
-      setSelectedFile(null);
-    }
-  };
+    fetchUserImages();
+  }, [toast]);
+
 
   const generate = async () => {
     if (!prompt.trim()) {
-      toast({ title: "Escreva um prompt", description: "Descreva o que deseja gerar.", variant: "destructive" });
+      toast({ title: "Escreva um prompt", variant: "destructive" });
       return;
     }
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+        toast({ title: "Acesso Negado", description: "Você precisa estar logado para gerar imagens.", variant: "destructive" });
+        return;
+    }
+
     setIsGenerating(true);
     try {
       let inputImageBase64: string | undefined;
@@ -99,47 +109,52 @@ const ImagePage = () => {
         inputImageBase64 = (reader.result as string).split(',')[1];
       }
 
-      const taskUUID = crypto.randomUUID();
-
-      const body: any = {
-        model,
-        positivePrompt: prompt,
-        width: selectedQualityInfo.width,
-        height: selectedQualityInfo.height,
-        numberResults: 1,
-        outputFormat: "PNG",
-        ...(inputImageBase64 ? { inputImage: inputImageBase64, strength: 0.8 } : {}),
-      };
-
-      const { data, error } = await supabase.functions.invoke('generate-image', { body });
-      if (error) throw error;
-
-      const base64 = data?.image as string | undefined;
-      const format = (data?.format as string | undefined) || 'webp';
+      const body: any = { model, positivePrompt: prompt, width: selectedQualityInfo.width, height: selectedQualityInfo.height, numberResults: 1, outputFormat: "PNG", ...(inputImageBase64 ? { inputImage: inputImageBase64, strength: 0.8 } : {}), };
+      const { data: apiData, error: apiError } = await supabase.functions.invoke('generate-image', { body });
+      if (apiError) throw apiError;
+      
+      const base64 = apiData?.image as string | undefined;
+      const format = (apiData?.format as string | undefined) || 'webp';
       const imageDataURI = base64 ? `data:image/${format};base64,${base64}` : undefined;
-      if (!imageDataURI) throw new Error('A API não retornou uma imagem. Verifique o log da função Supabase.');
+      if (!imageDataURI) throw new Error("A API não retornou uma imagem.");
 
-      const img: GeneratedImage = {
-        id: taskUUID,
-        prompt,
-        originalPrompt: prompt,
-        detailedPrompt: " ", // Adicionado para manter a interface consistente
-        url: imageDataURI,
-        timestamp: new Date().toISOString(),
-        quality: quality,
-        width: selectedQualityInfo.width,
-        height: selectedQualityInfo.height,
-        model: model,
+      setIsSaving(true);
+      
+      // --- LÓGICA DE UPLOAD E SALVAMENTO NO BANCO ---
+      const imageBlob = dataURIToBlob(imageDataURI);
+      const fileName = `${user.id}/${Date.now()}.png`;
+      
+      const { error: uploadError } = await supabase.storage.from('generated_images').upload(fileName, imageBlob);
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage.from('generated_images').getPublicUrl(fileName);
+
+      const newImageData = { user_id: user.id, prompt, image_url: publicUrl, model, quality, width: selectedQualityInfo.width, height: selectedQualityInfo.height, };
+      const { data: insertData, error: insertError } = await supabase.from('generated_images').insert(newImageData).select().single();
+      if (insertError) throw insertError;
+
+      const newImageForState: GeneratedImage = {
+          id: insertData.id,
+          prompt: insertData.prompt,
+          originalPrompt: insertData.prompt,
+          detailedPrompt: insertData.prompt,
+          url: insertData.image_url,
+          timestamp: insertData.created_at,
+          quality: insertData.quality,
+          width: insertData.width,
+          height: insertData.height,
+          model: insertData.model,
       };
 
-      setImages(prev => [img, ...prev].slice(0, MAX_IMAGES));
-      toast({ title: 'Imagem gerada', description: 'Sua imagem está pronta!' });
-      setSelectedFile(null);
+      setImages(prev => [newImageForState, ...prev].slice(0, MAX_IMAGES_TO_FETCH));
+      toast({ title: 'Imagem gerada e salva!', variant: "default" });
+
     } catch (e: any) {
-      console.error(e);
-      toast({ title: 'Erro ao gerar', description: e?.message || 'Tente novamente.', variant: "destructive" });
+      console.error("Erro no processo:", e);
+      toast({ title: 'Erro', description: e.message || 'Tente novamente.', variant: "destructive" });
     } finally {
       setIsGenerating(false);
+      setIsSaving(false);
     }
   };
 
@@ -160,9 +175,7 @@ const ImagePage = () => {
           </div>
         </div>
       </header>
-
       <main className="container mx-auto px-4 py-8">
-        
         <section className="max-w-7xl mx-auto mb-6">
             <Card>
               <CardContent className="pt-6 space-y-4">
@@ -176,9 +189,7 @@ const ImagePage = () => {
                     <Select value={model} onValueChange={setModel}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {MODELS.map(m => (
-                          <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-                        ))}
+                        {MODELS.map(m => ( <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem> ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -187,32 +198,22 @@ const ImagePage = () => {
                     <Select value={quality} onValueChange={setQuality}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {QUALITY_SETTINGS.map(q => (
-                          <SelectItem key={q.id} value={q.id}>{q.label}</SelectItem>
-                        ))}
+                        {QUALITY_SETTINGS.map(q => ( <SelectItem key={q.id} value={q.id}>{q.label}</SelectItem> ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="md:col-span-1">
                     <Label>Anexar Imagem</Label>
-                    <Input
-                        id="file-upload"
-                        type="file"
-                        accept="image/*"
-                        onChange={handleFileChange}
-                        className="sr-only"
-                    />
-                    <Label
-                        htmlFor="file-upload"
-                        className="mt-2 flex h-10 w-full cursor-pointer items-center justify-center rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground ring-offset-background hover:bg-accent hover:text-accent-foreground"
-                    >
+                    <Input id="file-upload" type="file" accept="image/*" onChange={handleFileChange} className="sr-only"/>
+                    <Label htmlFor="file-upload" className="mt-2 flex h-10 w-full cursor-pointer items-center justify-center rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground ring-offset-background hover:bg-accent hover:text-accent-foreground">
                         Escolha o arquivo
                     </Label>
                   </div>
                 </div>
                 <div className="flex justify-end">
-                    <Button onClick={generate} disabled={isGenerating} className="w-full sm:w-auto">
-                      {isGenerating ? 'Gerando...' : 'Gerar Imagem'}
+                    <Button onClick={generate} disabled={isGenerating || isSaving} className="w-full sm:w-auto">
+                        {(isGenerating || isSaving) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isGenerating ? 'Gerando...' : isSaving ? 'Salvando...' : 'Gerar Imagem'}
                     </Button>
                 </div>
               </CardContent>
@@ -224,32 +225,16 @@ const ImagePage = () => {
             <Card className="w-full h-full min-h-[512px] flex items-center justify-center">
               {isGenerating ? (
                 <div className="flex flex-col items-center gap-4 text-muted-foreground">
-                  <svg className="animate-spin h-10 w-10" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                  <Loader2 className="h-10 w-10 animate-spin" />
                   <span className="text-lg font-medium">Processando...</span>
                 </div>
               ) : images.length > 0 ? (
                 <CardContent className="p-0">
                   <img src={images[0].url} alt={`Imagem gerada: ${images[0].prompt}`} className="w-full h-auto object-cover rounded-t-lg" loading="eager" />
                   <div className="p-4 flex items-center justify-between gap-2 border-t">
-                    <Button variant="outline" className="gap-2 flex-1" onClick={() => handleDownload(images[0])}>
-                      <Download className="h-4 w-4" /> Baixar
-                    </Button>
-                    <Button variant="outline" className="gap-2 flex-1" onClick={() => handleShare(images[0])}>
-                      <Share2 className="h-4 w-4" /> Compartilhar
-                    </Button>
-                    <Dialog>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" className="gap-2 flex-1">
-                          <ZoomIn className="h-4 w-4" /> Ampliar
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-4xl">
-                        <img src={images[0].url} alt={`Imagem ampliada: ${images[0].prompt}`} className="w-full h-auto" />
-                      </DialogContent>
-                    </Dialog>
+                    <Button variant="outline" className="gap-2 flex-1" onClick={() => handleDownload(images[0])}><Download className="h-4 w-4" /> Baixar</Button>
+                    <Button variant="outline" className="gap-2 flex-1" onClick={() => handleShare(images[0])}><Share2 className="h-4 w-4" /> Compartilhar</Button>
+                    <Dialog><DialogTrigger asChild><Button variant="outline" className="gap-2 flex-1"><ZoomIn className="h-4 w-4" /> Ampliar</Button></DialogTrigger><DialogContent className="max-w-4xl"><img src={images[0].url} alt={`Imagem ampliada: ${images[0].prompt}`} className="w-full h-auto" /></DialogContent></Dialog>
                   </div>
                 </CardContent>
               ) : (
@@ -269,28 +254,17 @@ const ImagePage = () => {
                   return (
                     <Dialog key={img.id}>
                       <Card className="relative group overflow-hidden rounded-lg aspect-square">
-                        <DialogTrigger asChild>
-                          <img src={img.url} alt={`Imagem gerada: ${img.prompt}`} className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105" loading="lazy" />
-                        </DialogTrigger>
+                        <DialogTrigger asChild><img src={img.url} alt={`Imagem gerada: ${img.prompt}`} className="w-full h-full object-cover cursor-pointer transition-transform duration-300 group-hover:scale-105" loading="lazy" /></DialogTrigger>
                         <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-1 flex justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-                            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 h-8 w-8" onClick={(e) => { e.stopPropagation(); handleDownload(img); }}>
-                                <Download className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShare(img); }}>
-                                <Share2 className="h-4 w-4" />
-                            </Button>
+                            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 h-8 w-8" onClick={(e) => { e.stopPropagation(); handleDownload(img); }}><Download className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="text-white hover:bg-white/20 h-8 w-8" onClick={(e) => { e.stopPropagation(); handleShare(img); }}><Share2 className="h-4 w-4" /></Button>
                         </div>
                       </Card>
-                       <DialogContent className="max-w-4xl">
-                          <img src={img.url} alt={`Imagem ampliada: ${img.prompt}`} className="w-full h-auto" />
-                       </DialogContent>
+                       <DialogContent className="max-w-4xl"><img src={img.url} alt={`Imagem ampliada: ${img.prompt}`} className="w-full h-auto" /></DialogContent>
                     </Dialog>
                   );
                 }
-                
-                return (
-                  <Card key={`placeholder-${index}`} className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/20" />
-                );
+                return ( <Card key={`placeholder-${index}`} className="aspect-square rounded-lg border-2 border-dashed border-muted-foreground/30 bg-muted/20" /> );
               })}
             </div>
           </div>
