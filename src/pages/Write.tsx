@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserProfile } from "@/components/UserProfile";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Send, ArrowLeft, FileText, Mail, MessageSquare, Newspaper, Globe, Briefcase, Star, Zap, Smile, Heart, Coffee } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Write = () => {
   const [prompt, setPrompt] = useState("");
@@ -60,7 +61,7 @@ const Write = () => {
     console.log('⏳ Loading iniciado...');
     
     try {
-      console.log('🌐 Fazendo fetch para:', 'https://myqgnnqltemfpzdxwybj.supabase.co/functions/v1/write-content');
+      console.log('🌐 Chamando edge function via Supabase...');
       
       const requestBody = {
         prompt,
@@ -70,27 +71,24 @@ const Write = () => {
       };
       console.log('📦 Body da requisição:', requestBody);
       
-      const response = await fetch('https://myqgnnqltemfpzdxwybj.supabase.co/functions/v1/write-content', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
+      const { data, error } = await supabase.functions.invoke('write-content', {
+        body: requestBody
       });
 
-      console.log('📡 Response status:', response.status);
-      console.log('📡 Response ok:', response.ok);
+      console.log('📡 Response data:', data);
+      console.log('📡 Response error:', error);
 
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Response não ok. Texto do erro:', errorText);
-        throw new Error(`Erro ao gerar conteúdo: ${response.status} - ${errorText}`);
+      if (error) {
+        console.error('❌ Erro na chamada da função:', error);
+        throw new Error(`Erro ao gerar conteúdo: ${error.message}`);
       }
       
-      console.log('✅ Response ok, fazendo parse JSON...');
-      const data = await response.json();
-      console.log('📄 Dados recebidos:', data);
+      if (!data || !data.generatedText) {
+        console.error('❌ Dados inválidos recebidos:', data);
+        throw new Error('Resposta inválida da função');
+      }
       
+      console.log('📄 Texto gerado:', data.generatedText);
       setGeneratedText(data.generatedText);
       console.log('🎉 Conteúdo gerado com sucesso!');
     } catch (error) {
