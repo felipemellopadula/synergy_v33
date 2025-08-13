@@ -68,9 +68,9 @@ const ImagePage = () => {
                 .limit(MAX_IMAGES_TO_FETCH);
 
             if (error) {
-                console.error("Erro ao buscar histórico:", error);
-                // Só mostra o erro se a falha for do banco, não por falta de login
-                toast({ title: "Erro", description: "Não foi possível carregar seu histórico.", variant: "destructive" });
+                console.warn("Falha ao buscar histórico (mostrando estado vazio):", error?.message);
+                // Não mostrar erro ao usuário; manter experiência silenciosa
+                setImages([]);
             } else if (data) {
                 const formattedImages = data.map((dbImg) => {
                     const { data: pub } = supabase.storage.from('images').getPublicUrl(dbImg.image_path);
