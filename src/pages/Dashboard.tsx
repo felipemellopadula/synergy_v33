@@ -1,5 +1,5 @@
 import { useNavigate, Link } from "react-router-dom";
-import { MessageCircle, Video, Image, UserCheck, Code, Settings, LogOut } from "lucide-react";
+import { MessageCircle, Video, Image, UserCheck, PenTool, Settings, LogOut } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -53,13 +53,13 @@ const Dashboard = () => {
       onClick: () => navigate('/translator')
     },
     {
-      id: 'code',
-      icon: Code,
-      title: 'Código',
-      description: 'Assistente de programação',
+      id: 'write',
+      icon: PenTool,
+      title: 'Escrever',
+      description: 'Criação de textos e conteúdo',
       color: 'bg-indigo-500',
-      available: false,
-      onClick: () => {}
+      available: true,
+      onClick: () => navigate('/write')
     },
     {
       id: 'settings',
