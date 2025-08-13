@@ -5,11 +5,12 @@
  */
 
 // Interface que define a estrutura de um objeto de imagem gerada.
-export interface GeneratedImage {
+// Essencial para a tipagem correta das funções.
+interface GeneratedImage {
   id: string;
   prompt: string;
   originalPrompt: string;
-  // O campo detailedPrompt não estava sendo usado, removido para simplificar
+  detailedPrompt: string;
   url: string;
   timestamp: string;
   quality: string;
@@ -19,27 +20,12 @@ export interface GeneratedImage {
 }
 
 // Definição de tipo para uma função de notificação (toast).
-export type ToastFunction = (options: {
+// Permite que as funções sejam independentes da implementação específica do toast.
+type ToastFunction = (options: {
   title: string;
   description?: string;
   variant: "default" | "destructive";
 }) => void;
-
-/**
- * Converte uma string data URI para um objeto Blob.
- * Essencial para as funções de download e compartilhamento.
- */
-const dataURIToBlob = (dataURI: string): Blob => {
-  const byteString = atob(dataURI.split(',')[1]);
-  const mimeString = dataURI.split(',')[0].split(':')[1].split(';')[0];
-  const ab = new ArrayBuffer(byteString.length);
-  const ia = new Uint8Array(ab);
-  for (let i = 0; i < byteString.length; i++) {
-    ia[i] = byteString.charCodeAt(i);
-  }
-  return new Blob([ab], { type: mimeString });
-};
-
 
 /**
  * Inicia o download de uma imagem gerada para o dispositivo do usuário.
@@ -49,86 +35,73 @@ const dataURIToBlob = (dataURI: string): Blob => {
  * @param toast A função para exibir notificações de sucesso ou erro.
  */
 export const downloadImage = (image: GeneratedImage, toast: ToastFunction): void => {
-  try {
-    const fileName = `${image.prompt
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "_")
-      .substring(0, 30)}_${Date.now()}.png`;
+  const fileName = `${image.prompt
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .substring(0, 30)}_${Date.now()}.png`;
 
-    const blob = dataURIToBlob(image.url);
-    const url = window.URL.createObjectURL(blob);
-    
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-    
-    toast({ title: "Download iniciado", description: `A imagem "${fileName}" está a ser baixada.`, variant: "default" });
-  } catch (error) {
-      console.error("Erro no download da imagem:", error);
-      toast({ title: "Erro de Download", description: "Não foi possível baixar a imagem.", variant: "destructive" });
-  }
+  fetch(image.url)
+    .then((response) => {
+      if (!response.ok) {
+        throw new Error(`Falha na rede: ${response.statusText}`);
+      }
+      return response.blob();
+    })
+    .then((blob) => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast({ title: "Download iniciado", description: `A imagem "${fileName}" está a ser baixada.`, variant: "default" });
+    })
+    .catch((error) => {
+        console.error("Erro no download da imagem:", error);
+        toast({ title: "Erro de Download", description: "Não foi possível baixar a imagem.", variant: "destructive" });
+    });
 };
 
 /**
  * Compartilha uma imagem usando a API Web Share nativa do navegador, se disponível.
- * Converte o data URI para um arquivo para uma melhor experiência de compartilhamento.
+ * Caso contrário, copia a URL da imagem para a área de transferência como um fallback.
  *
  * @param image O objeto da imagem a ser compartilhada.
  * @param toast A função para exibir notificações.
  */
 export const shareImage = async (image: GeneratedImage, toast: ToastFunction): Promise<void> => {
+  const shareData = {
+    title: "Imagem Gerada por IA",
+    text: image.prompt,
+    url: image.url,
+  };
+
   try {
-    const blob = dataURIToBlob(image.url);
-    const file = new File([blob], `synergy-image-${Date.now()}.png`, { type: blob.type });
-
-    const shareData: any = {
-      title: "Imagem Gerada por IA",
-      text: image.prompt,
-      files: [file],
-    };
-
-    const canShareFiles = typeof (navigator as any).canShare === 'function' && (navigator as any).canShare(shareData);
-
-    if ((navigator as any).share && canShareFiles) {
-      await (navigator as any).share(shareData);
-      return;
+    if (navigator.share) {
+      await navigator.share(shareData);
+    } else {
+      await navigator.clipboard.writeText(image.url);
+      toast({
+        title: "URL Copiada",
+        description: "O link da imagem foi copiado para a área de transferência.",
+        variant: "default",
+      });
     }
-
-    // Fallback 1: copiar imagem para a área de transferência
-    const clipboard = (navigator as any).clipboard;
-    const ClipboardItemCtor = (window as any).ClipboardItem;
-    if (clipboard && typeof clipboard.write === 'function' && ClipboardItemCtor) {
-      const item = new ClipboardItemCtor({ [blob.type]: blob });
-      await clipboard.write([item]);
-      toast({ title: "Imagem copiada", description: "A imagem foi copiada para a área de transferência.", variant: "default" });
-      return;
-    }
-
-    // Fallback 2: abrir imagem em nova aba
-    const objUrl = URL.createObjectURL(blob);
-    window.open(objUrl, "_blank", "noopener,noreferrer");
-    setTimeout(() => URL.revokeObjectURL(objUrl), 30000);
-    toast({ title: "Compartilhar indisponível", description: "Abrimos a imagem em uma nova aba para você partilhar manualmente.", variant: "default" });
-  } catch (error: any) {
-    // Ignora o erro "AbortError" que acontece quando o usuário fecha a janela de compartilhamento
-    if (error?.name === 'AbortError') {
-      return;
-    }
-
+  } catch (error) {
     console.error("Erro ao compartilhar:", error);
-    toast({ title: "Erro ao Partilhar", description: "Não foi possível partilhar a imagem.", variant: "destructive" });
+    toast({ title: "Erro ao Partilhar", description: "Ocorreu um problema ao tentar partilhar a imagem.", variant: "destructive" });
   }
 };
 
 /**
  * Extrai os dados essenciais de um objeto de imagem para preparar uma nova geração.
+ * Esta é uma função pura que não causa efeitos colaterais.
  *
  * @param image O objeto de imagem existente.
- * @returns Um objeto contendo os dados para recriação.
+ * @returns Um objeto contendo o prompt, modelo e qualidade prontos para serem usados
+ * para definir o estado em um componente React.
  */
 export const getRecreationImageData = (image: GeneratedImage): { prompt: string; model: string; quality: string } => {
   return {
