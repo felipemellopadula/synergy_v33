@@ -1,4 +1,4 @@
-import { ArrowLeft, Paperclip, Mic, Globe, Star, Trash2, Plus, ChevronDown, ChevronUp, Copy, Menu, ArrowUp } from "lucide-react";
+import { ArrowLeft, Paperclip, Mic, Globe, Star, Trash2, Plus, ChevronDown, ChevronUp, Copy, Menu, ArrowUp, ArrowDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useState, useRef, useEffect } from "react";
@@ -68,6 +68,9 @@ const Chat = () => {
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [expandedReasoning, setExpandedReasoning] = useState<{ [key: string]: boolean }>({});
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
 
   // Redirect to home if not authenticated
   useEffect(() => {
@@ -92,6 +95,34 @@ const Chat = () => {
       })();
     }
   }, [user, loading]);
+
+  // Auto scroll to bottom when messages change and handle scroll button visibility
+  useEffect(() => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages]);
+
+  // Handle scroll detection for scroll-to-bottom button
+  useEffect(() => {
+    const chatContainer = chatContainerRef.current;
+    if (!chatContainer) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = chatContainer;
+      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShowScrollToBottom(!isNearBottom && messages.length > 0);
+    };
+
+    chatContainer.addEventListener('scroll', handleScroll);
+    return () => chatContainer.removeEventListener('scroll', handleScroll);
+  }, [messages.length]);
+
+  const scrollToBottom = () => {
+    if (messagesEndRef.current) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   // Select default model on page load if none
   useEffect(() => {
@@ -788,9 +819,9 @@ const Chat = () => {
           </ScrollArea>
         </aside>
         {/* Chat Area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden relative">
           {/* Chat Messages */}
-          <div className="flex-1 overflow-y-auto">
+          <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
             <div className="max-w-4xl mx-auto p-4 space-y-4">
               {messages.length === 0 ? (
                 <div className="flex items-center justify-center h-[60vh] text-muted-foreground">
@@ -924,8 +955,20 @@ const Chat = () => {
                   </div>
                 </div>
               )}
+              <div ref={messagesEndRef} />
             </div>
           </div>
+
+          {/* Scroll to bottom button */}
+          {showScrollToBottom && (
+            <Button
+              onClick={scrollToBottom}
+              className="absolute bottom-24 right-6 h-10 w-10 rounded-full shadow-lg hover:shadow-xl transition-all duration-200 z-10"
+              size="sm"
+            >
+              <ArrowDown className="h-4 w-4" />
+            </Button>
+          )}
           {/* Message Input - Fixed at bottom */}
           <div className="border-t border-border bg-background p-4">
             <div className="max-w-4xl mx-auto">
