@@ -1,4 +1,4 @@
-import { ArrowLeft, Paperclip, Mic, Globe, Star, Trash2, Plus, ChevronDown, ChevronUp, Copy, Menu, ArrowUp, ArrowDown, MoreHorizontal, Edit3 } from "lucide-react";
+import { MessageCircle, ArrowLeft, Paperclip, Mic, Globe, Star, Trash2, Plus, ChevronDown, ChevronUp, Copy, Menu, ArrowUp, ArrowDown, MoreHorizontal, Edit3 } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from "@/components/ui/button";
@@ -261,10 +261,10 @@ const Chat = () => {
         
         if (newConvId?.startsWith('temp_')) {
             setCurrentConversationId(data.id);
-            setConversations(prev => prev.map(c => c.id === newConvId ? data : c));
+            setConversations(prev => prev.map(c => c.id === newConvId ? ({ ...data, messages: Array.isArray(data.messages) ? data.messages : [] }) : c));
         } else {
             setCurrentConversationId(data.id);
-            setConversations(prev => [data, ...prev]);
+            setConversations(prev => [{ ...data, messages: Array.isArray(data.messages) ? data.messages : [] }, ...prev]);
         }
       } else {
         const currentConv = conversations.find(c => c.id === newConvId);
@@ -278,7 +278,7 @@ const Chat = () => {
           .eq('id', newConvId)
           .select('*').single();
         if (error) throw error;
-        setConversations(prev => [data, ...prev.filter(c => c.id !== data.id)]);
+        setConversations(prev => [{ ...data, messages: Array.isArray(data.messages) ? data.messages : [] }, ...prev.filter(c => c.id !== data.id)]);
       }
     } catch (e) { console.error('Erro ao salvar conversa:', e); }
   };
@@ -313,7 +313,7 @@ const Chat = () => {
       .update({ is_favorite: !conv.is_favorite })
       .eq('id', conv.id).select('*').single();
     if (error) toast({ title: 'Erro', description: 'Não foi possível atualizar favorito.', variant: 'destructive' });
-    else if (data) setConversations(prev => prev.map(c => c.id === data.id ? data : c));
+    else if (data) setConversations(prev => prev.map(c => c.id === data.id ? { ...data, messages: Array.isArray(data.messages) ? data.messages : [] } : c));
   };
   
   const renameConversation = async (id: string, newTitle: string) => {
@@ -324,7 +324,7 @@ const Chat = () => {
         .select('*').single();
     if (error) toast({ title: 'Erro', description: 'Não foi possível renomear a conversa.', variant: 'destructive' });
     else if (data) {
-        setConversations(prev => prev.map(c => c.id === data.id ? data : c));
+        setConversations(prev => prev.map(c => c.id === data.id ? { ...data, messages: Array.isArray(data.messages) ? data.messages : [] } : c));
         toast({ title: 'Conversa renomeada!' });
     }
   };
@@ -425,7 +425,10 @@ const Chat = () => {
                     <span className="hidden sm:inline">Voltar</span>
                 </Button>
                 <div className="h-6 w-px bg-border hidden sm:block" />
-                <h1 className="text-lg font-semibold text-foreground">Synergy Chat</h1>
+                <div className="flex items-center gap-2">
+                    <MessageCircle className="h-5 w-5 text-blue-500" />
+                    <h1 className="text-lg font-semibold text-foreground">Chat</h1>
+                </div>
             </div>
 
             {/* Lado Direito (Desktop) */}
