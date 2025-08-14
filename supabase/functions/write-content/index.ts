@@ -60,7 +60,7 @@ INSTRUÇÕES IMPORTANTES:
 
 Texto:`;
 
-    console.log('🌐 Calling OpenAI API...');
+    console.log('🌐 Calling OpenAI API with GPT-5 Nano...');
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -68,13 +68,13 @@ Texto:`;
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-5-nano-2025-08-07',
         messages: [
           { role: 'system', content: 'Você é um assistente de escrita especializado em criar conteúdo em português do Brasil.' },
           { role: 'user', content: enhancedPrompt }
         ],
-        max_tokens: 2048,
-        temperature: 0.7,
+        max_completion_tokens: 2048,
+        // Note: GPT-5 models don't support temperature parameter
       }),
     });
 
@@ -96,6 +96,37 @@ Texto:`;
 
     const generatedText = data.choices[0].message.content;
     console.log('✅ Successfully generated text');
+
+    // Consume 10,000 tokens from user account
+    console.log('💰 Consuming 10,000 tokens from user account...');
+    try {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL');
+      const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+      
+      if (supabaseUrl && supabaseServiceKey) {
+        const tokenResponse = await fetch(`${supabaseUrl}/functions/v1/consume-tokens`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${supabaseServiceKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            modelName: 'gpt-5-nano-2025-08-07',
+            message: `Geração de texto: ${format} - ${tone} - ${length}`,
+            tokenCost: 10000
+          }),
+        });
+        
+        if (tokenResponse.ok) {
+          console.log('✅ Tokens consumed successfully');
+        } else {
+          console.log('⚠️ Warning: Failed to consume tokens, but continuing...');
+        }
+      }
+    } catch (tokenError) {
+      console.log('⚠️ Warning: Token consumption failed:', tokenError.message);
+      // Continue anyway, don't block content generation
+    }
 
     return new Response(JSON.stringify({ generatedText }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
