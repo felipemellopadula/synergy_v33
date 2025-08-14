@@ -19,7 +19,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose 
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
-
 // --- INTERFACES ---
 interface Message {
   id: string;
@@ -31,7 +30,6 @@ interface Message {
   isStreaming?: boolean;
   files?: { name: string; type: string }[];
 }
-
 interface ChatConversation {
   id: string;
   user_id: string;
@@ -41,132 +39,14 @@ interface ChatConversation {
   created_at: string;
   updated_at: string;
 }
-
-// --- COMPONENTES FILHOS ---
-
-interface ConversationSidebarProps {
-  conversations: ChatConversation[];
-  currentConversationId: string | null;
-  onSelectConversation: (conv: ChatConversation) => void;
-  onNewConversation: () => void;
-  onDeleteConversation: (id: string) => void;
-  onToggleFavorite: (conv: ChatConversation) => void;
-  onRenameConversation: (id: string, newTitle: string) => void;
-  isMobile?: boolean;
-}
-
-const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
-  conversations,
-  currentConversationId,
-  onSelectConversation,
-  onNewConversation,
-  onDeleteConversation,
-  onToggleFavorite,
-  onRenameConversation,
-  isMobile = false
-}) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  
-  const handleRename = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    const newTitle = prompt("Digite o novo título da conversa:");
-    if (newTitle && newTitle.trim()) {
-      onRenameConversation(id, newTitle.trim());
-    }
-  };
-
-  const filteredConversations = conversations.filter(c =>
-    c.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const renderItem = (conv: ChatConversation) => (
-    <div
-      key={conv.id}
-      className={`group relative rounded-lg p-3 cursor-pointer transition-colors duration-200 ${
-        currentConversationId === conv.id ? "bg-muted" : "hover:bg-muted/50"
-      }`}
-      onClick={() => onSelectConversation(conv)}
-    >
-      <div className="flex items-start justify-between">
-        <div className="flex-1 min-w-0">
-          <h3 className="text-sm font-medium text-foreground truncate">{conv.title}</h3>
-          <p className="text-xs text-muted-foreground mt-1">
-            {new Date(conv.updated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
-          </p>
-        </div>
-        <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => e.stopPropagation()}>
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onToggleFavorite(conv); }}>
-                <Star className={`h-4 w-4 mr-2 ${conv.is_favorite ? 'text-yellow-500' : ''}`} />
-                {conv.is_favorite ? 'Desfavoritar' : 'Favoritar'}
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => handleRename(e, conv.id)}>
-                <Edit3 className="h-4 w-4 mr-2" />
-                Renomear
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDeleteConversation(conv.id); }} className="text-destructive">
-                <Trash2 className="h-4 w-4 mr-2" />
-                Deletar
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-    </div>
-  );
-  
-  const favorites = filteredConversations.filter(c => c.is_favorite);
-  const recents = filteredConversations.filter(c => !c.is_favorite);
-
-  return (
-    <div className="flex flex-col h-full bg-background border-r border-border">
-      <div className="p-4 border-b border-border flex flex-col gap-4 flex-shrink-0">
-        <Button onClick={onNewConversation} size="lg">
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Chat
-        </Button>
-        <input
-          placeholder="Pesquisar conversas..."
-          className="w-full h-9 rounded-md border bg-muted px-3 text-sm"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
-      </div>
-      <ScrollArea className="flex-1 p-2">
-        <div className="space-y-1">
-            {favorites.length > 0 && (
-                <>
-                    <h4 className="px-3 py-2 text-xs font-semibold text-muted-foreground">Favoritos</h4>
-                    {favorites.map(conv => isMobile ? <SheetClose asChild key={conv.id}>{renderItem(conv)}</SheetClose> : renderItem(conv))}
-                </>
-            )}
-            <h4 className="px-3 py-2 text-xs font-semibold text-muted-foreground">Recentes</h4>
-            {recents.map(conv => isMobile ? <SheetClose asChild key={conv.id}>{renderItem(conv)}</SheetClose> : renderItem(conv))}
-            
-            {filteredConversations.length === 0 && (
-                <p className="p-4 text-center text-sm text-muted-foreground">Nenhuma conversa encontrada.</p>
-            )}
-        </div>
-      </ScrollArea>
-    </div>
-  );
-};
-
 // --- COMPONENTE PRINCIPAL ---
-
 const Chat = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, profile, loading } = useAuth();
   const { consumeTokens, getTokenCost, getModelDisplayName, tokenBalance } = useTokens();
   const isMobile = useIsMobile();
-  
+ 
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined);
@@ -179,20 +59,18 @@ const Chat = () => {
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [expandedReasoning, setExpandedReasoning] = useState<{ [key: string]: boolean }>({});
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-
+  const [sidebarSearchTerm, setSidebarSearchTerm] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const recordingTimeoutRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-
   // --- LÓGICA DE NEGÓCIO ---
-  
+ 
   useEffect(() => {
     if (!loading && !user) navigate('/');
   }, [user, loading, navigate]);
-
   useEffect(() => {
     if (user && !loading) {
       (async () => {
@@ -205,11 +83,9 @@ const Chat = () => {
       })();
     }
   }, [user, loading]);
-
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
-
   useEffect(() => {
     const chatContainer = chatContainerRef.current;
     if (!chatContainer) return;
@@ -220,15 +96,12 @@ const Chat = () => {
     chatContainer.addEventListener('scroll', handleScroll);
     return () => chatContainer.removeEventListener('scroll', handleScroll);
   }, []);
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
-
   useEffect(() => {
     if (!selectedModel) setSelectedModel('synergy-ia');
   }, [selectedModel]);
-
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -237,28 +110,24 @@ const Chat = () => {
         reader.onerror = error => reject(error);
     });
   };
-
   const toSerializable = (msgs: Message[]) => msgs.map(m => ({...m, timestamp: m.timestamp.toISOString()}));
   const fromSerializable = (msgs: any[]): Message[] => (msgs || []).map((m) => ({...m, timestamp: new Date(m.timestamp)}));
   const deriveTitle = (msgs: Message[]) => (msgs.find(m => m.sender === 'user')?.content?.trim() || 'Nova conversa').slice(0, 50);
-
   const openConversation = (conv: ChatConversation) => {
     setCurrentConversationId(conv.id);
     setMessages(fromSerializable(conv.messages));
   };
-
   const upsertConversation = async (finalMessages: Message[], convId: string | null) => {
     try {
       const serial = toSerializable(finalMessages);
       let newConvId = convId;
-
       if (!newConvId || newConvId.startsWith('temp_')) {
         const { data, error } = await supabase
           .from('chat_conversations')
           .insert({ user_id: user!.id, title: deriveTitle(finalMessages), messages: serial })
           .select('*').single();
         if (error) throw error;
-        
+       
         if (newConvId?.startsWith('temp_')) {
             setCurrentConversationId(data.id);
             setConversations(prev => prev.map(c => c.id === newConvId ? data : c));
@@ -271,7 +140,7 @@ const Chat = () => {
         const shouldRename = !currentConv || currentConv.title === 'Nova conversa' || currentConv.messages.length === 0;
         const updatePayload: any = { messages: serial, updated_at: new Date().toISOString() };
         if (shouldRename) updatePayload.title = deriveTitle(finalMessages);
-        
+       
         const { data, error } = await supabase
           .from('chat_conversations')
           .update(updatePayload)
@@ -282,7 +151,6 @@ const Chat = () => {
       }
     } catch (e) { console.error('Erro ao salvar conversa:', e); }
   };
-
   const createNewConversation = async () => {
     if (messages.length > 0 && currentConversationId) {
         await upsertConversation(messages, currentConversationId);
@@ -293,7 +161,6 @@ const Chat = () => {
     setAttachedFiles([]);
     setProcessedPdfs(new Map());
   };
-
   const deleteConversation = async (id: string) => {
     const { error } = await supabase.from('chat_conversations').delete().eq('id', id);
     if (error) {
@@ -306,7 +173,7 @@ const Chat = () => {
     }
     toast({ title: 'Conversa excluída com sucesso!' });
   };
-  
+ 
   const toggleFavoriteConversation = async (conv: ChatConversation) => {
     const { data, error } = await supabase
       .from('chat_conversations')
@@ -315,7 +182,7 @@ const Chat = () => {
     if (error) toast({ title: 'Erro', description: 'Não foi possível atualizar favorito.', variant: 'destructive' });
     else if (data) setConversations(prev => prev.map(c => c.id === data.id ? data : c));
   };
-  
+ 
   const renameConversation = async (id: string, newTitle: string) => {
     const { data, error } = await supabase
         .from('chat_conversations')
@@ -328,31 +195,26 @@ const Chat = () => {
         toast({ title: 'Conversa renomeada!' });
     }
   };
-
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!inputValue.trim() && attachedFiles.length === 0) || isLoading) return;
-
     const currentInput = inputValue;
     const currentFiles = [...attachedFiles];
     setInputValue('');
     setAttachedFiles([]);
     setProcessedPdfs(new Map());
     if (fileInputRef.current) fileInputRef.current.value = '';
-
     const canProceed = await consumeTokens(selectedModel, currentInput);
     if (!canProceed) return;
-
     const fileData = await Promise.all(currentFiles.map(async (file) => {
         const baseData = { name: file.name, type: file.type, data: await fileToBase64(file) };
         return file.type === 'application/pdf' ? { ...baseData, pdfContent: processedPdfs.get(file.name) || '' } : baseData;
     }));
-
     const userMessage: Message = { id: Date.now().toString(), content: currentInput, sender: 'user', timestamp: new Date(), files: currentFiles.map(f => ({ name: f.name, type: f.type }))};
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setIsLoading(true);
-    
+   
     let convId = currentConversationId;
     if (!convId) {
         const tempId = `temp_${Date.now()}`;
@@ -361,17 +223,14 @@ const Chat = () => {
         setCurrentConversationId(tempId);
         convId = tempId;
     }
-
-
     try {
         const internalModel = selectedModel === 'synergy-ia' ? 'gpt-4o-mini' : selectedModel;
         const { data: fnData, error: fnError } = await supabase.functions.invoke('ai-chat', { body: { message: currentInput, model: internalModel, files: fileData.length > 0 ? fileData : undefined } });
         if (fnError) throw fnError;
-        
+       
         const data = fnData as any;
         let content = typeof data.response === 'string' ? data.response : data.response?.content || 'Desculpe, não consegui processar sua mensagem.';
         let reasoning = typeof data.response === 'string' ? '' : data.response?.reasoning;
-
         const botMessage: Message = { id: (Date.now() + 1).toString(), content, sender: 'bot', timestamp: new Date(), model: selectedModel, reasoning: reasoning || undefined };
         const finalMessages = [...newMessages, botMessage];
         setMessages(finalMessages);
@@ -384,7 +243,7 @@ const Chat = () => {
         setIsLoading(false);
     }
   };
-  
+ 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
@@ -404,65 +263,137 @@ const Chat = () => {
     }
     if (event.target) event.target.value = '';
   };
-  
+ 
   const startRecording = async () => {};
   const stopRecording = () => {};
   const transcribeAudio = async (audioBlob: Blob) => {};
 
+  const filteredConversations = conversations.filter(c =>
+    c.title.toLowerCase().includes(sidebarSearchTerm.toLowerCase())
+  );
+  const favorites = filteredConversations.filter(c => c.is_favorite);
+  const recents = filteredConversations.filter(c => !c.is_favorite);
+
+  const handleRename = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const newTitle = prompt("Digite o novo título da conversa:");
+    if (newTitle && newTitle.trim()) {
+      renameConversation(id, newTitle.trim());
+    }
+  };
+
+  const renderConversationItem = (conv: ChatConversation) => (
+    <div
+      className={`group relative rounded-lg p-3 cursor-pointer transition-colors duration-200 ${
+        currentConversationId === conv.id ? "bg-muted" : "hover:bg-muted/50"
+      }`}
+      onClick={() => openConversation(conv)}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-medium text-foreground truncate">{conv.title}</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            {new Date(conv.updated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </p>
+        </div>
+        <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => e.stopPropagation()}>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); toggleFavoriteConversation(conv); }}>
+                <Star className={`h-4 w-4 mr-2 ${conv.is_favorite ? 'text-yellow-500' : ''}`} />
+                {conv.is_favorite ? 'Desfavoritar' : 'Favoritar'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => handleRename(e, conv.id)}>
+                <Edit3 className="h-4 w-4 mr-2" />
+                Renomear
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); deleteConversation(conv.id); }} className="text-destructive">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Deletar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </div>
+  );
+
   // --- RENDERIZAÇÃO ---
   if (loading) return <div className="h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div></div>;
   if (!user || !profile) return null;
-
   return (
     <div className="h-screen max-h-screen bg-background flex flex-col">
       {/* Cabeçalho Fixo */}
       <header className="flex-shrink-0 border-b border-border">
-        <div className="flex h-16 items-center justify-between px-4 md:px-6">
+        <div className="max-w-4xl mx-auto flex h-16 items-center justify-between px-4 md:px-6">
           <div className="flex items-center gap-4">
-            <div className="md:hidden">
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon"><Menu className="h-5 w-5" /></Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="w-80 p-0">
-                  <ConversationSidebar
-                    conversations={conversations}
-                    currentConversationId={currentConversationId}
-                    onSelectConversation={openConversation}
-                    onNewConversation={createNewConversation}
-                    onDeleteConversation={deleteConversation}
-                    onToggleFavorite={toggleFavoriteConversation}
-                    onRenameConversation={renameConversation}
-                    isMobile={true}
-                  />
-                </SheetContent>
-              </Sheet>
-            </div>
+            <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard')}>
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <h1 className="text-lg font-semibold text-foreground">Synergy Chat</h1>
           </div>
           <div className="flex items-center gap-3">
-            <ModelSelector onModelSelect={setSelectedModel} selectedModel={selectedModel} />
             <ThemeToggle />
-            <UserProfile />
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon"><Menu className="h-5 w-5" /></Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-80">
+                <div className="flex flex-col h-full bg-background">
+                  <div className="p-4 border-b border-border flex flex-col gap-4 flex-shrink-0">
+                    <SheetClose asChild>
+                      <Button onClick={createNewConversation} size="lg">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Novo Chat
+                      </Button>
+                    </SheetClose>
+                    <ModelSelector onModelSelect={setSelectedModel} selectedModel={selectedModel} />
+                    <input
+                      placeholder="Pesquisar conversas..."
+                      className="w-full h-9 rounded-md border bg-muted px-3 text-sm"
+                      value={sidebarSearchTerm}
+                      onChange={(e) => setSidebarSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  <ScrollArea className="flex-1 p-2">
+                    <div className="space-y-1">
+                      {favorites.length > 0 && (
+                        <>
+                          <h4 className="px-3 py-2 text-xs font-semibold text-muted-foreground">Favoritos</h4>
+                          {favorites.map(conv => (
+                            <SheetClose asChild key={conv.id}>
+                              {renderConversationItem(conv)}
+                            </SheetClose>
+                          ))}
+                        </>
+                      )}
+                      <h4 className="px-3 py-2 text-xs font-semibold text-muted-foreground">Recentes</h4>
+                      {recents.map(conv => (
+                        <SheetClose asChild key={conv.id}>
+                          {renderConversationItem(conv)}
+                        </SheetClose>
+                      ))}
+                      {filteredConversations.length === 0 && (
+                        <p className="p-4 text-center text-sm text-muted-foreground">Nenhuma conversa encontrada.</p>
+                      )}
+                    </div>
+                  </ScrollArea>
+                  <div className="p-4 border-t border-border">
+                    <UserProfile />
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </header>
-
       {/* Corpo principal com Sidebar e Chat */}
       <div className="flex-1 flex flex-row overflow-hidden">
-        {/* Sidebar de Conversas (Desktop) */}
-        <aside className="w-80 flex-shrink-0 hidden md:flex flex-col bg-background">
-          <ConversationSidebar
-            conversations={conversations}
-            currentConversationId={currentConversationId}
-            onSelectConversation={openConversation}
-            onNewConversation={createNewConversation}
-            onDeleteConversation={deleteConversation}
-            onToggleFavorite={toggleFavoriteConversation}
-            onRenameConversation={renameConversation}
-          />
-        </aside>
-
         {/* Área Principal do Chat */}
         <main className="flex-1 flex flex-col bg-background">
           <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
@@ -484,7 +415,7 @@ const Chat = () => {
                     <div className={`max-w-[85%] rounded-lg px-4 py-3 ${message.sender === 'user' ? 'bg-primary text-primary-foreground ml-auto' : 'bg-muted'}`}>
                       <div className="space-y-3">
                         {message.files && (<div className="flex flex-wrap gap-2">{message.files.map((file, idx) => (<div key={idx} className="bg-background/50 px-3 py-1 rounded-full text-xs">📎 {file.name}</div>))}</div>)}
-                        
+                       
                         {message.reasoning && (
                           <div className="border-b border-border/50 pb-2">
                             <Button variant="ghost" size="sm" onClick={() => setExpandedReasoning(p => ({ ...p, [message.id]: !p[message.id] }))} className="h-auto p-1 text-xs opacity-70 hover:opacity-100">
@@ -493,12 +424,11 @@ const Chat = () => {
                             {expandedReasoning[message.id] && <div className="mt-2 text-xs opacity-80 bg-background/50 rounded p-2 whitespace-pre-wrap">{message.reasoning}</div>}
                           </div>
                         )}
-
                         <div className="text-sm prose prose-sm dark:prose-invert max-w-none break-words">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
                           {message.isStreaming && <span className="inline-block w-2 h-4 bg-current ml-1 animate-pulse" />}
                         </div>
-                        
+                       
                         {message.sender === 'bot' && (
                           <div className="flex items-center justify-between pt-2 border-t border-border/50">
                              <p className="text-xs opacity-70">{getModelDisplayName(message.model)}</p>
@@ -523,13 +453,12 @@ const Chat = () => {
               <div ref={messagesEndRef} />
             </div>
           </div>
-          
+         
           {showScrollToBottom && (
             <Button onClick={scrollToBottom} variant="outline" size="icon" className="absolute bottom-24 right-6 h-10 w-10 rounded-full shadow-lg z-20">
               <ArrowDown className="h-4 w-4" />
             </Button>
           )}
-
           {/* Área de Input */}
           <div className="flex-shrink-0 border-t border-border bg-background p-4">
             <div className="max-w-4xl mx-auto">
@@ -584,5 +513,4 @@ const Chat = () => {
     </div>
   );
 };
-
 export default Chat;
