@@ -146,7 +146,7 @@ const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
           )}
           <h4 className="px-2 pt-4 pb-2 text-xs font-semibold text-muted-foreground">Recentes</h4>
           <div className="space-y-1">
-            {recents.map(conv => <ItemWrapper key={conv.id}>{renderItem(conv)}</ItemWrapper>)}
+             {recents.map(conv => <ItemWrapper key={conv.id}>{renderItem(conv)}</ItemWrapper>)}
           </div>
           {filteredConversations.length === 0 && (
             <p className="p-4 text-center text-sm text-muted-foreground">Nenhuma conversa encontrada.</p>
@@ -156,6 +156,7 @@ const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
     </div>
   );
 };
+
 
 // --- COMPONENTE PRINCIPAL ---
 const Chat = () => {
@@ -309,19 +310,6 @@ const Chat = () => {
     else if (data) setConversations(prev => prev.map(c => c.id === data.id ? data : c).sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()));
   };
   
-  const renameConversation = async (id: string, newTitle: string) => {
-    const { data, error } = await supabase
-        .from('chat_conversations')
-        .update({ title: newTitle })
-        .eq('id', id)
-        .select('*').single();
-    if (error) toast({ title: 'Erro', description: 'Não foi possível renomear a conversa.', variant: 'destructive' });
-    else if (data) {
-        setConversations(prev => prev.map(c => c.id === data.id ? data : c));
-        toast({ title: 'Conversa renomeada!' });
-    }
-  };
-
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     if ((!inputValue.trim() && attachedFiles.length === 0) || isLoading) return;
@@ -398,26 +386,16 @@ const Chat = () => {
     }
   };
   
-  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    // ...
-  };
-  
-  const startRecording = async () => {
-    // ...
-  };
-  const stopRecording = () => {
-    // ...
-  };
-  const transcribeAudio = async (audioBlob: Blob) => {
-    // ...
-  };
-  
   const handleModelSelect = async (newModel: string) => {
     if (newModel === selectedModel) return;
     createNewConversation();
     setSelectedModel(newModel);
   };
-  
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => { /* ... */ };
+  const startRecording = async () => { /* ... */ };
+  const stopRecording = () => { /* ... */ };
+  const transcribeAudio = async (audioBlob: Blob) => { /* ... */ };
 
   // --- RENDERIZAÇÃO ---
   if (loading) return <div className="h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div></div>;
@@ -425,7 +403,6 @@ const Chat = () => {
 
   return (
     <div className="h-screen max-h-screen bg-background flex flex-col">
-      {/* Cabeçalho Fixo */}
       <header className="flex-shrink-0 border-b border-border">
         <div className="flex h-16 items-center justify-between px-4 md:px-6">
           <div className="flex items-center gap-4">
@@ -437,13 +414,11 @@ const Chat = () => {
             <h1 className="text-lg font-semibold text-foreground">Synergy Chat</h1>
           </div>
 
-          {/* Cabeçalho Desktop */}
           <div className="hidden md:flex items-center gap-3">
             <UserProfile />
             <ThemeToggle />
           </div>
 
-          {/* Cabeçalho Mobile */}
           <div className="md:hidden flex items-center gap-2">
             <ThemeToggle />
             <Sheet>
@@ -476,7 +451,6 @@ const Chat = () => {
                     onNewConversation={createNewConversation}
                     onDeleteConversation={deleteConversation}
                     onToggleFavorite={toggleFavoriteConversation}
-                    onRenameConversation={renameConversation}
                     isMobile={true}
                   />
                 </div>
@@ -486,10 +460,12 @@ const Chat = () => {
         </div>
       </header>
 
-      {/* Corpo principal com Sidebar e Chat */}
       <div className="flex-1 flex flex-row overflow-hidden">
-        {/* Sidebar de Conversas (Desktop) */}
         <aside className="w-80 flex-shrink-0 hidden md:flex flex-col bg-background">
+          <Button onClick={createNewConversation} size="lg" className="m-3">
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Chat
+          </Button>
           <ConversationSidebar
             conversations={conversations}
             currentConversationId={currentConversationId}
@@ -497,21 +473,19 @@ const Chat = () => {
             onNewConversation={createNewConversation}
             onDeleteConversation={deleteConversation}
             onToggleFavorite={toggleFavoriteConversation}
-            onRenameConversation={renameConversation}
           />
         </aside>
 
-        {/* Área Principal do Chat */}
         <main className="flex-1 flex flex-col bg-muted/30">
           <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
             <div className="max-w-4xl mx-auto p-4 space-y-4">
               {messages.length === 0 && !isLoading ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground" style={{ minHeight: 'calc(100vh - 250px)' }}>
-                  <div className="text-center">
-                    <img src="/synergy-logo-color.svg" alt="Synergy Logo" className="mx-auto h-24 w-24 mb-4 opacity-50" />
-                    <h3 className="text-xl font-medium">Como posso te ajudar hoje?</h3>
-                    <p className="mt-1 text-sm">Selecione uma conversa ou comece uma nova.</p>
-                  </div>
+                <div className="flex items-center justify-center h-full text-muted-foreground" style={{minHeight: 'calc(100vh - 250px)'}}>
+                    <div className="text-center">
+                        <h3 className="text-2xl font-bold mb-2">Olá, {profile.name}!</h3>
+                        <p>Selecione uma conversa ou inicie uma nova.</p>
+                        <p className="mt-2 text-sm">Você tem {tokenBalance.toLocaleString()} tokens disponíveis.</p>
+                    </div>
                 </div>
               ) : (
                 messages.map((message) => (
