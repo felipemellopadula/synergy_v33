@@ -6,7 +6,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserProfile } from "@/components/UserProfile";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Send, ArrowLeft, FileText, Mail, MessageSquare, Newspaper, Globe, Briefcase, Star, Zap, Smile, Heart, Coffee } from "lucide-react";
+import { Loader2, Send, ArrowLeft, FileText, Mail, MessageSquare, Newspaper, Globe, Briefcase, Star, Zap, Smile, PenTool, Coffee } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 
 const Write = () => {
@@ -112,7 +112,7 @@ const Write = () => {
               Voltar
             </Link>
             <div className="flex items-center gap-2">
-              <Heart className="h-6 w-6 text-primary" />
+              <PenTool className="h-6 w-6 text-primary" />
               <h1 className="text-xl font-bold text-foreground">Escrever</h1>
             </div>
           </div>

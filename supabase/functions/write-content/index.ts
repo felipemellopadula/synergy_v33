@@ -13,7 +13,27 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🔥 write-content function called');
+    
     const { prompt, format, tone, length } = await req.json();
+    console.log('📝 Received params:', { prompt, format, tone, length });
+
+    if (!prompt || !prompt.trim()) {
+      console.log('❌ Empty prompt provided');
+      return new Response(JSON.stringify({ error: 'Prompt is required' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const googleApiKey = Deno.env.get('GOOGLE_API_KEY');
+    if (!googleApiKey) {
+      console.log('❌ Google API key not found');
+      return new Response(JSON.stringify({ error: 'Google API key not configured' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     // Build the enhanced prompt with context
     const enhancedPrompt = `Você é um assistente de escrita especializado. Crie um texto em português com as seguintes especificações:
@@ -40,7 +60,8 @@ INSTRUÇÕES IMPORTANTES:
 
 Texto:`;
 
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=' + Deno.env.get('GOOGLE_API_KEY'), {
+    console.log('🌐 Calling Gemini API...');
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${googleApiKey}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -60,24 +81,34 @@ Texto:`;
       }),
     });
 
+    console.log('📡 Gemini API response status:', response.status);
+
     if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error('❌ Gemini API error:', response.status, errorText);
+      throw new Error(`Gemini API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
+    console.log('📦 Gemini API response:', JSON.stringify(data, null, 2));
     
     if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+      console.error('❌ Invalid response structure from Gemini API:', data);
       throw new Error('Invalid response from Gemini API');
     }
 
     const generatedText = data.candidates[0].content.parts[0].text;
+    console.log('✅ Successfully generated text');
 
     return new Response(JSON.stringify({ generatedText }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('Error in write-content function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    console.error('💥 Error in write-content function:', error);
+    return new Response(JSON.stringify({ 
+      error: `Erro interno: ${error.message}`,
+      details: error.toString()
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
