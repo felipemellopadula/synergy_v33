@@ -159,11 +159,14 @@ export default function Transcribe() {
               <ArrowLeft className="h-4 w-4" />
               <span className="hidden sm:inline">Voltar</span>
             </Button>
-            <div>
-              <h1 className="text-lg sm:text-xl font-bold text-foreground">Transcrever Áudio</h1>
-              <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
-                Converta seus áudios em texto com separação de interlocutores
-              </p>
+            <div className="flex items-center gap-2">
+              <FileAudio className="h-5 w-5 text-primary" />
+              <div>
+                <h1 className="text-lg sm:text-xl font-bold text-foreground">Transcrever Áudio</h1>
+                <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
+                  Converta seus áudios em texto com separação de interlocutores
+                </p>
+              </div>
             </div>
           </div>
           
