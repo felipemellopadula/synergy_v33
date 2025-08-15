@@ -14,14 +14,14 @@ import SettingsStats from "@/components/settings/SettingsStats";
 import { Moon, Sun } from "lucide-react";
 import { ArrowLeft, ImageIcon } from "lucide-react"; // Importações para o header
 
-// Componente ThemeToggle (corrigido: parêntese no useState e lógica de tema ajustada para dark/light)
+// Componente ThemeToggle: Alterna entre modo dark e light
 export const ThemeToggle = () => {
-  const [isDark, setIsDark] = useState(true); // Corrigido: fechamento correto do useState
+  const [isDark, setIsDark] = useState(true); // Corrigido: remoção de parêntese extra
 
   useEffect(() => {
     const root = document.documentElement;
     if (isDark) {
-      root.classList.add('dark'); // Adiciona 'dark' para modo escuro
+      root.classList.add('dark');
       root.classList.remove('light');
     } else {
       root.classList.add('light');
@@ -46,14 +46,14 @@ export const ThemeToggle = () => {
       <Moon className={`absolute h-4 w-4 transition-all duration-300 ${
         isDark ? 'rotate-0 scale-100 opacity-100' : '-rotate-90 scale-0 opacity-0'
       }`} />
-      <span className="sr-only">Toggle theme</span>
+      <span className="sr-only">Alternar tema</span>
     </Button>
   );
 };
 
-// Componente UserProfile (completado: agora exibe avatar e nome do usuário baseado no contexto de auth)
+// Componente UserProfile: Exibe avatar e nome do usuário baseado no contexto de autenticação
 const UserProfile = () => {
-  const { profile } = useAuth(); // Usando o contexto de autenticação para dados reais
+  const { profile } = useAuth();
 
   return (
     <div className="flex items-center gap-2">
@@ -77,6 +77,7 @@ const SettingsPage = () => {
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Efeito para configurar meta tags da página
   useEffect(() => {
     document.title = "Configurações da Conta | AI Chat";
     const desc = "Atualize foto, nome, email e telefone. Veja seu plano Profissional, tokens do mês e quando renovam.";
@@ -97,21 +98,24 @@ const SettingsPage = () => {
     link.href = `${window.location.origin}/settings`;
   }, []);
 
+  // Efeito para carregar dados do perfil
   useEffect(() => {
     if (profile) {
       setName(profile.name || "");
       setEmail(profile.email || "");
       setPhone(profile.phone || "");
-      setAvatarPreview(profile.avatar_url || null); // Inicializa preview com URL existente
+      setAvatarPreview(profile.avatar_url || null);
     }
   }, [profile]);
 
+  // Redireciona se não autenticado
   useEffect(() => {
     if (!loading && !user) {
       navigate("/");
     }
   }, [user, loading, navigate]);
 
+  // Cálculo do ciclo de tokens
   const { cycleStart, cycleEnd, nextReset } = useMemo(() => {
     if (!profile?.created_at) {
       const now = new Date();
@@ -129,6 +133,7 @@ const SettingsPage = () => {
     return { cycleStart: start, cycleEnd: end, nextReset: end };
   }, [profile?.created_at]);
 
+  // Função para formatar data
   const formatDate = (d: Date) => {
     const dd = String(d.getDate()).padStart(2, "0");
     const mm = String(d.getMonth() + 1).padStart(2, "0");
@@ -136,18 +141,17 @@ const SettingsPage = () => {
     return `${dd}/${mm}/${yyyy}`;
   };
 
+  // Função para alterar avatar (upload para Supabase)
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !profile) return;
     setSaving(true);
     try {
-      // Upload para Supabase Storage
       const { data, error } = await supabase.storage
         .from('avatars')
         .upload(`${profile.id}/${file.name}`, file);
       if (error) throw error;
 
-      // Obtendo URL pública corretamente (corrigido: acessando data.publicUrl)
       const { data: publicUrlData } = supabase.storage
         .from('avatars')
         .getPublicUrl(data.path);
@@ -168,13 +172,13 @@ const SettingsPage = () => {
     }
   };
 
+  // Função para salvar alterações no perfil
   const handleSave = async () => {
     if (!profile) return;
     setSaving(true);
     try {
       const updates: any = { name, phone, email };
 
-      // Update email in auth if it changed
       if (email && email !== profile.email) {
         const { error: authErr } = await supabase.auth.updateUser({ email: email.trim().toLowerCase() });
         if (authErr) throw authErr;
@@ -195,21 +199,22 @@ const SettingsPage = () => {
   };
 
   if (loading) {
-    return <div>Carregando...</div>;
+    return <div className="flex justify-center items-center min-h-screen">Carregando...</div>;
   }
 
   const planLabel = "Profissional"; // Pode ser dinâmico se necessário
 
   return (
     <div className="min-h-screen bg-background text-foreground">
+      {/* Header fixo e responsivo */}
       <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
-        <div className="container mx-auto px-4 py-4 flex justify-between items-center">
+        <div className="container mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="flex items-center gap-2 hover:bg-muted">
               <ArrowLeft className="h-4 w-4" />
               Voltar
             </Button>
-            <div className="h-6 w-px bg-border" />
+            <div className="h-6 w-px bg-border hidden sm:block" />
             <div className="flex items-center gap-2">
               <ImageIcon className="h-6 w-6 text-primary" />
               <h1 className="text-xl font-bold text-foreground">Configurações</h1>
@@ -217,36 +222,41 @@ const SettingsPage = () => {
           </div>
           <div className="flex items-center gap-4">
             <UserProfile />
-            <ThemeToggle /> {/* Botão de mudar tema */}
+            <ThemeToggle />
           </div>
         </div>
       </header>
+
+      {/* Main content com grid responsiva */}
       <main className="container mx-auto px-4 py-8">
-        <section className="grid lg:grid-cols-[1fr,auto] gap-8">
-          <Card className="max-w-2xl">
+        <section className="grid grid-cols-1 lg:grid-cols-[1fr,auto] gap-8">
+          {/* Card de Perfil: adapta-se em mobile */}
+          <Card className="w-full max-w-2xl">
             <CardHeader>
               <CardTitle>Perfil</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-start gap-6">
+              {/* Seção de avatar: flex responsivo */}
+              <div className="flex flex-col md:flex-row items-start gap-6">
                 <div className="relative">
                   <Avatar className="h-24 w-24">
                     <AvatarImage src={avatarPreview || profile?.avatar_url || undefined} alt="Foto de perfil do usuário" />
-                    <AvatarFallback>{profile?.name?.[0] || "U"}</AvatarFallback> {/* Corrigido: proteção contra null */}
+                    <AvatarFallback>{profile?.name?.[0] || "U"}</AvatarFallback>
                   </Avatar>
                 </div>
-                <div>
+                <div className="w-full">
                   <Label htmlFor="avatar" className="block mb-2">Foto</Label>
-                  <div className="flex items-center gap-2">
-                    <Input id="avatar" type="file" accept="image/*" onChange={handleAvatarChange} className="w-full" /> {/* Adicionado className para responsividade */}
-                    <Button type="button" variant="secondary">
+                  <div className="flex flex-col sm:flex-row items-center gap-2">
+                    <Input id="avatar" type="file" accept="image/*" onChange={handleAvatarChange} className="w-full" />
+                    <Button type="button" variant="secondary" className="w-full sm:w-auto">
                       <Camera className="h-4 w-4 mr-2" /> Trocar
                     </Button>
                   </div>
                 </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
+              {/* Formulário: grid responsiva */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">Nome</Label>
                   <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
@@ -261,15 +271,17 @@ const SettingsPage = () => {
                 </div>
               </div>
 
+              {/* Botão de salvar: alinhado à direita */}
               <div className="flex justify-end">
-                <Button onClick={handleSave} disabled={saving}>
+                <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
                   <Save className="h-4 w-4 mr-2" /> {saving ? "Salvando..." : "Salvar alterações"}
                 </Button>
               </div>
             </CardContent>
           </Card>
 
-          <div className="space-y-6">
+          {/* Seção de stats e gráfico: empilha em mobile */}
+          <div className="space-y-6 w-full">
             <SettingsStats
               planLabel={planLabel}
               tokensRemaining={profile.tokens_remaining}
@@ -277,7 +289,7 @@ const SettingsPage = () => {
               cycleEnd={cycleEnd}
               nextReset={nextReset}
             />
-            {/* Gráfico responsivo: wrapper com width 100% e height auto para adaptação em mobile/desktop */}
+            {/* Gráfico: wrapper responsivo com overflow */}
             <div className="w-full h-auto overflow-auto">
               <ModelUsageChart cycleStart={cycleStart} cycleEnd={cycleEnd} />
             </div>
