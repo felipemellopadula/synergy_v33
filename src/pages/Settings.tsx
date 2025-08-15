@@ -12,18 +12,20 @@ import { MessageCircle, Save, Camera } from "lucide-react";
 import ModelUsageChart from "@/components/settings/ModelUsageChart";
 import SettingsStats from "@/components/settings/SettingsStats";
 import { Moon, Sun } from "lucide-react";
-import { ArrowLeft, ImageIcon } from "lucide-react"; // Adicionei importações necessárias para o exemplo de header
+import { ArrowLeft, ImageIcon } from "lucide-react"; // Importações para o header
 
-// Componente ThemeToggle (mantido como fornecido)
+// Componente ThemeToggle (corrigido: parêntese no useState e lógica de tema ajustada para dark/light)
 export const ThemeToggle = () => {
-  const [isDark, setIsDark] = useState(true);
+  const [isDark, setIsDark] = useState(true); // Corrigido: fechamento correto do useState
 
   useEffect(() => {
     const root = document.documentElement;
     if (isDark) {
+      root.classList.add('dark'); // Adiciona 'dark' para modo escuro
       root.classList.remove('light');
     } else {
       root.classList.add('light');
+      root.classList.remove('dark');
     }
   }, [isDark]);
 
@@ -49,10 +51,19 @@ export const ThemeToggle = () => {
   );
 };
 
-// Assumindo que UserProfile é um componente existente (baseado no exemplo)
+// Componente UserProfile (completado: agora exibe avatar e nome do usuário baseado no contexto de auth)
 const UserProfile = () => {
-  // Implementação fictícia ou real; ajuste conforme necessário
-  return <div>User Profile</div>;
+  const { profile } = useAuth(); // Usando o contexto de autenticação para dados reais
+
+  return (
+    <div className="flex items-center gap-2">
+      <Avatar className="h-8 w-8">
+        <AvatarImage src={profile?.avatar_url || undefined} alt="Foto de perfil" />
+        <AvatarFallback>{profile?.name?.[0] || "U"}</AvatarFallback>
+      </Avatar>
+      <span className="text-sm font-medium text-foreground">{profile?.name || "Usuário"}</span>
+    </div>
+  );
 };
 
 const SettingsPage = () => {
@@ -91,6 +102,7 @@ const SettingsPage = () => {
       setName(profile.name || "");
       setEmail(profile.email || "");
       setPhone(profile.phone || "");
+      setAvatarPreview(profile.avatar_url || null); // Inicializa preview com URL existente
     }
   }, [profile]);
 
@@ -129,16 +141,17 @@ const SettingsPage = () => {
     if (!file || !profile) return;
     setSaving(true);
     try {
-      // Lógica para upload de avatar (ajuste conforme necessário)
-      // Exemplo: upload para Supabase Storage
+      // Upload para Supabase Storage
       const { data, error } = await supabase.storage
         .from('avatars')
         .upload(`${profile.id}/${file.name}`, file);
       if (error) throw error;
 
-      const { publicUrl } = supabase.storage
+      // Obtendo URL pública corretamente (corrigido: acessando data.publicUrl)
+      const { data: publicUrlData } = supabase.storage
         .from('avatars')
-        .getPublicUrl(data.path).data;
+        .getPublicUrl(data.path);
+      const publicUrl = publicUrlData.publicUrl;
 
       const updates = { avatar_url: publicUrl };
       const { error: updateError } = await updateProfile(updates);
@@ -185,7 +198,7 @@ const SettingsPage = () => {
     return <div>Carregando...</div>;
   }
 
-  const planLabel = "Profissional"; // Exemplo; ajuste conforme necessário
+  const planLabel = "Profissional"; // Pode ser dinâmico se necessário
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -204,7 +217,7 @@ const SettingsPage = () => {
           </div>
           <div className="flex items-center gap-4">
             <UserProfile />
-            <ThemeToggle /> {/* Botão de mudar tema adicionado aqui */}
+            <ThemeToggle /> {/* Botão de mudar tema */}
           </div>
         </div>
       </header>
@@ -219,13 +232,13 @@ const SettingsPage = () => {
                 <div className="relative">
                   <Avatar className="h-24 w-24">
                     <AvatarImage src={avatarPreview || profile?.avatar_url || undefined} alt="Foto de perfil do usuário" />
-                    <AvatarFallback>{profile.name?.[0] || "U"}</AvatarFallback>
+                    <AvatarFallback>{profile?.name?.[0] || "U"}</AvatarFallback> {/* Corrigido: proteção contra null */}
                   </Avatar>
                 </div>
                 <div>
                   <Label htmlFor="avatar" className="block mb-2">Foto</Label>
                   <div className="flex items-center gap-2">
-                    <Input id="avatar" type="file" accept="image/*" onChange={handleAvatarChange} />
+                    <Input id="avatar" type="file" accept="image/*" onChange={handleAvatarChange} className="w-full" /> {/* Adicionado className para responsividade */}
                     <Button type="button" variant="secondary">
                       <Camera className="h-4 w-4 mr-2" /> Trocar
                     </Button>
@@ -264,8 +277,8 @@ const SettingsPage = () => {
               cycleEnd={cycleEnd}
               nextReset={nextReset}
             />
-            {/* Tornando o gráfico responsivo: envolto em div com width 100% e height fixa/auto */}
-            <div className="w-full h-[300px] overflow-hidden"> {/* Ajuste a altura conforme necessário para responsividade */}
+            {/* Gráfico responsivo: wrapper com width 100% e height auto para adaptação em mobile/desktop */}
+            <div className="w-full h-auto min-h-[300px] overflow-hidden">
               <ModelUsageChart cycleStart={cycleStart} cycleEnd={cycleEnd} />
             </div>
           </div>
