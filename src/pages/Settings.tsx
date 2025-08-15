@@ -8,7 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MessageCircle, Save, Camera, ArrowLeft } from "lucide-react";
+import { Save, Camera, ArrowLeft } from "lucide-react";
 import ModelUsageChart from "@/components/settings/ModelUsageChart";
 import SettingsStats from "@/components/settings/SettingsStats";
 import ToggleTheme from "@/components/ToggleTheme";
@@ -17,6 +17,7 @@ const SettingsPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, profile, updateProfile, refreshProfile, loading } = useAuth();
+
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
@@ -25,7 +26,7 @@ const SettingsPage = () => {
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    document.title = "Configurações da Conta | AI Chat";
+    document.title = "Configurações da Conta | Synergy AI";
     const desc = "Atualize foto, nome, email e telefone. Veja seu plano Profissional, tokens do mês e quando renovam.";
     let meta = document.querySelector('meta[name="description"]');
     if (!meta) {
@@ -34,6 +35,7 @@ const SettingsPage = () => {
       document.head.appendChild(meta);
     }
     meta.setAttribute("content", desc);
+
     let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
     if (!link) {
       link = document.createElement("link");
@@ -89,17 +91,19 @@ const SettingsPage = () => {
       const fileExt = file.name.split(".").pop();
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `${user.id}/${fileName}`;
+
       const { error: uploadError } = await supabase.storage
         .from("avatars")
         .upload(filePath, file, { upsert: true, contentType: file.type });
       if (uploadError) throw uploadError;
-      const { data: publicUrlData } = supabase.storage
-        .from("avatars")
-        .getPublicUrl(filePath);
+
+      const { data: publicUrlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
       const publicUrl = publicUrlData.publicUrl;
       setAvatarPreview(publicUrl);
+
       const { error: profErr } = await updateProfile({ avatar_url: publicUrl });
       if (profErr) throw profErr;
+
       toast({ title: "Foto atualizada", description: "Sua foto de perfil foi alterada." });
     } catch (err) {
       console.error(err);
@@ -111,15 +115,18 @@ const SettingsPage = () => {
     if (!user || !profile) return;
     setSaving(true);
     try {
-      const updates: any = { name, phone, email };
-      // Update email in auth if it changed
+      const updates: any = { name, phone };
+
       if (email && email !== profile.email) {
         const { error: authErr } = await supabase.auth.updateUser({ email: email.trim().toLowerCase() });
         if (authErr) throw authErr;
         toast({ title: "Email atualizado", description: "Verifique sua caixa de entrada para confirmar a alteração." });
+        updates.email = email;
       }
+
       const { error } = await updateProfile(updates);
       if (error) throw error;
+
       await refreshProfile();
       toast({ title: "Configurações salvas", description: "Suas informações foram atualizadas." });
     } catch (err) {
@@ -142,31 +149,20 @@ const SettingsPage = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
+      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-10">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              asChild
-              className="flex items-center gap-2 hover:bg-muted"
-            >
-              <Link to="/" replace>
-                <ArrowLeft className="h-4 w-4" />
-                Voltar
-              </Link>
-            </Button>
-            <div className="h-6 w-px bg-border" />
-            <div className="flex items-center gap-2">
-              <MessageCircle className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-bold text-foreground">Configurações</h1>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <ToggleTheme />
-          </div>
+             <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="flex items-center gap-2 hover:bg-muted">
+               <ArrowLeft className="h-4 w-4" />
+               Voltar
+             </Button>
+             <div className="h-6 w-px bg-border" />
+             <h1 className="text-xl font-bold text-foreground">Configurações</h1>
+           </div>
+          <ToggleTheme />
         </div>
       </header>
+
       <main className="container mx-auto px-4 py-8">
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <Card className="lg:col-span-2">
@@ -174,34 +170,23 @@ const SettingsPage = () => {
               <CardTitle>Informações do perfil</CardTitle>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="relative">
-                  <Avatar className="h-20 w-20">
-                    <AvatarImage src={avatarPreview || undefined} alt="Foto de perfil do usuário" />
-                    <AvatarFallback>{profile.name?.[0] || "U"}</AvatarFallback>
-                  </Avatar>
-                </div>
-                <div>
-                  <Label htmlFor="avatar" className="block mb-2">Foto</Label>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <Avatar className="h-20 w-20">
+                  <AvatarImage src={avatarPreview || undefined} alt="Foto de perfil" />
+                  <AvatarFallback>{profile.name?.[0]?.toUpperCase() || "U"}</AvatarFallback>
+                </Avatar>
+                <div className="space-y-2">
+                  <Label htmlFor="avatar">Foto de perfil</Label>
                   <div className="flex items-center gap-2">
-                    <Input
-                      id="avatar"
-                      type="file"
-                      accept="image/*"
-                      onChange={handleAvatarChange}
-                      className="hidden"
-                      ref={avatarInputRef}
-                    />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => avatarInputRef.current?.click()}
-                    >
-                      <Camera className="h-4 w-4 mr-2" /> Trocar
+                    <Input id="avatar" type="file" accept="image/*" onChange={handleAvatarChange} ref={avatarInputRef} className="hidden" />
+                    <Button type="button" variant="outline" onClick={() => avatarInputRef.current?.click()}>
+                      <Camera className="h-4 w-4 mr-2" />
+                      Trocar foto
                     </Button>
                   </div>
                 </div>
               </div>
+
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="name">Nome</Label>
@@ -209,20 +194,23 @@ const SettingsPage = () => {
                 </div>
                 <div>
                   <Label htmlFor="phone">Telefone</Label>
-                  <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  <Input id="phone" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(XX) XXXXX-XXXX"/>
                 </div>
                 <div className="md:col-span-2">
                   <Label htmlFor="email">Email</Label>
                   <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
               </div>
+
               <div className="flex justify-end">
                 <Button onClick={handleSave} disabled={saving}>
-                  <Save className="h-4 w-4 mr-2" /> {saving ? "Salvando..." : "Salvar alterações"}
+                  <Save className="h-4 w-4 mr-2" />
+                  {saving ? "Salvando..." : "Salvar alterações"}
                 </Button>
               </div>
             </CardContent>
           </Card>
+
           <div className="space-y-6">
             <SettingsStats
               planLabel={planLabel}
@@ -230,17 +218,10 @@ const SettingsPage = () => {
               cycleStart={cycleStart}
               cycleEnd={cycleEnd}
               nextReset={nextReset}
+              formatDate={formatDate}
             />
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-foreground">Uso por Modelo</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="w-full h-80 relative overflow-hidden">
-                  <ModelUsageChart cycleStart={cycleStart} cycleEnd={cycleEnd} />
-                </div>
-              </CardContent>
-            </Card>
+            {/* O componente do gráfico agora é um card completo e responsivo por si só */}
+            <ModelUsageChart cycleStart={cycleStart} cycleEnd={cycleEnd} />
           </div>
         </section>
       </main>
