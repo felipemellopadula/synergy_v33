@@ -278,7 +278,7 @@ const SettingsPage = () => {
               nextReset={nextReset}
             />
             {/* Gráfico responsivo: wrapper com width 100% e height auto para adaptação em mobile/desktop */}
-            <div className="w-full h-auto min-h-[150px] overflow-hidden">
+            <div className="w-full h-auto overflow-auto">
               <ModelUsageChart cycleStart={cycleStart} cycleEnd={cycleEnd} />
             </div>
           </div>
