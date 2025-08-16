@@ -151,7 +151,7 @@ const Index = () => {
                 <h1 className="text-3xl md:text-5xl lg:text-6xl font-extrabold tracking-tight text-foreground">
                   Acesso <span className="text-primary">aos melhores<br />modelos</span> de Inteligência<br />
                   Artificial <span className="text-primary">do mundo</span>
-              _message:   </h1>
+               </h1>
                 <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
                   Nosso hub de IA combina os melhores modelos de inteligência artificial para potencializar seus projetos de forma simples e eficiente.
                 </p>
