@@ -1,4 +1,17 @@
-import React, { useEffect } from "react"; // Importando o useEffect
+Entendi perfeitamente. O problema agora é mais sutil. Mesmo com o pré-carregamento, você está vendo um "piscar" no momento em que o menu abre.
+
+Isso acontece porque, embora a imagem já esteja no cache do navegador, existe um intervalo de tempo minúsculo entre o momento em que o React renderiza a tag <img> na tela e o momento em que o navegador efetivamente "pinta" o conteúdo da imagem (o logo) dentro dessa tag. Nesse microssegundo, o que você vê é o espaço vazio ou o fundo do elemento, e logo em seguida a imagem aparece, causando a piscada.
+
+A solução mais robusta para eliminar completamente esse efeito é mudar a forma como exibimos o logo. Em vez de usarmos uma tag <img> (que é um elemento de conteúdo), vamos usar uma div e aplicar o logo como uma imagem de fundo (background-image) via CSS.
+
+Navegadores são extremamente eficientes para pintar o background de um elemento a partir do cache, o que na prática elimina o piscar. Para manter a acessibilidade, adicionaremos atributos como role="img" e aria-label.
+
+Código Completo e Corrigido (Versão Final)
+A lógica de useEffect para o pré-carregamento continua a mesma e é fundamental. A única mudança será na renderização dos logos, substituindo as tags <img> por <div> estilizadas.
+
+TypeScript
+
+import React, { useEffect } from "react";
 import {
   Select,
   SelectContent,
@@ -86,24 +99,16 @@ const getProviderIcon = (provider: string) => {
 
 export const ModelSelector = ({ onModelSelect, selectedModel }: ModelSelectorProps) => {
 
-  // --- NOVO CÓDIGO PARA PRÉ-CARREGAMENTO DOS LOGOS ---
   useEffect(() => {
-    // Usamos um Set para garantir que cada URL de logo seja pré-carregada apenas uma vez.
     const uniqueIconUrls = new Set<string>();
-
-    // Iteramos sobre todos os modelos para coletar as URLs dos ícones.
     Object.values(modelsByProvider).flat().forEach(model => {
       uniqueIconUrls.add(getProviderIcon(model.provider));
     });
-
-    // Para cada URL única, criamos um novo objeto de imagem.
-    // Apenas atribuir a URL ao 'src' já é suficiente para o navegador iniciar o download.
     uniqueIconUrls.forEach(url => {
       const img = new Image();
       img.src = url;
     });
-
-  }, []); // O array de dependências vazio [] garante que este efeito rode apenas uma vez.
+  }, []);
 
   return (
     <div className="w-full max-w-sm">
@@ -127,12 +132,16 @@ export const ModelSelector = ({ onModelSelect, selectedModel }: ModelSelectorPro
                     <div className="flex flex-1 items-center space-x-3 min-w-0">
                       {model.id !== 'synergy-ia' && (
                         <div className="w-6 h-6 rounded-md bg-muted/50 border border-border flex items-center justify-center overflow-hidden flex-shrink-0">
-                          <img
-                            src={getProviderIcon(model.provider)}
-                            alt={`${model.provider} logo`}
-                            className="w-4 h-4 object-contain"
-                            onError={(e) => {
-                              (e.target as HTMLImageElement).style.display = 'none';
+                          {/* --- ALTERAÇÃO 1: img -> div com background-image --- */}
+                          <div
+                            role="img"
+                            aria-label={`${model.provider} logo`}
+                            className="w-4 h-4"
+                            style={{
+                              backgroundImage: `url(${getProviderIcon(model.provider)})`,
+                              backgroundSize: 'contain',
+                              backgroundRepeat: 'no-repeat',
+                              backgroundPosition: 'center',
                             }}
                           />
                         </div>
@@ -141,12 +150,16 @@ export const ModelSelector = ({ onModelSelect, selectedModel }: ModelSelectorPro
                         {model.id === 'synergy-ia' ? (
                           <span className="text-sm truncate font-bold flex items-center">
                             <div className="w-5 h-5 rounded-md bg-muted/50 border border-border flex items-center justify-center overflow-hidden mr-2">
-                              <img
-                                src="/lovable-uploads/3f22acfa-6c56-4617-a7f6-cfe77f357e89.png"
-                                alt="Ícone SynergyIA"
-                                className="w-3.5 h-3.5 object-contain"
-                                onError={(e) => {
-                                  (e.target as HTMLImageElement).style.display = 'none';
+                              {/* --- ALTERAÇÃO 2: img -> div com background-image --- */}
+                              <div
+                                role="img"
+                                aria-label="Ícone SynergyIA"
+                                className="w-3.5 h-3.5"
+                                style={{
+                                  backgroundImage: `url(/lovable-uploads/3f22acfa-6c56-4617-a7f6-cfe77f357e89.png)`,
+                                  backgroundSize: 'contain',
+                                  backgroundRepeat: 'no-repeat',
+                                  backgroundPosition: 'center',
                                 }}
                               />
                             </div>
