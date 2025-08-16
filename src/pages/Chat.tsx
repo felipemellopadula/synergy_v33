@@ -229,6 +229,14 @@ const Chat = () => {
     if (!selectedModel) setSelectedModel('synergy-ia');
   }, [selectedModel]);
 
+  // Start new conversation when model changes
+  const handleModelChange = async (newModel: string) => {
+    if (selectedModel && selectedModel !== newModel && messages.length > 0) {
+      await createNewConversation();
+    }
+    setSelectedModel(newModel);
+  };
+
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -433,7 +441,7 @@ const Chat = () => {
 
             {/* Lado Direito (Desktop) */}
             <div className="hidden md:flex items-center gap-4">
-                <ModelSelector onModelSelect={setSelectedModel} selectedModel={selectedModel} />
+                <ModelSelector onModelSelect={handleModelChange} selectedModel={selectedModel} />
                 <UserProfile />
                 <ThemeToggle />
             </div>
@@ -453,7 +461,7 @@ const Chat = () => {
                         </SheetHeader>
                         <div className="p-4 space-y-4 border-b">
                            <UserProfile />
-                           <ModelSelector onModelSelect={setSelectedModel} selectedModel={selectedModel} />
+                           <ModelSelector onModelSelect={handleModelChange} selectedModel={selectedModel} />
                         </div>
                         <div className="flex-1 flex flex-col overflow-hidden">
                            <ConversationSidebar
@@ -517,12 +525,33 @@ const Chat = () => {
                             <Button variant="ghost" size="sm" onClick={() => setExpandedReasoning(p => ({ ...p, [message.id]: !p[message.id] }))} className="h-auto p-1 text-xs opacity-70 hover:opacity-100">
                               {expandedReasoning[message.id] ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />} Raciocínio
                             </Button>
-                            {expandedReasoning[message.id] && <div className="mt-2 text-xs opacity-80 bg-background/50 rounded p-2 whitespace-pre-wrap">{message.reasoning}</div>}
+                            {expandedReasoning[message.id] && <div className="mt-2 text-xs opacity-80 bg-background/50 rounded p-2 whitespace-pre-wrap overflow-hidden">{message.reasoning}</div>}
                           </div>
                         )}
 
-                        <div className="text-sm prose prose-sm dark:prose-invert max-w-none break-words">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                        <div className="text-sm prose prose-sm dark:prose-invert max-w-none break-words overflow-hidden">
+                          <ReactMarkdown 
+                            remarkPlugins={[remarkGfm]}
+                            components={{
+                              code: ({ className, children, ...props }: any) => {
+                                const isInline = !className?.includes('language-');
+                                return isInline ? (
+                                  <code className="bg-muted px-1 py-0.5 rounded text-xs font-mono break-all" {...props}>
+                                    {children}
+                                  </code>
+                                ) : (
+                                  <pre className="bg-muted p-3 rounded-md overflow-x-auto my-2">
+                                    <code className="text-xs font-mono block whitespace-pre-wrap break-all" {...props}>
+                                      {children}
+                                    </code>
+                                  </pre>
+                                );
+                              },
+                              pre: ({ children }: any) => <>{children}</>,
+                            }}
+                          >
+                            {message.content}
+                          </ReactMarkdown>
                           {message.isStreaming && <span className="inline-block w-2 h-4 bg-current ml-1 animate-pulse" />}
                         </div>
                         
@@ -586,13 +615,26 @@ const Chat = () => {
                   </div>
                   <Textarea
                     value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
+                    onChange={(e) => {
+                      setInputValue(e.target.value);
+                      // Reset height when content changes
+                      const target = e.target as HTMLTextAreaElement;
+                      target.style.height = 'auto';
+                      target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
+                    }}
                     placeholder={isWebSearchMode ? "Digite para buscar na web..." : "Pergunte alguma coisa..."}
                     disabled={isLoading}
-                    className="w-full pl-14 pr-24 py-3 rounded-lg resize-none min-h-[52px]"
+                    className="w-full pl-14 pr-24 py-3 rounded-lg resize-none min-h-[52px] max-h-[128px]"
                     rows={1}
-                    onInput={(e) => { const t = e.target as HTMLTextAreaElement; t.style.height = 'auto'; t.style.height = `${Math.min(t.scrollHeight, 128)}px`; }}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !isMobile && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as any); } }}
+                    onKeyDown={(e) => { 
+                      if (e.key === 'Enter' && !isMobile && !e.shiftKey) { 
+                        e.preventDefault(); 
+                        handleSendMessage(e as any);
+                        // Reset height after sending
+                        const target = e.target as HTMLTextAreaElement;
+                        target.style.height = '52px';
+                      } 
+                    }}
                   />
                   <div className="absolute right-3 top-3 flex gap-1">
                     <TooltipProvider><Tooltip><TooltipTrigger asChild>
