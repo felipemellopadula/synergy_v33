@@ -15,7 +15,6 @@ import SettingsStats from "@/components/settings/SettingsStats";
 // --- COMPONENTES AUXILIARES ---
 
 const ThemeToggle = () => {
-  // Inicializa o estado baseado na preferência do sistema ou no tema salvo
   const [isDark, setIsDark] = useState(() => {
     if (typeof window !== 'undefined') {
       return document.documentElement.classList.contains('dark');
@@ -58,7 +57,6 @@ const UserProfile = () => {
 
 // --- NOVO COMPONENTE DE GRÁFICO (SUBSTITUI O ANTIGO) ---
 const ModelUsageChart = ({ cycleStart, cycleEnd }: { cycleStart: Date, cycleEnd: Date }) => {
-  // Mock de dados - substitua pela sua lógica de fetch de dados reais
   const data = [
     { name: 'synergy-ia', value: 450, color: '#8b5cf6' },
     { name: 'claude-opus-4-20250514', value: 200, color: '#4b5563' },
@@ -84,19 +82,17 @@ const ModelUsageChart = ({ cycleStart, cycleEnd }: { cycleStart: Date, cycleEnd:
       <CardHeader>
         <CardTitle>Uso por modelo (ciclo atual)</CardTitle>
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-col md:flex-row items-center justify-center w-full min-h-[250px]">
-          <div className="h-40 w-40">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie data={data} innerRadius={50} outerRadius={70} fill="#8884d8" paddingAngle={3} dataKey="value" stroke="none">
-                  {data.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
-          <CustomLegend payload={data.map(item => ({ value: item.name, color: item.color }))} />
+      <CardContent className="flex flex-col items-center justify-center w-full min-h-[250px]">
+        <div className="h-36 w-36 md:h-40 md:w-40"> {/* Reduzi a altura e largura */}
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={data} innerRadius={40} outerRadius={60} fill="#8884d8" paddingAngle={3} dataKey="value" stroke="none"> {/* Reduzi os raios */}
+                {data.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
+              </Pie>
+            </PieChart>
+          </ResponsiveContainer>
         </div>
+        <CustomLegend payload={data.map(item => ({ value: item.name, color: item.color }))} />
       </CardContent>
     </Card>
   );
@@ -136,7 +132,6 @@ const SettingsPage = () => {
   }, [user, loading, navigate]);
 
   const { cycleStart, cycleEnd, nextReset } = useMemo(() => {
-    // Sua lógica de cálculo de ciclo está correta
     if (!profile?.created_at) {
       const now = new Date();
       const end = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
@@ -152,7 +147,7 @@ const SettingsPage = () => {
     const end = add30(start);
     return { cycleStart: start, cycleEnd: end, nextReset: end };
   }, [profile?.created_at]);
-  
+
   const formatDate = (d: Date) => {
     if (!d) return '';
     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -190,10 +185,10 @@ const SettingsPage = () => {
           updates.email = email.trim().toLowerCase();
           toast({ title: "Email atualizado", description: "Verifique sua caixa de entrada para confirmar." });
       }
-      
+
       const { error } = await updateProfile(updates);
       if (error) throw error;
-      
+
       await refreshProfile();
       toast({ title: "Configurações salvas!" });
     } catch (err) {
@@ -232,7 +227,6 @@ const SettingsPage = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8">
-        {/* LAYOUT RESPONSIVO CORRIGIDO */}
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2">
             <Card>
@@ -280,7 +274,7 @@ const SettingsPage = () => {
               </CardContent>
             </Card>
           </div>
-          
+
           <div className="lg:col-span-1 space-y-8">
             <SettingsStats
               planLabel={planLabel}
@@ -288,6 +282,7 @@ const SettingsPage = () => {
               cycleStart={cycleStart}
               cycleEnd={cycleEnd}
               nextReset={nextReset}
+              formatDate={formatDate}
             />
             {/* CHAMADA PARA O NOVO COMPONENTE DO GRÁFICO */}
             <ModelUsageChart cycleStart={cycleStart} cycleEnd={cycleEnd} />
