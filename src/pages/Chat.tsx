@@ -145,7 +145,7 @@ const Chat: React.FC = () => {
 
   return (
     <div className="h-screen max-h-screen bg-background flex flex-col">
-      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
+      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-10">
         <div className="container mx-auto px-4 h-16 flex justify-between items-center">
           {/* Lado Esquerdo */}
           <div className="flex items-center space-x-4">
