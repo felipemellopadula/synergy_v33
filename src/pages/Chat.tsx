@@ -43,6 +43,7 @@ interface ChatConversation {
 }
 
 // --- COMPONENTES FILHOS ---
+
 interface ConversationSidebarProps {
   conversations: ChatConversation[];
   currentConversationId: string | null;
@@ -65,126 +66,6 @@ const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
   isMobile = false
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-
+  
   const handleRename = (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    const newTitle = prompt('Enter new title:');
-    if (newTitle) {
-      onRenameConversation(id, newTitle);
-    }
-  };
-
-  const filteredConversations = conversations.filter(conv =>
-    conv.title.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  return (
-    <div className="w-64 h-full bg-background border-r border-border flex flex-col">
-      <div className="p-4 border-b border-border">
-        <Button onClick={onNewConversation} className="w-full">
-          <Plus className="mr-2 h-4 w-4" /> New Conversation
-        </Button>
-        <input
-          type="text"
-          placeholder="Search conversations..."
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          className="mt-2 w-full p-2 border border-border rounded"
-        />
-      </div>
-      <ScrollArea className="flex-1">
-        {filteredConversations.map(conv => (
-          <div
-            key={conv.id}
-            className={`p-4 border-b border-border cursor-pointer flex items-center justify-between ${conv.id === currentConversationId ? 'bg-accent' : ''}`}
-            onClick={() => onSelectConversation(conv)}
-          >
-            <span>{conv.title}</span>
-            <div className="flex space-x-2">
-              <Button variant="ghost" size="icon" onClick={e => { e.stopPropagation(); onToggleFavorite(conv); }}>
-                <Star className={`h-4 w-4 ${conv.is_favorite ? 'fill-yellow-500' : ''}`} />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={e => handleRename(e, conv.id)}>
-                <Edit3 className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={e => { e.stopPropagation(); onDeleteConversation(conv.id); }}>
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        ))}
-      </ScrollArea>
-    </div>
-  );
-};
-
-// Main Chat Component
-const Chat: React.FC = () => {
-  const { user } = useAuth(); // Assuming useAuth provides user
-  const profile = {}; // Placeholder, replace with actual profile logic if needed
-  const isMobile = useIsMobile();
-  const [conversations, setConversations] = useState<ChatConversation[]>([]); // Placeholder state
-  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
-
-  // Placeholder functions - implement as needed
-  const onSelectConversation = (conv: ChatConversation) => setCurrentConversationId(conv.id);
-  const onNewConversation = () => {
-    // Implement new conversation logic
-  };
-  const onDeleteConversation = (id: string) => {
-    // Implement delete logic
-  };
-  const onToggleFavorite = (conv: ChatConversation) => {
-    // Implement favorite toggle
-  };
-  const onRenameConversation = (id: string, newTitle: string) => {
-    // Implement rename logic
-  };
-
-  if (!user || !profile) return null;
-
-  return (
-    <div className="h-screen max-h-screen bg-background flex flex-col">
-      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-10">
-        <div className="container mx-auto px-4 h-16 flex justify-between items-center">
-          {/* Lado Esquerdo */}
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost"><ArrowLeft /></Button>
-            <ModelSelector />
-          </div>
-          {/* Centro */}
-          <div>Chat Title</div>
-          {/* Lado Direito */}
-          <div className="flex items-center space-x-4">
-            <ThemeToggle />
-            <UserProfile />
-          </div>
-        </div>
-      </header>
-      <div className="flex flex-1 overflow-hidden">
-        <ConversationSidebar
-          conversations={conversations}
-          currentConversationId={currentConversationId}
-          onSelectConversation={onSelectConversation}
-          onNewConversation={onNewConversation}
-          onDeleteConversation={onDeleteConversation}
-          onToggleFavorite={onToggleFavorite}
-          onRenameConversation={onRenameConversation}
-          isMobile={isMobile}
-        />
-        {/* Main Chat Area - Placeholder */}
-        <div className="flex-1 flex flex-col">
-          <ScrollArea className="flex-1 p-4">
-            {/* Messages would go here */}
-          </ScrollArea>
-          <div className="p-4 border-t border-border">
-            <Textarea placeholder="Type your message..." />
-            <Button>Send</Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 export default Chat;
