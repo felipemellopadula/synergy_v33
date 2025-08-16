@@ -1,22 +1,3 @@
-Mil desculpas pelo erro. Aconteceu de novo e a falha é totalmente minha. Encontrei o erro de sintaxe que eu introduzi na modificação anterior ao reorganizar o cabeçalho. É o tipo de erro frustrante que não deveria ter passado.
-
-Para corrigir de vez, descartei minhas alterações e comecei do zero a partir do seu código original que eu sei que funcionava. Apliquei todas as suas solicitações de uma vez nesta nova versão, com o máximo de cuidado para não introduzir nenhum outro problema.
-
-As seguintes alterações foram feitas:
-
-Botão "Voltar" Mobile: Agora exibe o texto "Voltar" junto com o ícone, em vez de apenas o ícone.
-
-Header Mobile Reorganizado: A ordem dos itens agora é: Botão Voltar, Título Chat, Seletor de IA, e Menu Hambúrguer.
-
-Conteúdo do Menu Mobile: O Seletor de IA foi movido para fora, e o Botão de Tema foi movido para dentro do menu, junto com o Perfil de Usuário, em um rodapé.
-
-Botão de Tema: A correção flex-shrink-0 foi mantida para garantir que ele não fique achatado.
-
-Estou confiante de que agora o código está 100% correto, sem erros de sintaxe e com todas as alterações visuais que você pediu. Lamento sinceramente pelos problemas e pela sua paciência.
-
-Código Final, Completo e Corrigido de Vez
-TypeScript
-
 import { MessageCircle, ArrowLeft, Paperclip, Mic, Globe, Star, Trash2, Plus, ChevronDown, ChevronUp, Copy, Menu, ArrowUp, ArrowDown, MoreHorizontal, Edit3 } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
