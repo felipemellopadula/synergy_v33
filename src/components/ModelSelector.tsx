@@ -1,3 +1,4 @@
+import React, { useEffect } from "react"; // Importando o useEffect
 import {
   Select,
   SelectContent,
@@ -84,6 +85,26 @@ const getProviderIcon = (provider: string) => {
 };
 
 export const ModelSelector = ({ onModelSelect, selectedModel }: ModelSelectorProps) => {
+
+  // --- NOVO CÓDIGO PARA PRÉ-CARREGAMENTO DOS LOGOS ---
+  useEffect(() => {
+    // Usamos um Set para garantir que cada URL de logo seja pré-carregada apenas uma vez.
+    const uniqueIconUrls = new Set<string>();
+
+    // Iteramos sobre todos os modelos para coletar as URLs dos ícones.
+    Object.values(modelsByProvider).flat().forEach(model => {
+      uniqueIconUrls.add(getProviderIcon(model.provider));
+    });
+
+    // Para cada URL única, criamos um novo objeto de imagem.
+    // Apenas atribuir a URL ao 'src' já é suficiente para o navegador iniciar o download.
+    uniqueIconUrls.forEach(url => {
+      const img = new Image();
+      img.src = url;
+    });
+
+  }, []); // O array de dependências vazio [] garante que este efeito rode apenas uma vez.
+
   return (
     <div className="w-full max-w-sm">
       <Select onValueChange={onModelSelect} value={selectedModel}>
@@ -103,8 +124,6 @@ export const ModelSelector = ({ onModelSelect, selectedModel }: ModelSelectorPro
                   className="cursor-pointer pl-6"
                 >
                   <div className="flex items-center justify-between w-full">
-                    {/* --- ALTERAÇÃO AQUI --- */}
-                    {/* Adicionamos flex-1 e min-w-0 para que esta div ocupe o espaço e empurre o badge */}
                     <div className="flex flex-1 items-center space-x-3 min-w-0">
                       {model.id !== 'synergy-ia' && (
                         <div className="w-6 h-6 rounded-md bg-muted/50 border border-border flex items-center justify-center overflow-hidden flex-shrink-0">
@@ -113,7 +132,7 @@ export const ModelSelector = ({ onModelSelect, selectedModel }: ModelSelectorPro
                             alt={`${model.provider} logo`}
                             className="w-4 h-4 object-contain"
                             onError={(e) => {
-                              e.currentTarget.style.display = 'none';
+                              (e.target as HTMLImageElement).style.display = 'none';
                             }}
                           />
                         </div>
@@ -127,7 +146,7 @@ export const ModelSelector = ({ onModelSelect, selectedModel }: ModelSelectorPro
                                 alt="Ícone SynergyIA"
                                 className="w-3.5 h-3.5 object-contain"
                                 onError={(e) => {
-                                  e.currentTarget.style.display = 'none';
+                                  (e.target as HTMLImageElement).style.display = 'none';
                                 }}
                               />
                             </div>
@@ -144,7 +163,7 @@ export const ModelSelector = ({ onModelSelect, selectedModel }: ModelSelectorPro
                     >
                       {model.category}
                     </Badge>
-          </div>
+                  </div>
                 </SelectItem>
               ))}
             </div>
