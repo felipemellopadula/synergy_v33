@@ -1,9 +1,9 @@
 import { useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
-// 1. RENOMEAMOS o ícone 'Image' para 'ImageIcon' para evitar conflito.
 import { MessageCircle, Video, Image as ImageIcon, Languages, PenTool, FileAudio, LogOut } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+// CORREÇÃO: Removido o '/ui' do caminho, que foi adicionado por engano.
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserProfile } from "@/components/UserProfile";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,7 +13,6 @@ const Dashboard = () => {
   const { signOut } = useAuth();
 
   useEffect(() => {
-    // Agora, 'new Image()' refere-se corretamente ao construtor do navegador.
     const logoDarkUrl = "/lovable-uploads/c26d1b3b-b8c2-4bbf-9902-d76ebe9534f5.png";
     const logoLightUrl = "/lovable-uploads/95128e47-ede1-4ceb-a2f2-4d0c2ed4eb80.png";
 
@@ -50,7 +49,6 @@ const Dashboard = () => {
     },
     {
       id: 'image',
-      // 2. Usamos o novo nome 'ImageIcon' aqui.
       icon: ImageIcon,
       title: 'Imagem',
       description: 'Criação de imagens',
@@ -116,7 +114,7 @@ const Dashboard = () => {
                   backgroundPosition: 'left center',
                 }}
               />
-            </Link>
+       L     </Link>
           </div>
           <div className="flex items-center gap-4">
             <UserProfile />
