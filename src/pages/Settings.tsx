@@ -55,19 +55,19 @@ const UserProfile = () => {
   );
 };
 
-// --- NOVO COMPONENTE DE GRÁFICO (SUBSTITUI O ANTIGO) ---
+// --- COMPONENTE DE GRÁFICO TOTALMENTE RESPONSIVO ---
 const ModelUsageChart = ({ cycleStart, cycleEnd }: { cycleStart: Date, cycleEnd: Date }) => {
   const data = [
-    { name: 'synergy-ia', value: 450, color: '#8b5cf6' },
-    { name: 'claude-opus-4-20250514', value: 200, color: '#4b5563' },
-    { name: 'gpt-4.1-mini-2025-04-14', value: 120, color: '#6b7280' },
-    { name: 'gemini-2.0-flash-exp', value: 100, color: '#ef4444' },
-    { name: 'grok-beta', value: 80, color: '#ffffff' },
-    { name: 'grok-4-0709', value: 50, color: '#a1a1aa' },
+      { name: 'synergy-ia', value: 450, color: '#8b5cf6' },
+      { name: 'claude-opus', value: 200, color: '#4b5563' },
+      { name: 'gpt-4.1-mini', value: 120, color: '#6b7280' },
+      { name: 'gemini-2.0-flash', value: 100, color: '#ef4444' },
+      { name: 'grok-beta', value: 80, color: '#ffffff' },
+      { name: 'grok-4-0709', value: 50, color: '#a1a1aa' },
   ];
 
   const CustomLegend = ({ payload }: any) => (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm mt-4 md:mt-0 md:ml-6">
+    <div className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm w-full mt-4">
       {payload.map((entry: any, index: number) => (
         <div key={`item-${index}`} className="flex items-center gap-2 truncate">
           <div className="h-3 w-3 rounded-full flex-shrink-0" style={{ backgroundColor: entry.color }} />
@@ -82,22 +82,23 @@ const ModelUsageChart = ({ cycleStart, cycleEnd }: { cycleStart: Date, cycleEnd:
       <CardHeader>
         <CardTitle>Uso por modelo (ciclo atual)</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-col items-center justify-center w-full min-h-[250px]">
-        <div className="h-36 w-36 md:h-40 md:w-40"> {/* Reduzi a altura e largura */}
+      <CardContent className="flex flex-col items-center justify-center w-full min-h-[280px]">
+        {/* Container do Gráfico */}
+        <div className="h-40 w-40">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
-              <Pie data={data} innerRadius={40} outerRadius={60} fill="#8884d8" paddingAngle={3} dataKey="value" stroke="none"> {/* Reduzi os raios */}
+              <Pie data={data} innerRadius={50} outerRadius={70} fill="#8884d8" paddingAngle={3} dataKey="value" stroke="none">
                 {data.map((entry, index) => <Cell key={`cell-${index}`} fill={entry.color} />)}
               </Pie>
             </PieChart>
           </ResponsiveContainer>
         </div>
-        <CustomLegend payload={data.map(item => ({ value: item.name, color: item.color }))} />
+        {/* Container da Legenda */}
+        <CustomLegend payload={data.map(item => ({ value: item.name.replace(/-(\d{4})-(\d{2})-(\d{2})/, ''), color: item.color }))} />
       </CardContent>
     </Card>
   );
 };
-
 
 // --- PÁGINA PRINCIPAL ---
 const SettingsPage = () => {
@@ -147,7 +148,7 @@ const SettingsPage = () => {
     const end = add30(start);
     return { cycleStart: start, cycleEnd: end, nextReset: end };
   }, [profile?.created_at]);
-
+  
   const formatDate = (d: Date) => {
     if (!d) return '';
     return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' });
@@ -156,17 +157,14 @@ const SettingsPage = () => {
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-
     try {
       const fileExt = file.name.split(".").pop();
       const fileName = `${Date.now()}.${fileExt}`;
       const filePath = `${user.id}/${fileName}`;
-
       const { error: uploadError } = await supabase.storage.from("avatars").upload(filePath, file, { upsert: true });
       if (uploadError) throw uploadError;
-
-      const { data: publicUrlData } = supabase.storage.from("avatars").getPublicUrl(filePath);
-      await updateProfile({ avatar_url: publicUrlData.publicUrl });
+      const { data: { publicUrl } } = supabase.storage.from("avatars").getPublicUrl(filePath);
+      await updateProfile({ avatar_url: publicUrl });
       await refreshProfile();
       toast({ title: "Foto atualizada com sucesso!" });
     } catch (err) {
@@ -185,10 +183,8 @@ const SettingsPage = () => {
           updates.email = email.trim().toLowerCase();
           toast({ title: "Email atualizado", description: "Verifique sua caixa de entrada para confirmar." });
       }
-
       const { error } = await updateProfile(updates);
       if (error) throw error;
-
       await refreshProfile();
       toast({ title: "Configurações salvas!" });
     } catch (err) {
@@ -208,18 +204,18 @@ const SettingsPage = () => {
     <div className="min-h-screen bg-background text-foreground">
       <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-10">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="flex items-center gap-2">
               <ArrowLeft className="h-4 w-4" />
-              Voltar
+              <span className="hidden sm:inline">Voltar</span>
             </Button>
-            <div className="h-6 w-px bg-border" />
+            <div className="h-6 w-px bg-border hidden sm:block" />
             <div className="flex items-center gap-3">
               <SettingsIcon className="h-6 w-6 text-primary" />
-              <h1 className="text-xl font-bold text-foreground">Configurações</h1>
+              <h1 className="text-lg sm:text-xl font-bold text-foreground">Configurações</h1>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <UserProfile />
             <ThemeToggle />
           </div>
@@ -228,20 +224,21 @@ const SettingsPage = () => {
 
       <main className="container mx-auto px-4 py-8">
         <section className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Coluna do Perfil (ocupa 2 de 3 colunas em telas grandes) */}
           <div className="lg:col-span-2">
             <Card>
               <CardHeader>
                 <CardTitle>Perfil</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+              <CardContent className="space-y-8">
+                <div className="flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
                   <Avatar className="h-24 w-24 flex-shrink-0">
                     <AvatarImage src={avatarPreview || undefined} alt="Foto de perfil" />
                     <AvatarFallback>{profile.name?.[0]?.toUpperCase() || "U"}</AvatarFallback>
                   </Avatar>
                   <div className="w-full space-y-2">
                     <Label htmlFor="avatar-button">Foto</Label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex justify-center sm:justify-start">
                       <Input id="avatar-input" type="file" accept="image/*" onChange={handleAvatarChange} ref={avatarInputRef} className="hidden" />
                       <Button id="avatar-button" type="button" variant="outline" onClick={() => avatarInputRef.current?.click()}>
                         <Camera className="h-4 w-4 mr-2" />
@@ -267,14 +264,15 @@ const SettingsPage = () => {
                 </div>
 
                 <div className="flex justify-end">
-                  <Button onClick={handleSave} disabled={saving}>
+                  <Button onClick={handleSave} disabled={saving} className="w-full sm:w-auto">
                     <Save className="h-4 w-4 mr-2" /> {saving ? "Salvando..." : "Salvar alterações"}
                   </Button>
                 </div>
               </CardContent>
             </Card>
           </div>
-
+          
+          {/* Coluna de Stats e Gráfico (ocupa 1 de 3 colunas em telas grandes) */}
           <div className="lg:col-span-1 space-y-8">
             <SettingsStats
               planLabel={planLabel}
@@ -282,8 +280,8 @@ const SettingsPage = () => {
               cycleStart={cycleStart}
               cycleEnd={cycleEnd}
               nextReset={nextReset}
+              formatDate={formatDate}
             />
-            {/* CHAMADA PARA O NOVO COMPONENTE DO GRÁFICO */}
             <ModelUsageChart cycleStart={cycleStart} cycleEnd={cycleEnd} />
           </div>
         </section>
