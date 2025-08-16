@@ -15,7 +15,6 @@ const Dashboard = () => {
     const logoDarkUrl = "/lovable-uploads/c26d1b3b-b8c2-4bbf-9902-d76ebe9534f5.png";
     const logoLightUrl = "/lovable-uploads/95128e47-ede1-4ceb-a2f2-4d0c2ed4eb80.png";
 
-    // ALTERAÇÃO: Usando 'window.Image' para ser explícito e evitar conflitos de ambiente.
     const imgDark = new window.Image();
     imgDark.src = logoDarkUrl;
 
@@ -114,7 +113,8 @@ const Dashboard = () => {
                   backgroundPosition: 'left center',
                 }}
               />
-            </Link>
+              {/* O 'L' que estava aqui foi removido. */}
+            </Link>
           </div>
           <div className="flex items-center gap-4">
             <UserProfile />
