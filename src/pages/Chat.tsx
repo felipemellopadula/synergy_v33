@@ -427,17 +427,13 @@ const Chat = () => {
       <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
         <div className="container mx-auto px-4 h-16 flex justify-between items-center">
             {/* Lado Esquerdo: Voltar e Título */}
-            <div className="flex items-center gap-3 md:gap-4">
-                {/* BOTÃO PARA DESKTOP */}
-                <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="hidden sm:flex items-center gap-2">
+            <div className="flex items-center gap-3">
+                {/* Botão Voltar (Visível em todos os tamanhos) */}
+                <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="flex items-center gap-2">
                     <ArrowLeft className="h-4 w-4" />
-                    <span>Voltar</span>
+                    <span className="hidden sm:inline">Voltar</span>
                 </Button>
-                {/* BOTÃO PARA MOBILE */}
-                <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="sm:hidden flex items-center gap-2">
-                    <ArrowLeft className="h-4 w-4" />
-                    <span>Voltar</span>
-                </Button>
+                {/* Divisor e Título (Apenas em telas maiores que mobile) */}
                 <div className="h-6 w-px bg-border hidden sm:block" />
                 <div className="flex items-center gap-2">
                     <MessageCircle className="h-5 w-5 text-blue-500" />
@@ -456,9 +452,7 @@ const Chat = () => {
 
             {/* Lado Direito (Mobile) */}
             <div className="md:hidden flex items-center gap-1">
-                <div className="flex-shrink-0">
-                  <ThemeToggle />
-                </div>
+                <ModelSelector onModelSelect={handleModelChange} selectedModel={selectedModel} />
                 <Sheet>
                     <SheetTrigger asChild>
                         <Button variant="ghost" size="icon">
@@ -467,12 +461,8 @@ const Chat = () => {
                     </SheetTrigger>
                     <SheetContent side="right" className="w-[320px] p-0 flex flex-col">
                         <SheetHeader className="p-4 border-b">
-                            <SheetTitle>Menu</SheetTitle>
+                            <SheetTitle>Conversas</SheetTitle>
                         </SheetHeader>
-                        <div className="p-4 space-y-4 border-b">
-                           <UserProfile />
-                           <ModelSelector onModelSelect={handleModelChange} selectedModel={selectedModel} />
-                        </div>
                         <div className="flex-1 flex flex-col overflow-hidden">
                            <ConversationSidebar
                              conversations={conversations}
@@ -484,6 +474,13 @@ const Chat = () => {
                              onRenameConversation={renameConversation}
                              isMobile={true}
                            />
+                        </div>
+                        {/* Rodapé do Menu Mobile */}
+                        <div className="p-4 border-t border-border flex items-center justify-between">
+                           <UserProfile />
+                           <div className="flex-shrink-0">
+                             <ThemeToggle />
+                           </div>
                         </div>
                     </SheetContent>
                 </Sheet>
@@ -569,7 +566,7 @@ const Chat = () => {
                                  h2: ({ children }) => <h2 className="text-xl font-semibold mb-5">{children}</h2>,
                                  h3: ({ children }) => <h3 className="text-lg font-medium mb-5">{children}</h3>,
                                  ul: ({ children }) => <ul className="list-disc list-inside mb-6 space-y-1">{children}</ul>,
-                                 ol: ({ children }) => <ol className="list-decimal list-inside mb-6 space-y-1">{children}</ol>,
+                                 ol: ({ children }) => <ol className="list-decimal list-inside mb-6 space-y-1">{children}</ul>,
                                  blockquote: ({ children }) => <blockquote className="border-l-4 border-border pl-4 italic mb-6">{children}</blockquote>,
                                  hr: () => <hr className="my-6 border-border" />,
                                  a: ({ children, href, ...props }) => (
