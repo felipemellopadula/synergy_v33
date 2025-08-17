@@ -430,7 +430,7 @@ const Chat = () => {
             <div className="flex items-center gap-3 md:gap-4">
                <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="flex items-center gap-2 hover:bg-muted">
                   <ArrowLeft className="h-4 w-4" />
-                  <span className="hidden sm:inline">Voltar</span>
+                  <span>Voltar</span>
                 </Button>
                 <div className="h-6 w-px bg-border hidden sm:block" />
                 <div className="flex items-center gap-2">
