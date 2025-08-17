@@ -488,7 +488,7 @@ const Chat = () => {
 
 
       {/* Corpo principal com Sidebar e Chat */}
-      <div className="flex-1 flex flex-row overflow-hidden">
+      <div className="flex-1 flex flex-row overflow-hidden min-h-0">
         {/* Sidebar de Conversas (Desktop) */}
         <aside className="w-80 flex-shrink-0 hidden md:flex flex-col bg-background">
           <ConversationSidebar
@@ -503,7 +503,7 @@ const Chat = () => {
         </aside>
 
         {/* Área Principal do Chat */}
-        <main className="flex-1 flex flex-col bg-background">
+        <main className="flex-1 flex flex-col bg-background min-h-0">
           <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
             <div className="max-w-4xl mx-auto p-4 space-y-4">
               {messages.length === 0 ? (
