@@ -31,17 +31,27 @@ const Index = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [annual, setAnnual] = useState(true);
   const [isLight, setIsLight] = useState<boolean>(() => document.documentElement.classList.contains('light'));
+  
   const handlePrimaryCta = () => {
     if (user) navigate("/dashboard");
     else setShowAuthModal(true);
   };
+  
   const scrollToSection = (sectionId: string) => {
     const element = document.getElementById(sectionId);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });
     }
   };
+  
   useEffect(() => {
+    // Pré-carregar ambas as imagens para evitar flash
+    const lightLogo = new Image();
+    lightLogo.src = "/lovable-uploads/d3026126-a31a-4979-b9d5-265db8e3f148.png";
+    
+    const darkLogo = new Image();
+    darkLogo.src = "/lovable-uploads/75b65017-8e97-493c-85a8-fe1b0f60ce9f.png";
+    
     document.title = "Synergy AI Hub – Modelos de IA, Recursos e Planos";
     const setMeta = (name: string, content: string) => {
       let el = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
@@ -63,12 +73,14 @@ const Index = () => {
       document.head.appendChild(link);
     }
     link.setAttribute("href", window.location.href);
+    
     const apply = () => setIsLight(document.documentElement.classList.contains('light'));
     apply();
     const observer = new MutationObserver(apply);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
     return () => observer.disconnect();
   }, []);
+  
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -76,6 +88,7 @@ const Index = () => {
       </div>
     );
   }
+  
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Main Content */}
@@ -84,11 +97,22 @@ const Index = () => {
         <header className="border-b border-border sticky top-0 z-30 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
           <div className="container mx-auto px-4 py-4 flex justify-between items-center">
             <a href="/" className="flex items-center gap-2" aria-label="Synergy AI">
-              {isLight ? (
-                <img src="/lovable-uploads/d3026126-a31a-4979-b9d5-265db8e3f148.png" alt="Synergy AI logo" className="h-8 w-auto" />
-              ) : (
-                <img src="/lovable-uploads/75b65017-8e97-493c-85a8-fe1b0f60ce9f.png" alt="Synergy AI logo" className="h-8 w-auto" />
-              )}
+              {/* Logo container com altura fixa para prevenir layout shift */}
+              <div className="relative h-8 w-auto">
+                {/* Ambos os logos carregados, mas apenas um visível por vez */}
+                <img 
+                  src="/lovable-uploads/d3026126-a31a-4979-b9d5-265db8e3f148.png" 
+                  alt="Synergy AI logo" 
+                  className={`h-8 w-auto transition-opacity duration-200 ${isLight ? 'opacity-100' : 'opacity-0 absolute'}`}
+                  loading="eager"
+                />
+                <img 
+                  src="/lovable-uploads/75b65017-8e97-493c-85a8-fe1b0f60ce9f.png" 
+                  alt="Synergy AI logo" 
+                  className={`h-8 w-auto transition-opacity duration-200 ${!isLight ? 'opacity-100' : 'opacity-0 absolute'}`}
+                  loading="eager"
+                />
+              </div>
             </a>
             <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
               <a href="#modelos" className="hover:text-foreground transition-colors">Soluções</a>
@@ -450,3 +474,5 @@ const Index = () => {
   );
 };
 export default Index;
+
+
