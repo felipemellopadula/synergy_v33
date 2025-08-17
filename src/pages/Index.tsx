@@ -425,7 +425,7 @@ const Index = () => {
             <div className="container mx-auto px-4 py-12">
               <div className="grid gap-8 md:grid-cols-4">
                 <div>
-                  <h3 className="text-xl font-bold">IA Hub</h3>
+                  <h3 className="text-xl font-bold">Synergy IA Hub</h3>
                   <p className="mt-2 text-sm text-muted-foreground">
                     Capacitando desenvolvedores e empresas com recursos de IA de ponta.
                   </p>
