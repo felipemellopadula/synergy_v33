@@ -422,88 +422,63 @@ const Chat = () => {
   if (!user || !profile) return null;
 
   return (
-    <div className="h-screen max-h-screen bg-background flex flex-col">
-      {/* ===== INÍCIO DO CABEÇALHO MODIFICADO ===== */}
-      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
-        <div className="container mx-auto px-4 h-16 flex justify-between items-center">
-            {/* Lado Esquerdo: Voltar e Título */}
-            <div className="flex items-center gap-3 md:gap-4">
-               <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="flex items-center gap-2 hover:bg-muted">
-                            <ArrowLeft className="h-4 w-4" />
-                            Voltar
-                        </Button>
-                <div className="h-6 w-px bg-border hidden sm:block" />
-                <div className="flex items-center gap-2">
-                    <MessageCircle className="h-5 w-5 text-blue-500" />
-                    <h1 className="text-lg font-semibold text-foreground">Chat</h1>
-                </div>
-            </div>
+    <div className="h-screen flex flex-col bg-background">
+      <div className="flex h-full">
+        {/* Sidebar Desktop */}
+        {!isMobile && (
+          <div className="w-80 flex-shrink-0 border-r border-border">
+            <ConversationSidebar
+              conversations={conversations}
+              currentConversationId={currentConversationId}
+              onSelectConversation={openConversation}
+              onNewConversation={createNewConversation}
+              onDeleteConversation={deleteConversation}
+              onToggleFavorite={toggleFavoriteConversation}
+              onRenameConversation={renameConversation}
+            />
+          </div>
+        )}
 
-            {/* Lado Direito (Desktop) */}
-            <div className="hidden md:flex items-center gap-4">
-                <ModelSelector onModelSelect={handleModelChange} selectedModel={selectedModel} />
-                <UserProfile />
-                <div className="flex-shrink-0">
-                  <ThemeToggle />
-                </div>
-            </div>
-
-            {/* Lado Direito (Mobile) */}
-            <div className="md:hidden flex items-center gap-1">
-                <div className="flex-shrink-0">
-                  <ThemeToggle />
-                </div>
+        {/* Main Content */}
+        <main className="flex-1 flex flex-col">
+          {/* Header */}
+          <div className="flex-shrink-0 flex items-center justify-between border-b border-border bg-background px-4 py-3">
+            <div className="flex items-center gap-3">
+              {isMobile && (
                 <Sheet>
-                    <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                            <Menu className="h-5 w-5" />
-                        </Button>
-                    </SheetTrigger>
-                    <SheetContent side="right" className="w-[320px] p-0 flex flex-col">
-                        <SheetHeader className="p-4 border-b">
-                            <SheetTitle>Menu</SheetTitle>
-                        </SheetHeader>
-                        <div className="p-4 space-y-4 border-b">
-                           <UserProfile />
-                           <ModelSelector onModelSelect={handleModelChange} selectedModel={selectedModel} />
-                        </div>
-                        <div className="flex-1 flex flex-col overflow-hidden">
-                           <ConversationSidebar
-                             conversations={conversations}
-                             currentConversationId={currentConversationId}
-                             onSelectConversation={openConversation}
-                             onNewConversation={createNewConversation}
-                             onDeleteConversation={deleteConversation}
-                             onToggleFavorite={toggleFavoriteConversation}
-                             onRenameConversation={renameConversation}
-                             isMobile={true}
-                           />
-                        </div>
-                    </SheetContent>
+                  <SheetTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-8 w-8">
+                      <Menu className="h-4 w-4" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="w-80 p-0">
+                    <SheetHeader className="p-4 border-b border-border">
+                      <SheetTitle>Conversas</SheetTitle>
+                    </SheetHeader>
+                    <ConversationSidebar
+                      conversations={conversations}
+                      currentConversationId={currentConversationId}
+                      onSelectConversation={openConversation}
+                      onNewConversation={createNewConversation}
+                      onDeleteConversation={deleteConversation}
+                      onToggleFavorite={toggleFavoriteConversation}
+                      onRenameConversation={renameConversation}
+                      isMobile={true}
+                    />
+                  </SheetContent>
                 </Sheet>
+              )}
+              <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => navigate('/')}>
+                <ArrowLeft className="h-4 w-4" />
+              </Button>
             </div>
-        </div>
-      </header>
-      {/* ===== FIM DO CABEÇALHO MODIFICADO ===== */}
-
-
-      {/* Corpo principal com Sidebar e Chat */}
-      <div className="flex-1 flex flex-row overflow-hidden">
-        {/* Sidebar de Conversas (Desktop) */}
-        <aside className="w-80 flex-shrink-0 hidden md:flex flex-col bg-background">
-          <ConversationSidebar
-            conversations={conversations}
-            currentConversationId={currentConversationId}
-            onSelectConversation={openConversation}
-            onNewConversation={createNewConversation}
-            onDeleteConversation={deleteConversation}
-            onToggleFavorite={toggleFavoriteConversation}
-            onRenameConversation={renameConversation}
-          />
-        </aside>
-
-        {/* Área Principal do Chat */}
-        <main className="flex-1 flex flex-col bg-background">
+            <div className="flex items-center gap-3">
+              <ModelSelector selectedModel={selectedModel} onModelSelect={handleModelChange} />
+              <span className="text-xs text-muted-foreground">Tokens: {tokenBalance}</span>
+              <ThemeToggle />
+              <UserProfile />
+            </div>
+          </div>
           <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
             <div className="max-w-4xl mx-auto p-4 space-y-4">
               {messages.length === 0 ? (
@@ -520,7 +495,7 @@ const Chat = () => {
                     {message.sender === 'bot' && (
                       <Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback></Avatar>
                     )}
-                      <div className={`max-w-[85%] rounded-lg px-4 py-3 relative group ${message.sender === 'user' ? 'bg-primary text-primary-foreground ml-auto' : 'bg-muted'}`}>
+                      <div className={`max-w-[85%] rounded-lg px-4 py-3 relative group ${message.sender === 'user' ? 'bg-user-message text-user-message-foreground ml-auto' : 'bg-muted text-muted-foreground'}`}>
                           <div className="space-y-3">
                            {message.files && (<div className="flex flex-wrap gap-2">{message.files.map((file, idx) => (<div key={idx} className="bg-background/50 px-3 py-1 rounded-full text-xs">📎 {file.name}</div>))}</div>)}
                            
@@ -623,7 +598,7 @@ const Chat = () => {
           )}
 
           {/* Área de Input */}
-          <div className="flex-shrink-0 border-t border-border bg-background p-4">
+          <div className="flex-shrink-0 border-t border-border bg-background p-3">
             <div className="max-w-4xl mx-auto">
                 {attachedFiles.length > 0 && (
                   <div className="flex flex-wrap gap-2 mb-3">
