@@ -1,14 +1,21 @@
-import React, { useState, useRef } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Camera, Upload, Eye, EyeOff } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import React, { useState, useRef } from "react";
+import type { AuthResponse } from "@supabase/supabase-js";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Camera, Upload, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -20,25 +27,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string>('');
+  const [avatarPreview, setAvatarPreview] = useState<string>("");
   const [showSignInPassword, setShowSignInPassword] = useState(false);
   const [showSignUpPassword, setShowSignUpPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sign In Form State
   const [signInData, setSignInData] = useState({
-    email: '',
-    password: '',
+    email: "",
+    password: "",
   });
 
-  // Sign Up Form State
   const [signUpData, setSignUpData] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    password: '',
-    confirmPassword: '',
+    name: "",
+    email: "",
+    phone: "",
+    password: "",
+    confirmPassword: "",
   });
 
   const handleAvatarChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,29 +60,20 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   const uploadAvatar = async (userId: string): Promise<string | null> => {
     if (!avatarFile) return null;
-
     try {
-      const fileExt = avatarFile.name.split('.').pop();
+      const fileExt = avatarFile.name.split(".").pop();
       const fileName = `${userId}/avatar.${fileExt}`;
-
       const { error: uploadError } = await supabase.storage
-        .from('avatars')
-        .upload(fileName, avatarFile, {
-          upsert: true
-        });
-
+        .from("avatars")
+        .upload(fileName, avatarFile, { upsert: true });
       if (uploadError) {
-        console.error('Upload error:', uploadError);
+        console.error("Upload error:", uploadError);
         return null;
       }
-
-      const { data } = supabase.storage
-        .from('avatars')
-        .getPublicUrl(fileName);
-
+      const { data } = supabase.storage.from("avatars").getPublicUrl(fileName);
       return data.publicUrl;
     } catch (error) {
-      console.error('Avatar upload error:', error);
+      console.error("Avatar upload error:", error);
       return null;
     }
   };
@@ -85,23 +81,21 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-
     try {
       const emailNormalized = signInData.email.trim().toLowerCase();
       const { error } = await signIn(emailNormalized, signInData.password);
-
       if (error) {
         let errorMessage = error.message;
-        
-        // Handle common authentication errors with Portuguese messages
-        if (error.message.includes('Invalid login credentials')) {
-          errorMessage = 'Email ou senha inválidos. Verifique suas credenciais.';
-        } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = 'Confirme seu email antes de fazer login. Verifique sua caixa de entrada.';
-        } else if (error.message.includes('Too many requests')) {
-          errorMessage = 'Muitas tentativas de login. Tente novamente em alguns minutos.';
+        if (error.message.includes("Invalid login credentials")) {
+          errorMessage =
+            "Email ou senha inválidos. Verifique suas credenciais.";
+        } else if (error.message.includes("Email not confirmed")) {
+          errorMessage =
+            "Confirme seu email antes de fazer login. Verifique sua caixa de entrada.";
+        } else if (error.message.includes("Too many requests")) {
+          errorMessage =
+            "Muitas tentativas de login. Tente novamente em alguns minutos.";
         }
-        
         toast({
           title: "Erro no login",
           description: errorMessage,
@@ -109,20 +103,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         });
         return;
       }
-
       toast({
         title: "Login realizado com sucesso!",
         description: "Bem-vindo de volta.",
       });
-
       onClose();
-      
-      // Redirect to dashboard after successful login
       setTimeout(() => {
-        window.location.href = '/dashboard';
+        window.location.href = "/dashboard";
       }, 1000);
     } catch (error: any) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
       toast({
         title: "Erro",
         description: "Ocorreu um erro inesperado. Tente novamente.",
@@ -135,50 +125,48 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-
     if (signUpData.password !== signUpData.confirmPassword) {
       toast({
-        title: "Erro",
+        title: "Erro de Validação",
         description: "As senhas não coincidem.",
         variant: "destructive",
       });
-      setLoading(false);
       return;
     }
-
+    setLoading(true);
     try {
-      const { error } = await signUp(
+      const response = (await signUp(
         signUpData.email,
         signUpData.password,
         signUpData.name,
         signUpData.phone
-      );
+      )) as AuthResponse;
 
-      if (error) {
-        toast({
-          title: "Erro no cadastro",
-          description: error.message,
-          variant: "destructive",
-        });
-        return;
+      // Se a resposta contiver um erro, o bloco 'catch' irá lidar com isso.
+      if (response.error) {
+        throw response.error;
       }
 
+      // --- LÓGICA DE SUCESSO SIMPLIFICADA ---
+      // Se não houve erro, o cadastro foi bem-sucedido e o e-mail de confirmação foi enviado.
+      // Mostramos a mensagem de sucesso e fechamos o modal.
       toast({
         title: "Cadastro realizado com sucesso!",
-        description: "Redirecionando para o dashboard...",
+        description: "Verifique seu e-mail para continuar e ativar sua conta.",
+        duration: 6000,
       });
 
+      // Tenta fazer o upload do avatar em segundo plano, se houver um usuário na resposta
+      if (response.data?.user && avatarFile) {
+        await uploadAvatar(response.data.user.id);
+      }
+
       onClose();
-      
-      // Redirect to dashboard after successful signup
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 1000);
-    } catch (error) {
+    } catch (error: any) {
       toast({
-        title: "Erro",
-        description: "Ocorreu um erro inesperado. Tente novamente.",
+        title: "Erro no Cadastro",
+        description:
+          error.message || "Ocorreu um erro inesperado. Tente novamente.",
         variant: "destructive",
       });
     } finally {
@@ -188,10 +176,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
   const handleGoogleSignIn = async () => {
     setLoading(true);
-
     try {
       const { error } = await signInWithGoogle();
-
       if (error) {
         toast({
           title: "Erro no login",
@@ -200,12 +186,10 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
         });
         return;
       }
-
       toast({
         title: "Redirecionando...",
         description: "Você será redirecionado para fazer login com Google.",
       });
-
       onClose();
     } catch (error) {
       toast({
@@ -217,319 +201,333 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       setLoading(false);
     }
   };
-  
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
+      <DialogContent className="w-[95vw] max-w-md rounded-lg max-h-[90vh] flex flex-col p-0">
+        <DialogHeader className="p-6 pb-4 flex-shrink-0">
           <DialogTitle>Acesse sua conta</DialogTitle>
+          <DialogDescription>
+            Crie uma conta ou faça login para continuar.
+          </DialogDescription>
         </DialogHeader>
-
-        <Tabs defaultValue="signin" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="signin">Entrar</TabsTrigger>
-            <TabsTrigger value="signup">Cadastrar</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="signin" className="space-y-4">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-            >
-              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                <path
-                  fill="currentColor"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              {loading ? "Redirecionando..." : "Entrar com Google"}
-            </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">ou</span>
-              </div>
-            </div>
-
-            <form onSubmit={handleSignIn} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="signin-email">Email</Label>
-                <Input
-                  id="signin-email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={signInData.email}
-                  onChange={(e) =>
-                    setSignInData({ ...signInData, email: e.target.value })
-                  }
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="signin-password">Senha</Label>
-                <div className="relative">
-                  <Input
-                    id="signin-password"
-                    type={showSignInPassword ? "text" : "password"}
-                    placeholder="Sua senha"
-                    value={signInData.password}
-                    onChange={(e) =>
-                      setSignInData({ ...signInData, password: e.target.value })
-                    }
-                    required
-                    className="pr-10"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowSignInPassword(!showSignInPassword)}
-                  >
-                    {showSignInPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Entrando..." : "Entrar"}
-              </Button>
-
+        <div className="overflow-y-auto px-6 pb-6">
+          <Tabs defaultValue="signin" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="signin">Entrar</TabsTrigger>
+              <TabsTrigger value="signup">Cadastrar</TabsTrigger>
+            </TabsList>
+            <TabsContent value="signin" className="mt-4 space-y-4">
               <Button
                 type="button"
-                variant="link"
+                variant="outline"
                 className="w-full"
+                onClick={handleGoogleSignIn}
                 disabled={loading}
-                onClick={async () => {
-                  const email = signInData.email.trim().toLowerCase();
-                  if (!email) {
-                    toast({
-                      title: 'Informe seu email',
-                      description: 'Preencha o campo de email para receber o link.',
-                      variant: 'destructive',
-                    });
-                    return;
-                  }
-                  setLoading(true);
-                  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-                    redirectTo: `${window.location.origin}/dashboard`,
-                  });
-                  setLoading(false);
-                  if (error) {
-                    toast({ title: 'Erro ao enviar link', description: error.message, variant: 'destructive' });
-                  } else {
-                    toast({ title: 'Email enviado', description: 'Verifique sua caixa de entrada para redefinir a senha.' });
-                  }
-                }}
               >
-                Esqueci minha senha
-              </Button>
-            </form>
-          </TabsContent>
-
-          <TabsContent value="signup" className="space-y-4">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full"
-              onClick={handleGoogleSignIn}
-              disabled={loading}
-            >
-              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                <path
-                  fill="currentColor"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                />
-                <path
-                  fill="currentColor"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                />
-              </svg>
-              {loading ? "Redirecionando..." : "Cadastrar com Google"}
-            </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">ou</span>
-              </div>
-            </div>
-
-            <form onSubmit={handleSignUp} className="space-y-4">
-              <div className="flex flex-col items-center space-y-2">
-                <div className="relative">
-                  <Avatar className="h-20 w-20">
-                    <AvatarImage src={avatarPreview} />
-                    <AvatarFallback>
-                      <Camera className="h-8 w-8" />
-                    </AvatarFallback>
-                  </Avatar>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full p-0"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    <Upload className="h-4 w-4" />
-                  </Button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    accept="image/*"
-                    onChange={handleAvatarChange}
-                    className="hidden"
+                <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                  <path
+                    fill="currentColor"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                   />
+                  <path
+                    fill="currentColor"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="currentColor"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  />
+                  <path
+                    fill="currentColor"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
+                </svg>
+                {loading ? "Redirecionando..." : "Entrar com Google"}
+              </Button>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
                 </div>
-                <Label className="text-sm text-muted-foreground">
-                  Foto de perfil (opcional)
-                </Label>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    ou
+                  </span>
+                </div>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="signup-name">Nome completo</Label>
-                <Input
-                  id="signup-name"
-                  type="text"
-                  placeholder="Seu nome completo"
-                  value={signUpData.name}
-                  onChange={(e) =>
-                    setSignUpData({ ...signUpData, name: e.target.value })
-                  }
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="signup-email">Email</Label>
-                <Input
-                  id="signup-email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={signUpData.email}
-                  onChange={(e) =>
-                    setSignUpData({ ...signUpData, email: e.target.value })
-                  }
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="signup-phone">Celular (opcional)</Label>
-                <Input
-                  id="signup-phone"
-                  type="tel"
-                  placeholder="(11) 99999-9999"
-                  value={signUpData.phone}
-                  onChange={(e) =>
-                    setSignUpData({ ...signUpData, phone: e.target.value })
-                  }
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="signup-password">Senha</Label>
-                <div className="relative">
+              <form onSubmit={handleSignIn} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="signin-email">Email</Label>
                   <Input
-                    id="signup-password"
-                    type={showSignUpPassword ? "text" : "password"}
-                    placeholder="Sua senha"
-                    value={signUpData.password}
+                    id="signin-email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={signInData.email}
                     onChange={(e) =>
-                      setSignUpData({ ...signUpData, password: e.target.value })
+                      setSignInData({ ...signInData, email: e.target.value })
                     }
                     required
-                    className="pr-10"
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowSignUpPassword(!showSignUpPassword)}
-                  >
-                    {showSignUpPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signin-password">Senha</Label>
+                  <div className="relative">
+                    <Input
+                      id="signin-password"
+                      type={showSignInPassword ? "text" : "password"}
+                      placeholder="Sua senha"
+                      value={signInData.password}
+                      onChange={(e) =>
+                        setSignInData({
+                          ...signInData,
+                          password: e.target.value,
+                        })
+                      }
+                      required
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowSignInPassword(!showSignInPassword)}
+                    >
+                      {showSignInPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Entrando..." : "Entrar"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="link"
+                  className="w-full"
+                  disabled={loading}
+                  onClick={async () => {
+                    const email = signInData.email.trim().toLowerCase();
+                    if (!email) {
+                      toast({
+                        title: "Informe seu email",
+                        description:
+                          "Preencha o campo de email para receber o link.",
+                        variant: "destructive",
+                      });
+                      return;
+                    }
+                    setLoading(true);
+                    const { error } = await supabase.auth.resetPasswordForEmail(
+                      email,
+                      {
+                        redirectTo: `${window.location.origin}/dashboard`,
+                      }
+                    );
+                    setLoading(false);
+                    if (error) {
+                      toast({
+                        title: "Erro ao enviar link",
+                        description: error.message,
+                        variant: "destructive",
+                      });
+                    } else {
+                      toast({
+                        title: "Email enviado",
+                        description:
+                          "Verifique sua caixa de entrada para redefinir a senha.",
+                      });
+                    }
+                  }}
+                >
+                  Esqueci minha senha
+                </Button>
+              </form>
+            </TabsContent>
+            <TabsContent value="signup" className="mt-4 space-y-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={handleGoogleSignIn}
+                disabled={loading}
+              >
+                <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                  <path
+                    fill="currentColor"
+                    d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                  />
+                  <path
+                    fill="currentColor"
+                    d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                  />
+                  <path
+                    fill="currentColor"
+                    d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                  />
+                  <path
+                    fill="currentColor"
+                    d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                  />
+                </svg>
+                {loading ? "Redirecionando..." : "Cadastrar com Google"}
+              </Button>
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">
+                    ou
+                  </span>
                 </div>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="signup-confirm-password">Confirmar senha</Label>
-                <div className="relative">
+              <form onSubmit={handleSignUp} className="space-y-4">
+                <div className="flex flex-col items-center space-y-2">
+                  <div className="relative">
+                    <Avatar className="h-20 w-20">
+                      <AvatarImage src={avatarPreview} />
+                      <AvatarFallback>
+                        <Camera className="h-8 w-8" />
+                      </AvatarFallback>
+                    </Avatar>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="absolute -bottom-2 -right-2 h-8 w-8 rounded-full"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      <Upload className="h-4 w-4" />
+                    </Button>
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleAvatarChange}
+                      className="hidden"
+                    />
+                  </div>
+                  <Label className="text-sm text-muted-foreground">
+                    Foto de perfil (opcional)
+                  </Label>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-name">Nome completo</Label>
                   <Input
-                    id="signup-confirm-password"
-                    type={showConfirmPassword ? "text" : "password"}
-                    placeholder="Confirme sua senha"
-                    value={signUpData.confirmPassword}
+                    id="signup-name"
+                    type="text"
+                    placeholder="Seu nome completo"
+                    value={signUpData.name}
                     onChange={(e) =>
-                      setSignUpData({
-                        ...signUpData,
-                        confirmPassword: e.target.value,
-                      })
+                      setSignUpData({ ...signUpData, name: e.target.value })
                     }
                     required
-                    className="pr-10"
                   />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  >
-                    {showConfirmPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
-                  </Button>
                 </div>
-              </div>
-
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Cadastrando..." : "Cadastrar"}
-              </Button>
-            </form>
-          </TabsContent>
-        </Tabs>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-email">Email</Label>
+                  <Input
+                    id="signup-email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={signUpData.email}
+                    onChange={(e) =>
+                      setSignUpData({ ...signUpData, email: e.target.value })
+                    }
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-phone">Celular (opcional)</Label>
+                  <Input
+                    id="signup-phone"
+                    type="tel"
+                    placeholder="(11) 99999-9999"
+                    value={signUpData.phone}
+                    onChange={(e) =>
+                      setSignUpData({ ...signUpData, phone: e.target.value })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-password">Senha</Label>
+                  <div className="relative">
+                    <Input
+                      id="signup-password"
+                      type={showSignUpPassword ? "text" : "password"}
+                      placeholder="Sua senha"
+                      value={signUpData.password}
+                      onChange={(e) =>
+                        setSignUpData({
+                          ...signUpData,
+                          password: e.target.value,
+                        })
+                      }
+                      required
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowSignUpPassword(!showSignUpPassword)}
+                    >
+                      {showSignUpPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="signup-confirm-password">
+                    Confirmar senha
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="signup-confirm-password"
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Confirme sua senha"
+                      value={signUpData.confirmPassword}
+                      onChange={(e) =>
+                        setSignUpData({
+                          ...signUpData,
+                          confirmPassword: e.target.value,
+                        })
+                      }
+                      required
+                      className="pr-10"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() =>
+                        setShowConfirmPassword(!showConfirmPassword)
+                      }
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? "Cadastrando..." : "Cadastrar"}
+                </Button>
+              </form>
+            </TabsContent>
+          </Tabs>
+        </div>
       </DialogContent>
     </Dialog>
   );
