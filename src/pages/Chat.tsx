@@ -229,7 +229,6 @@ const Chat = () => {
     if (!selectedModel) setSelectedModel('synergy-ia');
   }, [selectedModel]);
 
-  // Start new conversation when model changes
   const handleModelChange = async (newModel: string) => {
     if (selectedModel && selectedModel !== newModel && messages.length > 0) {
       await createNewConversation();
@@ -302,6 +301,7 @@ const Chat = () => {
     setProcessedPdfs(new Map());
   };
 
+  // --- INÍCIO DA MODIFICAÇÃO: TOAST REMOVIDO ---
   const deleteConversation = async (id: string) => {
     const { error } = await supabase.from('chat_conversations').delete().eq('id', id);
     if (error) {
@@ -312,8 +312,9 @@ const Chat = () => {
     if (currentConversationId === id) {
       createNewConversation();
     }
-    toast({ title: 'Conversa excluída com sucesso!' });
+    // A linha do toast de sucesso foi removida daqui.
   };
+  // --- FIM DA MODIFICAÇÃO ---
   
   const toggleFavoriteConversation = async (conv: ChatConversation) => {
     const { data, error } = await supabase
@@ -370,25 +371,52 @@ const Chat = () => {
         convId = tempId;
     }
 
-
     try {
         const internalModel = selectedModel === 'synergy-ia' ? 'gpt-4o-mini' : selectedModel;
         const { data: fnData, error: fnError } = await supabase.functions.invoke('ai-chat', { body: { message: currentInput, model: internalModel, files: fileData.length > 0 ? fileData : undefined } });
         if (fnError) throw fnError;
         
         const data = fnData as any;
-        let content = typeof data.response === 'string' ? data.response : data.response?.content || 'Desculpe, não consegui processar sua mensagem.';
-        let reasoning = typeof data.response === 'string' ? '' : data.response?.reasoning;
+        const fullBotText = typeof data.response === 'string' ? data.response : data.response?.content || 'Desculpe, não consegui processar sua mensagem.';
+        const reasoning = typeof data.response === 'string' ? '' : data.response?.reasoning;
 
-        const botMessage: Message = { id: (Date.now() + 1).toString(), content, sender: 'bot', timestamp: new Date(), model: selectedModel, reasoning: reasoning || undefined };
-        const finalMessages = [...newMessages, botMessage];
-        setMessages(finalMessages);
-        await upsertConversation(finalMessages, convId);
+        const botMessageId = (Date.now() + 1).toString();
+        const placeholderBotMessage: Message = { 
+            id: botMessageId, 
+            content: '', 
+            sender: 'bot', 
+            timestamp: new Date(), 
+            model: selectedModel, 
+            reasoning: reasoning || undefined,
+            isStreaming: true 
+        };
+        setMessages(prev => [...newMessages, placeholderBotMessage]);
+
+        let charIndex = 0;
+        const typingInterval = setInterval(() => {
+            if (charIndex < fullBotText.length) {
+                setMessages(prev => prev.map(msg => 
+                    msg.id === botMessageId 
+                    ? { ...msg, content: fullBotText.slice(0, charIndex + 1) } 
+                    : msg
+                ));
+                charIndex++;
+            } else {
+                clearInterval(typingInterval);
+                
+                const finalBotMessage: Message = { ...placeholderBotMessage, content: fullBotText, isStreaming: false };
+                const finalMessages = [...newMessages, finalBotMessage];
+                setMessages(finalMessages);
+                
+                upsertConversation(finalMessages, convId);
+                setIsLoading(false);
+            }
+        }, 25);
+
     } catch (error) {
         console.error('Error sending message:', error);
         toast({ title: "Erro", description: "Não foi possível enviar a mensagem.", variant: "destructive" });
         setMessages(newMessages);
-    } finally {
         setIsLoading(false);
     }
   };
@@ -463,16 +491,16 @@ const Chat = () => {
                            <ModelSelector onModelSelect={handleModelChange} selectedModel={selectedModel} />
                         </div>
                         <div className="flex-1 flex flex-col overflow-hidden">
-                           <ConversationSidebar
-                             conversations={conversations}
-                             currentConversationId={currentConversationId}
-                             onSelectConversation={openConversation}
-                             onNewConversation={createNewConversation}
-                             onDeleteConversation={deleteConversation}
-                             onToggleFavorite={toggleFavoriteConversation}
-                             onRenameConversation={renameConversation}
-                             isMobile={true}
-                           />
+                            <ConversationSidebar
+                              conversations={conversations}
+                              currentConversationId={currentConversationId}
+                              onSelectConversation={openConversation}
+                              onNewConversation={createNewConversation}
+                              onDeleteConversation={deleteConversation}
+                              onToggleFavorite={toggleFavoriteConversation}
+                              onRenameConversation={renameConversation}
+                              isMobile={true}
+                            />
                         </div>
                     </SheetContent>
                 </Sheet>
@@ -509,8 +537,6 @@ const Chat = () => {
                 messages.map((message) => (
                   <div key={message.id} className={`flex items-start gap-3 ${message.sender === 'user' ? 'justify-end' : ''}`}>
                     
-                    {/* ===== INÍCIO DA CORREÇÃO: LÓGICA DE RENDERIZAÇÃO DAS MENSAGENS ===== */}
-
                     {message.sender === 'bot' ? (
                       <>
                         <Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback></Avatar>
@@ -577,7 +603,6 @@ const Chat = () => {
                         <Avatar className="h-8 w-8 shrink-0"><AvatarFallback>U</AvatarFallback></Avatar>
                       </>
                     )}
-                    {/* ===== FIM DA CORREÇÃO ===== */}
                     
                   </div>
                 ))
