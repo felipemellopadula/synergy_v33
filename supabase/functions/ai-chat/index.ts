@@ -61,21 +61,131 @@ const processPdfFromStorage = async (storagePath: string): Promise<string> => {
       throw new Error(`Error downloading PDF: ${downloadError.message}`);
     }
     
-    // Convert blob to arrayBuffer and then to Uint8Array
+    // Convert blob to arrayBuffer
     const arrayBuffer = await fileData.arrayBuffer();
-    const pdfBytes = new Uint8Array(arrayBuffer);
     
-    // For now, return a simple extracted text (in production you'd use a PDF parsing library)
-    // This is a placeholder - in a real implementation you'd use a PDF parser
-    const extractedText = `[PDF Content from Storage]\nPDF file has been processed. Size: ${pdfBytes.length} bytes.\nNote: Full PDF text extraction would require a PDF parsing library.`;
+    console.log('PDF downloaded successfully, size:', arrayBuffer.byteLength, 'bytes');
     
-    console.log('PDF processed successfully, extracted text length:', extractedText.length);
-    return extractedText;
+    // Extract text from PDF
+    try {
+      const extractedText = await extractTextFromPdf(arrayBuffer);
+      console.log('PDF processed successfully, content length:', extractedText.length);
+      return extractedText;
+    } catch (extractError) {
+      console.error('Error extracting text from PDF:', extractError);
+      return `PDF baixado (${arrayBuffer.byteLength} bytes) mas erro na extração de texto: ${extractError}`;
+    }
     
   } catch (error) {
     console.error('Error processing PDF from storage:', error);
     throw new Error(`Failed to process PDF: ${error.message}`);
   }
+};
+
+// Function to extract text from PDF using a simple method
+const extractTextFromPdf = async (arrayBuffer: ArrayBuffer): Promise<string> => {
+  try {
+    // Convert PDF to text using a simple approach
+    // This method looks for text patterns in the PDF structure
+    const uint8Array = new Uint8Array(arrayBuffer);
+    const textDecoder = new TextDecoder('latin1');
+    const pdfContent = textDecoder.decode(uint8Array);
+    
+    // Extract text between stream markers and clean it
+    const textMatches = [];
+    
+    // Look for text objects in PDF structure
+    const streamRegex = /stream\s*(.*?)\s*endstream/gs;
+    const matches = pdfContent.match(streamRegex);
+    
+    if (matches) {
+      for (const match of matches) {
+        // Remove stream markers
+        let content = match.replace(/^stream\s*/, '').replace(/\s*endstream$/, '');
+        
+        // Try to extract readable text
+        const readableText = extractReadableText(content);
+        if (readableText && readableText.length > 20) {
+          textMatches.push(readableText);
+        }
+      }
+    }
+    
+    // Also try direct text extraction
+    const directText = extractDirectText(pdfContent);
+    if (directText && directText.length > 50) {
+      textMatches.push(directText);
+    }
+    
+    if (textMatches.length > 0) {
+      const combinedText = textMatches.join('\n\n');
+      // Clean and format the text
+      const cleanedText = cleanExtractedText(combinedText);
+      return cleanedText.length > 100 ? cleanedText : 'PDF processado mas conteúdo de texto limitado encontrado.';
+    } else {
+      return 'PDF processado com sucesso, mas não foi possível extrair texto legível. O arquivo pode conter principalmente imagens ou estar criptografado.';
+    }
+    
+  } catch (error) {
+    console.error('PDF text extraction failed:', error);
+    return 'Erro na extração de texto do PDF. O arquivo pode estar corrompido ou em formato não suportado.';
+  }
+};
+
+// Helper function to extract readable text from PDF content
+const extractReadableText = (content: string): string => {
+  // Remove binary data and control characters
+  let text = content.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\xFF]/g, ' ');
+  
+  // Look for text patterns (letters, numbers, common punctuation)
+  const textPattern = /[a-zA-ZÀ-ÿ0-9\s.,;:!?()-]+/g;
+  const textMatches = text.match(textPattern);
+  
+  if (textMatches) {
+    return textMatches
+      .filter(match => match.trim().length > 3)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+  
+  return '';
+};
+
+// Helper function to extract direct text from PDF
+const extractDirectText = (pdfContent: string): string => {
+  // Look for direct text patterns in PDF
+  const patterns = [
+    /\((.*?)\)/g,  // Text in parentheses
+    /\[(.*?)\]/g,  // Text in brackets
+    /BT\s+(.*?)\s+ET/gs,  // Text between BT (Begin Text) and ET (End Text)
+  ];
+  
+  const extractedParts = [];
+  
+  for (const pattern of patterns) {
+    const matches = pdfContent.match(pattern);
+    if (matches) {
+      for (const match of matches) {
+        const cleaned = match.replace(/[()[\]]/g, '').trim();
+        if (cleaned.length > 5 && /[a-zA-ZÀ-ÿ]/.test(cleaned)) {
+          extractedParts.push(cleaned);
+        }
+      }
+    }
+  }
+  
+  return extractedParts.join(' ');
+};
+
+// Helper function to clean extracted text
+const cleanExtractedText = (text: string): string => {
+  return text
+    .replace(/\s+/g, ' ')  // Normalize whitespace
+    .replace(/[^\w\sÀ-ÿ.,;:!?()-]/g, ' ')  // Keep only readable characters
+    .replace(/\s+/g, ' ')  // Normalize whitespace again
+    .trim()
+    .substring(0, 15000);  // Limit to reasonable size
 };
 
 const performWebSearch = async (query: string): Promise<string | null> => {
