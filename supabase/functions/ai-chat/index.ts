@@ -1,5 +1,11 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0';
+
+// Initialize Supabase client
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,7 +18,9 @@ interface ChatRequest {
   files?: Array<{
     name: string;
     type: string;
-    data: string; // base64
+    data?: string; // base64 for small files
+    storagePath?: string; // Storage path for large files like PDFs
+    isLargeFile?: boolean; // Flag to indicate if file is stored in Storage
     pdfContent?: string; // extracted PDF text
   }>;
 }
@@ -37,6 +45,37 @@ const getApiKey = (model: string): string | null => {
     return Deno.env.get('APILLM_API_KEY');
   }
   return null;
+};
+
+// Function to process PDF from Storage
+const processPdfFromStorage = async (storagePath: string): Promise<string> => {
+  try {
+    console.log('Downloading PDF from storage:', storagePath);
+    
+    // Download file from Storage
+    const { data: fileData, error: downloadError } = await supabase.storage
+      .from('documents')
+      .download(storagePath);
+    
+    if (downloadError) {
+      throw new Error(`Error downloading PDF: ${downloadError.message}`);
+    }
+    
+    // Convert blob to arrayBuffer and then to Uint8Array
+    const arrayBuffer = await fileData.arrayBuffer();
+    const pdfBytes = new Uint8Array(arrayBuffer);
+    
+    // For now, return a simple extracted text (in production you'd use a PDF parsing library)
+    // This is a placeholder - in a real implementation you'd use a PDF parser
+    const extractedText = `[PDF Content from Storage]\nPDF file has been processed. Size: ${pdfBytes.length} bytes.\nNote: Full PDF text extraction would require a PDF parsing library.`;
+    
+    console.log('PDF processed successfully, extracted text length:', extractedText.length);
+    return extractedText;
+    
+  } catch (error) {
+    console.error('Error processing PDF from storage:', error);
+    throw new Error(`Failed to process PDF: ${error.message}`);
+  }
 };
 
 const performWebSearch = async (query: string): Promise<string | null> => {
@@ -71,7 +110,7 @@ const performWebSearch = async (query: string): Promise<string | null> => {
   }
 }
 
-const callOpenAI = async (message: string, model: string, files?: Array<{name: string; type: string; data: string; pdfContent?: string}>): Promise<string> => {
+const callOpenAI = async (message: string, model: string, files?: Array<{name: string; type: string; data?: string; storagePath?: string; isLargeFile?: boolean; pdfContent?: string}>): Promise<string> => {
   const apiKey = Deno.env.get('OPENAI_API_KEY');
   
   console.log('=== OPENAI DEBUG ===');
@@ -641,6 +680,23 @@ serve(async (req) => {
     }
 
     console.log(`Processing chat request for model: ${model}`);
+
+    // Process large files from Storage if needed
+    if (files && files.length > 0) {
+      console.log('Processing files...');
+      for (const file of files) {
+        if (file.isLargeFile && file.storagePath && file.type.includes('pdf')) {
+          console.log('Processing PDF from storage:', file.storagePath);
+          try {
+            file.pdfContent = await processPdfFromStorage(file.storagePath);
+            console.log('PDF processed successfully, content length:', file.pdfContent.length);
+          } catch (error) {
+            console.error('Error processing PDF from storage:', error);
+            file.pdfContent = `[Erro ao processar PDF: ${file.name}]\nNão foi possível extrair o conteúdo do arquivo.`;
+          }
+        }
+      }
+    }
 
     let response: string;
 
