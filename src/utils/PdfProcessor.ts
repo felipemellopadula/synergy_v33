@@ -14,8 +14,9 @@ export interface PdfProcessResult {
 }
 
 export class PdfProcessor {
-  // Limites de tamanho - removemos o limite de páginas para usar Storage
+  // Limites de tamanho
   static readonly MAX_FILE_SIZE_MB = 50; // 50MB
+  static readonly MAX_PAGES = 1000; // 2000 páginas
   static readonly MAX_FILE_SIZE_BYTES = PdfProcessor.MAX_FILE_SIZE_MB * 1024 * 1024;
 
   static async processPdf(file: File): Promise<PdfProcessResult> {
@@ -54,13 +55,11 @@ export class PdfProcessor {
 
       const numPages = pdfDocument.numPages;
 
-      // Para PDFs grandes, apenas validamos que pode ser lido
-      // O processamento completo será feito na Edge Function via Storage
-      if (numPages > 200) {
-        console.log(`PDF tem ${numPages} páginas - será processado via Storage`);
+      // Verificar número de páginas
+      if (numPages > this.MAX_PAGES) {
         return {
-          success: true,
-          content: `PDF com ${numPages} páginas será processado automaticamente`,
+          success: false,
+          error: `PDF tem muitas páginas. Máximo permitido: ${this.MAX_PAGES} páginas`,
           pageCount: numPages,
           fileSize: Math.round(file.size / (1024 * 1024) * 100) / 100
         };
@@ -139,6 +138,6 @@ export class PdfProcessor {
   }
 
   static getMaxFileInfo(): string {
-    return `Tamanho máximo: ${this.MAX_FILE_SIZE_MB}MB | Sem limite de páginas`;
+    return `Tamanho máximo: ${this.MAX_FILE_SIZE_MB}MB | Páginas máximas: ${this.MAX_PAGES}`;
   }
 }
