@@ -1,6 +1,8 @@
-// Caminho: src/pages/Chat.tsx (ou onde estiver seu componente)
+// VERSÃO CORRIGIDA: Removida a linha de importação do ConversationSidebar que causava o erro.
 
-import { MessageCircle, ArrowLeft, Paperclip, Plus, Copy, Menu, ArrowUp, FileText, Loader2, Bot, User } from "lucide-react";
+import {
+  MessageCircle, ArrowLeft, Paperclip, Plus, Copy, Menu, ArrowUp, FileText, Loader2, Bot, User, Star, Trash2, MoreHorizontal, Edit3, SheetClose
+} from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from "@/components/ui/button";
@@ -16,11 +18,12 @@ import { useTokens } from "@/hooks/useTokens";
 import { supabase } from "@/integrations/supabase/client";
 import { PdfProcessor } from "@/utils/PdfProcessor";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { ConversationSidebar } from "@/components/ConversationSidebar"; // Supondo que você moveu para um arquivo separado
 import { Card, CardContent } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+
 
 // --- INTERFACES ---
 interface Message {
@@ -40,6 +43,122 @@ interface ChatConversation {
   created_at: string;
   updated_at: string;
 }
+
+// --- COMPONENTE SIDEBAR (DEFINIDO DENTRO DO ARQUIVO) ---
+interface ConversationSidebarProps {
+  conversations: ChatConversation[];
+  currentConversationId: string | null;
+  onSelectConversation: (conv: ChatConversation) => void;
+  onNewConversation: () => void;
+  onDeleteConversation: (id: string) => void;
+  onToggleFavorite: (conv: ChatConversation) => void;
+  onRenameConversation: (id: string, newTitle: string) => void;
+  isMobile?: boolean;
+}
+
+const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
+  conversations,
+  currentConversationId,
+  onSelectConversation,
+  onNewConversation,
+  onDeleteConversation,
+  onToggleFavorite,
+  onRenameConversation,
+  isMobile = false
+}) => {
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  const handleRename = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const newTitle = prompt("Digite o novo título da conversa:");
+    if (newTitle && newTitle.trim()) {
+      onRenameConversation(id, newTitle.trim());
+    }
+  };
+
+  const filteredConversations = conversations.filter(c =>
+    c.title.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const renderItem = (conv: ChatConversation) => (
+    <div
+      key={conv.id}
+      className={`group relative rounded-lg p-3 cursor-pointer transition-colors duration-200 ${
+        currentConversationId === conv.id ? "bg-muted" : "hover:bg-muted/50"
+      }`}
+      onClick={() => onSelectConversation(conv)}
+    >
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          <h3 className="text-sm font-medium text-foreground truncate">{conv.title}</h3>
+          <p className="text-xs text-muted-foreground mt-1">
+            {new Date(conv.updated_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}
+          </p>
+        </div>
+        <div className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={e => e.stopPropagation()}>
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onToggleFavorite(conv); }}>
+                <Star className={`h-4 w-4 mr-2 ${conv.is_favorite ? 'text-yellow-500 fill-current' : ''}`} />
+                {conv.is_favorite ? 'Desfavoritar' : 'Favoritar'}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => handleRename(e, conv.id)}>
+                <Edit3 className="h-4 w-4 mr-2" />
+                Renomear
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onDeleteConversation(conv.id); }} className="text-destructive">
+                <Trash2 className="h-4 w-4 mr-2" />
+                Deletar
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      </div>
+    </div>
+  );
+  
+  const favorites = filteredConversations.filter(c => c.is_favorite);
+  const recents = filteredConversations.filter(c => !c.is_favorite);
+
+  return (
+    <div className="flex flex-col h-full bg-background border-r border-border">
+      <div className="p-4 border-b border-border flex flex-col gap-4 flex-shrink-0">
+        <Button onClick={onNewConversation} size="lg">
+          <Plus className="w-4 h-4 mr-2" />
+          Novo Chat
+        </Button>
+        <input
+          placeholder="Pesquisar conversas..."
+          className="w-full h-9 rounded-md border bg-muted px-3 text-sm"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+      <ScrollArea className="flex-1 p-2">
+        <div className="space-y-1">
+            {favorites.length > 0 && (
+                <>
+                    <h4 className="px-3 py-2 text-xs font-semibold text-muted-foreground">Favoritos</h4>
+                    {favorites.map(conv => isMobile ? <SheetClose asChild key={conv.id}>{renderItem(conv)}</SheetClose> : renderItem(conv))}
+                </>
+            )}
+            <h4 className="px-3 py-2 text-xs font-semibold text-muted-foreground">Recentes</h4>
+            {recents.map(conv => isMobile ? <SheetClose asChild key={conv.id}>{renderItem(conv)}</SheetClose> : renderItem(conv))}
+            
+            {filteredConversations.length === 0 && (
+                <p className="p-4 text-center text-sm text-muted-foreground">Nenhuma conversa encontrada.</p>
+            )}
+        </div>
+      </ScrollArea>
+    </div>
+  );
+};
+
 
 // --- COMPONENTE PRINCIPAL ---
 const Chat = () => {
@@ -64,7 +183,6 @@ const Chat = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // A lista de modelos agora informa ao frontend qual provedor usar para chamar a função correta
   const models = [
     { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash', provider: 'gemini' },
     { value: 'gemini-exp-1206', label: 'Gemini 2.0 Pro', provider: 'gemini' },
@@ -187,15 +305,13 @@ const Chat = () => {
     setIsLoading(true);
 
     try {
-      // **AJUSTE FINAL: SEMPRE CHAMA A FUNÇÃO 'ai-chat'**
-      // O backend agora é inteligente o suficiente para rotear
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: { message: promptParaBackend, model: selectedModel }
       });
 
       if (error) throw error;
       
-      const responseContent = data.response || "Não recebi uma resposta válida.";
+      const responseContent = data.response.content || "Não recebi uma resposta válida.";
 
       const aiMessage: Message = { id: (Date.now() + 1).toString(), content: responseContent, sender: 'bot', timestamp: new Date(), model: selectedModel };
       const finalMessages = [...updatedMessages, aiMessage];
