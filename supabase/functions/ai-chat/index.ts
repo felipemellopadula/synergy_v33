@@ -185,7 +185,110 @@ const cleanExtractedText = (text: string): string => {
     .replace(/[^\w\sÀ-ÿ.,;:!?()-]/g, ' ')  // Keep only readable characters
     .replace(/\s+/g, ' ')  // Normalize whitespace again
     .trim()
-    .substring(0, 15000);  // Limit to reasonable size
+    .substring(0, 50000);  // Increase limit for better processing
+};
+
+// Function to split text into chunks based on token limits
+const chunkText = (text: string, maxTokens: number = 15000): string[] => {
+  // Estimate ~4 characters per token (conservative estimate)
+  const maxChars = maxTokens * 4;
+  const chunks: string[] = [];
+  
+  if (text.length <= maxChars) {
+    return [text];
+  }
+  
+  // Split by paragraphs first, then sentences if needed
+  const paragraphs = text.split(/\n\s*\n/);
+  let currentChunk = '';
+  
+  for (const paragraph of paragraphs) {
+    if ((currentChunk + paragraph).length <= maxChars) {
+      currentChunk += (currentChunk ? '\n\n' : '') + paragraph;
+    } else {
+      if (currentChunk) {
+        chunks.push(currentChunk);
+        currentChunk = '';
+      }
+      
+      // If paragraph is too large, split by sentences
+      if (paragraph.length > maxChars) {
+        const sentences = paragraph.split(/[.!?]+/);
+        for (const sentence of sentences) {
+          if ((currentChunk + sentence).length <= maxChars) {
+            currentChunk += (currentChunk ? '. ' : '') + sentence;
+          } else {
+            if (currentChunk) {
+              chunks.push(currentChunk);
+              currentChunk = sentence;
+            } else {
+              // If single sentence is still too large, split by words
+              const words = sentence.split(' ');
+              for (const word of words) {
+                if ((currentChunk + ' ' + word).length <= maxChars) {
+                  currentChunk += (currentChunk ? ' ' : '') + word;
+                } else {
+                  if (currentChunk) {
+                    chunks.push(currentChunk);
+                    currentChunk = word;
+                  }
+                }
+              }
+            }
+          }
+        }
+      } else {
+        currentChunk = paragraph;
+      }
+    }
+  }
+  
+  if (currentChunk) {
+    chunks.push(currentChunk);
+  }
+  
+  return chunks;
+};
+
+// Function to check if model has limitations
+const getModelLimitations = (model: string): { isLimited: boolean; maxTokens: number; warning?: string } => {
+  // Mini/Nano models have stricter limits
+  if (model.includes('mini') || model.includes('nano')) {
+    return {
+      isLimited: true,
+      maxTokens: 8000,
+      warning: `⚠️ Modelo ${model} tem limitações para PDFs grandes. Para análises completas, considere usar um modelo mais potente.`
+    };
+  }
+  
+  // GPT-5 and newer models need smaller chunks due to rate limits
+  if (model.includes('gpt-5') || model.includes('o4') || model.includes('gpt-4.1')) {
+    return {
+      isLimited: true,
+      maxTokens: 15000,
+      warning: `ℹ️ PDF grande detectado. Processando em partes menores para evitar limites de tokens por minuto.`
+    };
+  }
+  
+  // Claude models
+  if (model.includes('claude')) {
+    return {
+      isLimited: true,
+      maxTokens: 15000,
+      warning: `ℹ️ PDF grande detectado. Processando em partes menores para evitar limites de tokens por minuto.`
+    };
+  }
+  
+  // Grok models
+  if (model.includes('grok')) {
+    return {
+      isLimited: true,
+      maxTokens: 12000,
+      warning: `ℹ️ PDF grande detectado. Processando em partes menores para evitar limites de tokens por minuto.`
+    };
+  }
+  
+  return { isLimited: false, maxTokens: 30000 };
 };
 
 const performWebSearch = async (query: string): Promise<string | null> => {
@@ -791,15 +894,89 @@ serve(async (req) => {
 
     console.log(`Processing chat request for model: ${model}`);
 
-    // Process large files from Storage if needed
+    // Process large files from Storage if needed and implement chunking
     if (files && files.length > 0) {
       console.log('Processing files...');
       for (const file of files) {
         if (file.isLargeFile && file.storagePath && file.type.includes('pdf')) {
           console.log('Processing PDF from storage:', file.storagePath);
           try {
-            file.pdfContent = await processPdfFromStorage(file.storagePath);
-            console.log('PDF processed successfully, content length:', file.pdfContent.length);
+            const fullPdfContent = await processPdfFromStorage(file.storagePath);
+            console.log('PDF processed successfully, content length:', fullPdfContent.length);
+            
+            // Check model limitations and chunk if necessary
+            const limitations = getModelLimitations(actualModel || model);
+            
+            if (fullPdfContent.length > limitations.maxTokens * 4) { // Estimate chars per token
+              console.log('PDF is large, chunking required. Model limitations:', limitations);
+              
+              // Split into chunks
+              const chunks = chunkText(fullPdfContent, limitations.maxTokens);
+              console.log(`PDF split into ${chunks.length} chunks`);
+              
+              // Process each chunk and combine results
+              let combinedResponse = '';
+              
+              if (limitations.warning) {
+                combinedResponse = limitations.warning + '\n\n';
+              }
+              
+              for (let i = 0; i < chunks.length; i++) {
+                console.log(`Processing chunk ${i + 1}/${chunks.length}, length: ${chunks[i].length}`);
+                
+                // Create a temporary file object for this chunk
+                const chunkFile = {
+                  ...file,
+                  pdfContent: chunks[i]
+                };
+                
+                const chunkMessage = `${message}\n\n[IMPORTANTE: Esta é a parte ${i + 1} de ${chunks.length} do PDF "${file.name}". Analise esta parte e forneça insights relevantes.]`;
+                
+                try {
+                  let chunkResponse: string;
+                  
+                  // Route to appropriate API for this chunk
+                  if (actualModel.includes('gpt-') || actualModel.includes('o4')) {
+                    chunkResponse = await callOpenAI(chunkMessage, actualModel, [chunkFile]);
+                  } else if (model.includes('claude')) {
+                    chunkResponse = await callAnthropic(chunkMessage, model, [chunkFile]);
+                  } else if (model.includes('gemini')) {
+                    chunkResponse = await callGoogleAI(chunkMessage, model, [chunkFile]);
+                  } else if (model.includes('grok')) {
+                    chunkResponse = await callXAI(chunkMessage, model, [chunkFile]);
+                  } else if (model.includes('deepseek')) {
+                    chunkResponse = await callDeepSeek(chunkMessage, model, [chunkFile]);
+                  } else if (model.includes('Llama-4')) {
+                    chunkResponse = await callAPILLM(chunkMessage, model, [chunkFile]);
+                  } else {
+                    chunkResponse = await callOpenAI(chunkMessage, 'gpt-4.1-mini', [chunkFile]);
+                  }
+                  
+                  combinedResponse += `\n\n### Análise da Parte ${i + 1}/${chunks.length}:\n${chunkResponse}`;
+                  
+                  // Add delay between chunks to respect rate limits
+                  if (i < chunks.length - 1) {
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
+                  }
+                  
+                } catch (chunkError) {
+                  console.error(`Error processing chunk ${i + 1}:`, chunkError);
+                  combinedResponse += `\n\n### Erro na Parte ${i + 1}/${chunks.length}:\nNão foi possível processar esta seção do PDF.`;
+                }
+              }
+              
+              // Add final summary
+              combinedResponse += '\n\n### Resumo Geral:\nEste PDF foi processado em partes devido ao seu tamanho. As análises acima cobrem todo o conteúdo disponível.';
+              
+              return new Response(JSON.stringify({ response: combinedResponse }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+              
+            } else {
+              // PDF is small enough to process normally
+              file.pdfContent = fullPdfContent;
+            }
+            
           } catch (error) {
             console.error('Error processing PDF from storage:', error);
             file.pdfContent = `[Erro ao processar PDF: ${file.name}]\nNão foi possível extrair o conteúdo do arquivo.`;
