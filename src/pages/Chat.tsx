@@ -1,12 +1,14 @@
-// Salve este código como: src/components/Chat.tsx (ou onde ele estiver no seu projeto)
+// APAGUE TUDO E COLE ESTE CÓDIGO NO SEU ARQUIVO Chat.tsx
 
-import { MessageCircle, ArrowLeft, Paperclip, Mic, Globe, Star, Trash2, Plus, ChevronDown, ChevronUp, Copy, Menu, ArrowUp, ArrowDown, MoreHorizontal, Edit3, Square, FileText, Loader2 } from "lucide-react";
+import {
+  MessageCircle, ArrowLeft, Paperclip, Mic, Globe, Star, Trash2, Plus, ChevronDown, ChevronUp, Copy, Menu, ArrowUp, ArrowDown, MoreHorizontal, Edit3, Square, FileText, Loader2, Bot, User
+} from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate } from "react-router-dom";
-import { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { ModelSelector } from "@/components/ModelSelector";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -15,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTokens } from "@/hooks/useTokens";
 import { supabase } from "@/integrations/supabase/client";
-import { PdfProcessor } from "@/utils/PdfProcessor"; // Verifique se o caminho para o PdfProcessor está correto
+import { PdfProcessor } from "@/utils/PdfProcessor";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
@@ -23,15 +25,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-// --- INTERFACES ---
+// --- SEÇÃO 1: INTERFACES (TIPOS DE DADOS) ---
 interface Message {
   id: string;
   content: string;
   sender: 'user' | 'bot';
   timestamp: Date;
   model?: string;
-  reasoning?: string;
-  isStreaming?: boolean;
 }
 
 interface ChatConversation {
@@ -44,8 +44,8 @@ interface ChatConversation {
   updated_at: string;
 }
 
-// --- COMPONENTES FILHOS ---
 
+// --- SEÇÃO 2: COMPONENTE DA SIDEBAR (INCLUÍDO PARA SER COMPLETO) ---
 interface ConversationSidebarProps {
   conversations: ChatConversation[];
   currentConversationId: string | null;
@@ -160,27 +160,24 @@ const ConversationSidebar: React.FC<ConversationSidebarProps> = ({
   );
 };
 
-// --- COMPONENTE PRINCIPAL ---
 
+// --- SEÇÃO 3: COMPONENTE PRINCIPAL 'CHAT' ---
 const Chat = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, profile, loading } = useAuth();
-  const { consumeTokens, getModelDisplayName, tokenBalance } = useTokens();
+  const { consumeTokens, tokenBalance } = useTokens();
   const isMobile = useIsMobile();
   
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [inputValue, setInputValue] = useState('');
-  const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined);
-  const [isLoading, setIsLoading] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isWebSearchMode, setIsWebSearchMode] = useState(false);
+  // Estados para UI e conversas
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
-  const [expandedReasoning, setExpandedReasoning] = useState<{ [key: string]: boolean }>({});
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-
-  // Estados para o PDF
+  
+  // Estados da lógica funcional (do código que funciona)
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('gpt-5-2025-08-07');
   const [pdfContent, setPdfContent] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
   const [pdfInfo, setPdfInfo] = useState<{ pages?: number; size?: number } | null>(null);
@@ -188,98 +185,62 @@ const Chat = () => {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
-  const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  
+  const models = [
+    { value: 'gemini-2.0-flash-exp', label: 'Gemini 2.0 Flash', provider: 'gemini' },
+    { value: 'gemini-exp-1206', label: 'Gemini 2.0 Pro', provider: 'gemini' },
+    { value: 'gpt-5-2025-08-07', label: 'GPT-5 (Flagship)', provider: 'openai' },
+    { value: 'gpt-5-mini-2025-08-07', label: 'GPT-5 Mini (Rápido)', provider: 'openai' },
+    { value: 'gpt-4.1-2025-04-14', label: 'GPT-4.1 (Confiável)', provider: 'openai' },
+  ];
 
+  
+  // --- SEÇÃO 4: LÓGICA DE CONVERSAS (SALVAR, CARREGAR, ETC) ---
   useEffect(() => {
     if (!loading && !user) navigate('/');
-  }, [user, loading, navigate]);
-
-  useEffect(() => {
     if (user && !loading) {
-      (async () => {
-        const { data, error } = await supabase
-          .from('chat_conversations')
-          .select('*')
-          .order('updated_at', { ascending: false });
-        if (error) console.error('Erro ao carregar conversas:', error);
-        else if (data) setConversations(data as any);
-      })();
+      fetchConversations();
     }
-  }, [user, loading]);
+  }, [user, loading, navigate]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isLoading]);
 
-  useEffect(() => {
-    const chatContainer = chatContainerRef.current;
-    if (!chatContainer) return;
-    const handleScroll = () => {
-      const { scrollTop, scrollHeight, clientHeight } = chatContainer;
-      setShowScrollToBottom(scrollHeight - scrollTop - clientHeight > 100);
-    };
-    chatContainer.addEventListener('scroll', handleScroll);
-    return () => chatContainer.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const fetchConversations = async () => {
+    const { data, error } = await supabase.from('chat_conversations').select('*').order('updated_at', { ascending: false });
+    if (error) console.error('Erro ao carregar conversas:', error);
+    else setConversations((data as any) || []);
   };
 
-  useEffect(() => {
-    if (!selectedModel) setSelectedModel('synergy-ia');
-  }, [selectedModel]);
-
-  const toSerializable = (msgs: Message[]) => msgs.map(m => ({...m, timestamp: m.timestamp.toISOString()}));
-  const fromSerializable = (msgs: any[]): Message[] => (msgs || []).map((m) => ({...m, timestamp: new Date(m.timestamp)}));
-  const deriveTitle = (msgs: Message[]) => (msgs.find(m => m.sender === 'user')?.content?.trim() || 'Nova conversa').slice(0, 50);
+  const toSerializable = (msgs: Message[]) => msgs.map(m => ({ ...m, timestamp: m.timestamp.toISOString() }));
+  const fromSerializable = (msgs: any[]): Message[] => (msgs || []).map(m => ({ ...m, timestamp: new Date(m.timestamp) }));
+  const deriveTitle = (msgs: Message[]) => (msgs[0]?.content?.trim() || 'Nova conversa').slice(0, 50);
 
   const openConversation = (conv: ChatConversation) => {
     setCurrentConversationId(conv.id);
     setMessages(fromSerializable(conv.messages));
+    setPdfContent(''); setFileName(''); setPdfInfo(null);
   };
 
-  const upsertConversation = async (finalMessages: Message[], convId: string | null) => {
-    try {
-      const serial = toSerializable(finalMessages);
-      let newConvId = convId;
+  const upsertConversation = async (finalMessages: Message[]) => {
+    if (!user || finalMessages.length === 0) return;
+    const serialMessages = toSerializable(finalMessages);
+    const title = deriveTitle(finalMessages);
+    let convId = currentConversationId;
 
-      if (!newConvId || newConvId.startsWith('temp_')) {
-        const { data, error } = await supabase
-          .from('chat_conversations')
-          .insert({ user_id: user!.id, title: deriveTitle(finalMessages), messages: serial })
-          .select('*').single();
-        if (error) throw error;
-        
-        if (newConvId?.startsWith('temp_')) {
-            setCurrentConversationId(data.id);
-            setConversations(prev => prev.map(c => c.id === newConvId ? ({ ...data, messages: Array.isArray(data.messages) ? data.messages : [] }) : c));
-        } else {
-            setCurrentConversationId(data.id);
-            setConversations(prev => [{ ...data, messages: Array.isArray(data.messages) ? data.messages : [] }, ...prev]);
-        }
-      } else {
-        const currentConv = conversations.find(c => c.id === newConvId);
-        const shouldRename = !currentConv || currentConv.title === 'Nova conversa' || currentConv.messages.length === 0;
-        const updatePayload: any = { messages: serial, updated_at: new Date().toISOString() };
-        if (shouldRename) updatePayload.title = deriveTitle(finalMessages);
-        
-        const { data, error } = await supabase
-          .from('chat_conversations')
-          .update(updatePayload)
-          .eq('id', newConvId)
-          .select('*').single();
-        if (error) throw error;
-        setConversations(prev => [{ ...data, messages: Array.isArray(data.messages) ? data.messages : [] }, ...prev.filter(c => c.id !== data.id)]);
-      }
-    } catch (e) { console.error('Erro ao salvar conversa:', e); }
-  };
-
-  const createNewConversation = async () => {
-    if (messages.length > 0 && currentConversationId) {
-        await upsertConversation(messages, currentConversationId);
+    if (convId) {
+      const { error } = await supabase.from('chat_conversations').update({ messages: serialMessages, title, updated_at: new Date().toISOString() }).eq('id', convId);
+      if (error) console.error("Erro ao atualizar conversa:", error);
+    } else {
+      const { data, error } = await supabase.from('chat_conversations').insert({ user_id: user.id, title, messages: serialMessages }).select().single();
+      if (data) setCurrentConversationId(data.id);
+      if (error) console.error("Erro ao criar conversa:", error);
     }
+    await fetchConversations();
+  };
+
+  const createNewConversation = () => {
     setCurrentConversationId(null);
     setMessages([]);
     setInputValue('');
@@ -287,147 +248,29 @@ const Chat = () => {
     setFileName('');
     setPdfInfo(null);
   };
-
+  
   const deleteConversation = async (id: string) => {
     const { error } = await supabase.from('chat_conversations').delete().eq('id', id);
-    if (error) {
-      toast({ title: 'Erro', description: 'Não foi possível excluir a conversa.', variant: 'destructive' });
-      return;
-    }
-    setConversations((prev) => prev.filter(c => c.id !== id));
-    if (currentConversationId === id) {
-      createNewConversation();
+    if (error) toast({ title: "Erro", description: "Não foi possível deletar.", variant: "destructive" });
+    else {
+      toast({ title: "Sucesso", description: "Conversa deletada." });
+      if (currentConversationId === id) createNewConversation();
+      await fetchConversations();
     }
   };
   
   const toggleFavoriteConversation = async (conv: ChatConversation) => {
-    const { data, error } = await supabase
-      .from('chat_conversations')
-      .update({ is_favorite: !conv.is_favorite })
-      .eq('id', conv.id).select('*').single();
-    if (error) toast({ title: 'Erro', description: 'Não foi possível atualizar favorito.', variant: 'destructive' });
-    else if (data) setConversations(prev => prev.map(c => c.id === data.id ? { ...data, messages: Array.isArray(data.messages) ? data.messages : [] } : c));
+    await supabase.from('chat_conversations').update({ is_favorite: !conv.is_favorite }).eq('id', conv.id);
+    await fetchConversations();
   };
   
   const renameConversation = async (id: string, newTitle: string) => {
-    const { data, error } = await supabase
-        .from('chat_conversations')
-        .update({ title: newTitle })
-        .eq('id', id)
-        .select('*').single();
-    if (error) toast({ title: 'Erro', description: 'Não foi possível renomear a conversa.', variant: 'destructive' });
-    else if (data) {
-        setConversations(prev => prev.map(c => c.id === data.id ? { ...data, messages: Array.isArray(data.messages) ? data.messages : [] } : c));
-        toast({ title: 'Conversa renomeada!' });
-    }
+    await supabase.from('chat_conversations').update({ title: newTitle }).eq('id', id);
+    await fetchConversations();
   };
 
-  const handleStopGeneration = () => {
-    if (typingIntervalRef.current) {
-      clearInterval(typingIntervalRef.current);
-      typingIntervalRef.current = null;
-    }
-    setIsLoading(false);
-    setMessages(prev =>
-      prev.map(msg =>
-        msg.isStreaming ? { ...msg, isStreaming: false } : msg
-      )
-    );
-  };
-
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if ((!inputValue.trim() && !pdfContent) || isLoading) return;
-
-    const canProceed = await consumeTokens(selectedModel, inputValue);
-    if (!canProceed) return;
-    
-    let messageContent = inputValue;
-    let displayMessage = inputValue || `Análise do arquivo: ${fileName}`;
-
-    if (pdfContent && pdfInfo) {
-      // *** MUDANÇA CRUCIAL AQUI ***
-      // Usando os métodos do PdfProcessor para criar prompts otimizados
-      const isSummaryRequest = inputValue.toLowerCase().includes('resumo') || !inputValue.trim();
-      
-      if (isSummaryRequest) {
-        messageContent = PdfProcessor.createSummaryPrompt(pdfContent, pdfInfo.pages || 0);
-        displayMessage = `Resumo do PDF: ${fileName}`;
-      } else {
-        messageContent = PdfProcessor.createAnalysisPrompt(pdfContent, pdfInfo.pages || 0, inputValue);
-        displayMessage = `Sobre "${inputValue}" no PDF: ${fileName}`;
-      }
-    }
-
-    const userMessage: Message = { id: Date.now().toString(), content: displayMessage, sender: 'user', timestamp: new Date() };
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
-    setIsLoading(true);
-    setInputValue(''); 
-
-    // Limpa o estado do PDF logo após o envio
-    setPdfContent('');
-    setFileName('');
-    setPdfInfo(null);
-    if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-    }
-
-    let convId = currentConversationId;
-    if (!convId) {
-        const tempId = `temp_${Date.now()}`;
-        const newTempConv = { id: tempId, title: deriveTitle(newMessages), messages: toSerializable(newMessages), is_favorite: false, user_id: user!.id, created_at: new Date().toISOString(), updated_at: new Date().toISOString()};
-        setConversations(prev => [newTempConv, ...prev]);
-        setCurrentConversationId(tempId);
-        convId = tempId;
-    }
-
-    try {
-        const internalModel = selectedModel === 'synergy-ia' ? 'gpt-4o-mini' : selectedModel;
-        const { data: fnData, error: fnError } = await supabase.functions.invoke('ai-chat', {
-             body: { 
-                message: messageContent, 
-                model: internalModel 
-            } 
-        });
-
-        if (fnError) throw fnError;
-        
-        const data = fnData as any;
-        const fullBotText = typeof data.response === 'string' ? data.response : data.response?.content || 'Desculpe, não consegui processar sua mensagem.';
-        const reasoning = typeof data.response === 'string' ? '' : data.response?.reasoning;
-
-        const botMessageId = (Date.now() + 1).toString();
-        const placeholderBotMessage: Message = { 
-            id: botMessageId, content: '', sender: 'bot', timestamp: new Date(), 
-            model: selectedModel, reasoning: reasoning || undefined, isStreaming: true 
-        };
-        setMessages(prev => [...newMessages, placeholderBotMessage]);
-
-        let charIndex = 0;
-        typingIntervalRef.current = setInterval(() => {
-            if (charIndex < fullBotText.length) {
-                setMessages(prev => prev.map(msg => msg.id === botMessageId ? { ...msg, content: fullBotText.slice(0, charIndex + 1) } : msg));
-                charIndex++;
-            } else {
-                if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
-                typingIntervalRef.current = null;
-                const finalBotMessage: Message = { ...placeholderBotMessage, content: fullBotText, isStreaming: false };
-                const finalMessages = [...newMessages, finalBotMessage];
-                setMessages(finalMessages);
-                upsertConversation(finalMessages, convId);
-                setIsLoading(false);
-            }
-        }, 25);
-
-    } catch (error) {
-        console.error('Error sending message:', error);
-        toast({ title: "Erro", description: "Não foi possível enviar a mensagem. O PDF pode ser muito grande para o modelo processar.", variant: "destructive" });
-        setMessages(newMessages);
-        setIsLoading(false);
-    }
-  };
   
+  // --- SEÇÃO 5: LÓGICA FUNCIONAL DE PDF & ENVIO DE MENSAGEM (A QUE FUNCIONA) ---
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -440,188 +283,150 @@ const Chat = () => {
     setIsProcessingPdf(true);
     try {
       const result = await PdfProcessor.processPdf(file);
-
       if (result.success && result.content) {
         setPdfContent(result.content);
         setFileName(file.name);
         setPdfInfo({ pages: result.pageCount, size: result.fileSize });
-        toast({ title: "PDF processado com sucesso", description: `${file.name} - ${result.pageCount} páginas (${result.fileSize}MB)` });
+        toast({ title: "PDF Processado", description: `${file.name} - ${result.pageCount} páginas`, });
       } else {
-        toast({ title: "Erro ao processar PDF", description: result.error || "Ocorreu um erro desconhecido.", variant: "destructive" });
+        toast({ title: "Erro ao Processar PDF", description: result.error || "Erro desconhecido", variant: "destructive" });
         setPdfContent(''); setFileName(''); setPdfInfo(null);
       }
     } catch (error) {
-      console.error('Erro ao processar PDF:', error);
-      toast({ title: "Erro Interno", description: "Ocorreu um erro inesperado ao processar o arquivo PDF.", variant: "destructive" });
+      toast({ title: "Erro Crítico", description: "Ocorreu um erro interno ao processar o PDF.", variant: "destructive" });
       setPdfContent(''); setFileName(''); setPdfInfo(null);
     } finally {
       setIsProcessingPdf(false);
-      if (event.target) event.target.value = '';
+      if(event.target) event.target.value = '';
     }
   };
-  
-  // --- RENDERIZAÇÃO ---
-  if (loading) return <div className="h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div></div>;
+
+  const handleSendMessage = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if ((!inputValue.trim() && !pdfContent) || isLoading) return;
+
+    await consumeTokens(selectedModel, inputValue);
+
+    let messageContent = inputValue;
+    let displayMessage = inputValue || `Análise do arquivo: ${fileName}`;
+
+    if (pdfContent && pdfInfo) {
+      if (inputValue.toLowerCase().includes('resumo') || !inputValue.trim()) {
+        messageContent = PdfProcessor.createSummaryPrompt(pdfContent, pdfInfo.pages || 0);
+        displayMessage = `Resumo do PDF: ${fileName}`;
+      } else {
+        messageContent = PdfProcessor.createAnalysisPrompt(pdfContent, pdfInfo.pages || 0, inputValue);
+        displayMessage = `Análise sobre: ${inputValue}`;
+      }
+    }
+    
+    const userMessage: Message = { id: Date.now().toString(), content: displayMessage, sender: 'user', timestamp: new Date() };
+    const updatedMessages = [...messages, userMessage];
+    setMessages(updatedMessages);
+    setInputValue('');
+    setIsLoading(true);
+
+    try {
+      const currentModel = models.find(m => m.value === selectedModel);
+      // ** PONTO CHAVE: USA AS FUNÇÕES 'openai-chat' e 'gemini-chat' QUE FUNCIONAM **
+      const functionName = currentModel?.provider === 'openai' ? 'openai-chat' : 'gemini-chat';
+
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body: { message: messageContent, model: selectedModel }
+      });
+
+      if (error) throw new Error(error.message);
+
+      const aiMessage: Message = { id: (Date.now() + 1).toString(), content: data.response, sender: 'bot', timestamp: new Date(), model: selectedModel };
+      const finalMessages = [...updatedMessages, aiMessage];
+      setMessages(finalMessages);
+      
+      await upsertConversation(finalMessages);
+
+      setPdfContent(''); setFileName(''); setPdfInfo(null);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error);
+      toast({ title: "Erro de API", description: "Não foi possível se comunicar com o modelo. Verifique sua chave de API ou o console do Supabase.", variant: "destructive" });
+      setMessages(messages);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (loading) return <div className="h-screen bg-background flex items-center justify-center"><Loader2 className="h-16 w-16 animate-spin" /></div>;
   if (!user || !profile) return null;
 
+  
+  // --- SEÇÃO 6: RENDERIZAÇÃO / JSX COMPLETO ---
   return (
     <div className="h-screen max-h-screen bg-background flex flex-col">
-      {/* ... (O resto do seu JSX do Header e Sidebar permanece o mesmo) ... */}
-       <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
-        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur z-10">
+         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
             <div className="flex items-center gap-3 md:gap-4">
-               <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="flex items-center gap-2 hover:bg-muted">
-                 <ArrowLeft className="h-4 w-4" />
-                 Voltar
-               </Button>
+               <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="flex items-center gap-2 hover:bg-muted"><ArrowLeft className="h-4 w-4" />Voltar</Button>
                <div className="h-6 w-px bg-border hidden sm:block" />
-               <div className="flex items-center gap-2">
-                   <MessageCircle className="h-5 w-5 text-blue-500" />
-                   <h1 className="text-lg font-semibold text-foreground">Chat</h1>
-               </div>
+               <div className="flex items-center gap-2"><MessageCircle className="h-5 w-5 text-blue-500" /><h1 className="text-lg font-semibold text-foreground">Chat</h1></div>
             </div>
             <div className="hidden md:flex items-center gap-4">
-                <ModelSelector onModelSelect={(model) => setSelectedModel(model)} selectedModel={selectedModel} />
+                <ModelSelector onModelSelect={setSelectedModel} selectedModel={selectedModel} />
                 <UserProfile />
-                <div className="flex-shrink-0">
-                  <ThemeToggle />
-                </div>
+                <ThemeToggle />
             </div>
             <div className="md:hidden flex items-center gap-1">
-                <div className="flex-shrink-0">
-                  <ThemeToggle />
-                </div>
-                <Sheet>
-                    <SheetTrigger asChild>
-                        <Button variant="ghost" size="icon">
-                            <Menu className="h-5 w-5" />
-                        </Button>
-                    </SheetTrigger>
-                    <SheetContent side="right" className="w-[320px] p-0 flex flex-col">
-                        <SheetHeader className="p-4 border-b">
-                            <SheetTitle>Menu</SheetTitle>
-                        </SheetHeader>
-                        <div className="p-4 space-y-4 border-b">
-                           <UserProfile />
-                           <ModelSelector onModelSelect={(model) => setSelectedModel(model)} selectedModel={selectedModel} />
-                        </div>
-                        <div className="flex-1 flex flex-col overflow-hidden">
-                            <ConversationSidebar
-                              conversations={conversations}
-                              currentConversationId={currentConversationId}
-                              onSelectConversation={openConversation}
-                              onNewConversation={createNewConversation}
-                              onDeleteConversation={deleteConversation}
-                              onToggleFavorite={toggleFavoriteConversation}
-                              onRenameConversation={renameConversation}
-                              isMobile={true}
-                            />
-                        </div>
-                    </SheetContent>
-                </Sheet>
+                <ThemeToggle />
+                <Sheet><SheetTrigger asChild><Button variant="ghost" size="icon"><Menu className="h-5 w-5" /></Button></SheetTrigger><SheetContent side="right" className="w-[320px] p-0 flex flex-col"><SheetHeader className="p-4 border-b"><SheetTitle>Menu</SheetTitle></SheetHeader><div className="p-4 space-y-4 border-b"><UserProfile /><ModelSelector onModelSelect={setSelectedModel} selectedModel={selectedModel} /></div><div className="flex-1 flex flex-col overflow-hidden"><ConversationSidebar conversations={conversations} currentConversationId={currentConversationId} onSelectConversation={openConversation} onNewConversation={createNewConversation} onDeleteConversation={deleteConversation} onToggleFavorite={toggleFavoriteConversation} onRenameConversation={renameConversation} isMobile={true} /></div></SheetContent></Sheet>
             </div>
         </div>
       </header>
 
       <div className="flex-1 flex flex-row overflow-hidden">
         <aside className="w-80 flex-shrink-0 hidden md:flex flex-col bg-background">
-          <ConversationSidebar
-            conversations={conversations}
-            currentConversationId={currentConversationId}
-            onSelectConversation={openConversation}
-            onNewConversation={createNewConversation}
-            onDeleteConversation={deleteConversation}
-            onToggleFavorite={toggleFavoriteConversation}
-            onRenameConversation={renameConversation}
-          />
+          <ConversationSidebar conversations={conversations} currentConversationId={currentConversationId} onSelectConversation={openConversation} onNewConversation={createNewConversation} onDeleteConversation={deleteConversation} onToggleFavorite={toggleFavoriteConversation} onRenameConversation={renameConversation} />
         </aside>
 
         <main className="flex-1 flex flex-col bg-background">
-          <div ref={chatContainerRef} className="flex-1 overflow-y-auto">
-            <div className="max-w-4xl mx-auto p-4 space-y-4">
+          <ScrollArea className="flex-1">
+            <div className="max-w-4xl mx-auto p-4 space-y-6">
               {messages.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-muted-foreground" style={{minHeight: 'calc(100vh - 250px)'}}>
+                <div className="flex items-center justify-center h-full text-muted-foreground" style={{minHeight: 'calc(100vh - 300px)'}}>
                   <div className="text-center">
+                    <Bot className="h-12 w-12 mx-auto mb-4 opacity-50" />
                     <h3 className="text-2xl font-bold mb-2">Olá, {profile.name}!</h3>
-                    <p>Como posso te ajudar hoje?</p>
-                    <p className="mt-2 text-sm">Você tem {tokenBalance.toLocaleString()} tokens disponíveis.</p>
+                    <p>Selecione uma conversa ou comece uma nova.</p>
+                    <p className="mt-2 text-sm">Tokens disponíveis: {tokenBalance.toLocaleString()}</p>
                   </div>
                 </div>
               ) : (
                 messages.map((message) => (
                   <div key={message.id} className={`flex items-start gap-3 ${message.sender === 'user' ? 'justify-end' : ''}`}>
-                     {message.sender === 'bot' ? (
-                        <>
-                            <Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback></Avatar>
-                            <div className="max-w-[85%] rounded-lg px-4 py-3 bg-muted">
-                              <div className="space-y-3">
-                                {message.reasoning && (
-                                  <div className="border-b border-border/50 pb-2">
-                                    <Button variant="ghost" size="sm" onClick={() => setExpandedReasoning(p => ({ ...p, [message.id]: !p[message.id] }))} className="h-auto p-1 text-xs opacity-70 hover:opacity-100">
-                                      {expandedReasoning[message.id] ? <ChevronUp className="h-3 w-3 mr-1" /> : <ChevronDown className="h-3 w-3 mr-1" />} Raciocínio
-                                    </Button>
-                                    {expandedReasoning[message.id] && <div className="mt-2 text-xs opacity-80 bg-background/50 rounded p-2 whitespace-pre-wrap overflow-hidden">{message.reasoning}</div>}
-                                  </div>
-                                )}
-                                <div className="text-sm prose prose-sm dark:prose-invert max-w-none break-words overflow-hidden">
-                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
-                                  {message.isStreaming && <span className="inline-block w-2 h-4 bg-current ml-1 animate-pulse" />}
-                                </div>
-                                <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                                  <p className="text-xs opacity-70">{getModelDisplayName(message.model)}</p>
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="icon" onClick={() => { navigator.clipboard.writeText(message.content); toast({ title: "Copiado!" }); }} className="h-7 w-7"><Copy className="h-3.5 w-3.5" /></Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>Copiar</TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
-                                </div>
-                              </div>
-                            </div>
-                        </>
-                    ) : (
-                        <>
-                            <div className="group flex flex-col items-end max-w-[90%]">
-                              <div className="rounded-lg px-4 py-3 bg-primary text-primary-foreground">
-                                <div className="space-y-3">
-                                  <div className="text-sm prose prose-sm dark:prose-invert max-w-none break-words overflow-hidden">
-                                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                            <Avatar className="h-8 w-8 shrink-0"><AvatarFallback>U</AvatarFallback></Avatar>
-                        </>
-                    )}
+                    {message.sender === 'bot' && <Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback></Avatar>}
+                    <div className={`max-w-[85%] rounded-lg px-4 py-3 ${message.sender === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>
+                      <div className="text-sm prose prose-sm dark:prose-invert max-w-none break-words">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                      </div>
+                    </div>
+                    {message.sender === 'user' && <Avatar className="h-8 w-8 shrink-0"><AvatarFallback>{profile.name?.charAt(0).toUpperCase() || 'U'}</AvatarFallback></Avatar>}
                   </div>
                 ))
               )}
-              {isLoading && !messages.some(m => m.isStreaming) && (
-                <div className="flex gap-3"><Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback></Avatar><div className="bg-muted rounded-lg px-4 py-2 flex items-center"><div className="flex space-x-1"><div className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2 h-2 bg-current rounded-full animate-bounce"></div></div></div></div>
-              )}
+              {isLoading && <div className="flex gap-3"><Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback></Avatar><div className="bg-muted rounded-lg px-4 py-2 flex items-center"><div className="flex space-x-1"><div className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2 h-2 bg-current rounded-full animate-bounce"></div></div></div></div>}
               <div ref={messagesEndRef} />
             </div>
-          </div>
-          
-          {showScrollToBottom && (
-            <Button onClick={scrollToBottom} variant="outline" size="icon" className="absolute bottom-40 right-6 h-10 w-10 rounded-full shadow-lg z-20">
-              <ArrowDown className="h-4 w-4" />
-            </Button>
-          )}
+          </ScrollArea>
 
           <div className="flex-shrink-0 border-t border-border bg-background px-4 pt-4 pb-8">
             <div className="max-w-4xl mx-auto space-y-3">
-              {fileName && (
+               {fileName && (
                 <Card className="bg-primary/5 border-primary/20">
                   <CardContent className="p-3">
                     <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 text-sm">
-                        <FileText className="h-4 w-4 text-primary" />
-                        <div>
-                          <span className="text-foreground font-medium">Anexado: {fileName}</span>
-                          {pdfInfo && ( <div className="text-xs text-muted-foreground mt-1"> {pdfInfo.pages} páginas • {pdfInfo.size}MB </div> )}
+                      <div className="flex items-center gap-2 text-sm overflow-hidden">
+                        <FileText className="h-4 w-4 text-primary shrink-0" />
+                        <div className="truncate">
+                          <span className="text-foreground font-medium" title={fileName}>{fileName}</span>
+                          {pdfInfo && <span className="text-xs text-muted-foreground ml-2">{pdfInfo.pages} pgs • {pdfInfo.size}MB</span>}
                         </div>
                       </div>
                       <Button variant="ghost" size="sm" onClick={() => { setPdfContent(''); setFileName(''); setPdfInfo(null); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="text-muted-foreground hover:text-foreground">Remover</Button>
@@ -629,47 +434,14 @@ const Chat = () => {
                   </CardContent>
                 </Card>
               )}
-
               {isProcessingPdf && (
-                <Card className="bg-secondary/5 border-secondary/20">
-                  <CardContent className="p-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Loader2 className="h-4 w-4 animate-spin text-secondary" />
-                      <div>
-                        <span className="text-foreground font-medium">Processando PDF...</span>
-                        <div className="text-xs text-muted-foreground mt-1">Aguarde, arquivos grandes podem levar alguns minutos.</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <Card className="bg-secondary/5 border-secondary/20"><CardContent className="p-3"><div className="flex items-center gap-2 text-sm"><Loader2 className="h-4 w-4 animate-spin text-secondary" /><div><span className="text-foreground font-medium">Processando PDF...</span><div className="text-xs text-muted-foreground mt-1">Aguarde, arquivos grandes podem levar alguns segundos.</div></div></div></CardContent></Card>
               )}
-
               <form onSubmit={handleSendMessage} className="flex items-end gap-2">
-                <div className="flex-1 relative">
-                  <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf" />
-                  <div className="absolute left-2 top-3 z-10">
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon" className="h-8 w-8"><Plus className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                          <DropdownMenuContent side="top" align="start" className="mb-2">
-                              <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="cursor-pointer" disabled={isProcessingPdf}>
-                                {isProcessingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Paperclip className="h-4 w-4 mr-2" />} Anexar PDF
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setIsWebSearchMode(p => !p)} className="cursor-pointer"><Globe className="h-4 w-4 mr-2" />{isWebSearchMode ? 'Desativar Busca Web' : 'Busca Web'}</DropdownMenuItem>
-                          </DropdownMenuContent>
-                      </DropdownMenu>
-                  </div>
-                  <Textarea value={inputValue} onChange={(e) => { setInputValue(e.target.value); const target = e.target as HTMLTextAreaElement; target.style.height = 'auto'; target.style.height = `${Math.min(target.scrollHeight, 128)}px`; }}
-                    placeholder={ pdfContent ? "Faça uma pergunta sobre o PDF ou digite 'resumo'..." : "Pergunte alguma coisa..." }
-                    disabled={isLoading || isProcessingPdf} className="w-full pl-14 pr-24 py-3 rounded-lg resize-none min-h-[52px] max-h-[128px]" rows={1}
-                    onKeyDown={(e) => { if (e.key === 'Enter' && !isMobile && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as any); const target = e.target as HTMLTextAreaElement; target.style.height = '52px'; } }} />
-                  <div className="absolute right-3 top-3 flex gap-1">
-                    {isLoading ? (
-                      <Button type="button" onClick={handleStopGeneration} size="icon" variant="destructive" className="h-8 w-8 rounded-full"><Square className="h-4 w-4" /></Button>
-                    ) : (
-                      <Button type="submit" disabled={(!inputValue.trim() && !pdfContent) || isProcessingPdf} size="icon" className="h-8 w-8 rounded-full"><ArrowUp className="h-4 w-4" /></Button>
-                    )}
-                  </div>
-                </div>
+                <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf" />
+                <Button type="button" variant="outline" size="icon" onClick={() => fileInputRef.current?.click()} disabled={isProcessingPdf || isLoading}><Paperclip className="h-4 w-4" /></Button>
+                <Textarea value={inputValue} onChange={(e) => setInputValue(e.target.value)} placeholder={fileName ? `Pergunte sobre ${fileName}...` : "Pergunte alguma coisa..."} disabled={isLoading || isProcessingPdf} className="w-full resize-none min-h-[52px]" rows={1} onKeyDown={(e) => { if (e.key === 'Enter' && !isMobile && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as any); }}}/>
+                <Button type="submit" disabled={isLoading || isProcessingPdf || (!inputValue.trim() && !pdfContent)} size="icon" className="h-full px-4"><ArrowUp className="h-4 w-4" /></Button>
               </form>
             </div>
           </div>
