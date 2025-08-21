@@ -38,9 +38,14 @@ const modelsByProvider = {
     { id: 'deepseek-reasoner', name: 'DeepSeek Reasoner', provider: 'DeepSeek', category: 'premium' as const },
   ],
   'META': [
-    { id: 'Llama-4-Maverick-17B-128E-Instruct-FP8', name: 'Llama 4 Maverick', provider: 'APILLM', category: 'premium' as const },
-    { id: 'Llama-4-Scout-17B-16E-Instruct-FP8', name: 'Llama 4 Scout', provider: 'APILLM', category: 'standard' as const },
-    { id: 'llama3.3-70b-instruct', name: 'Llama 3.3 70B', provider: 'APILLM', category: 'standard' as const },
+    { id: 'llama-3.1-405b-instruct', name: 'Llama 3.1 405B Instruct', provider: 'APILLM', category: 'premium' as const },
+    { id: 'llama-3.1-70b-instruct', name: 'Llama 3.1 70B Instruct', provider: 'APILLM', category: 'standard' as const },
+    { id: 'mixtral-8x22b-instruct', name: 'Mixtral 8x22B Instruct', provider: 'APILLM', category: 'premium' as const },
+    { id: 'command-r-plus', name: 'Command R+ (Cohere)', provider: 'APILLM', category: 'premium' as const },
+    { id: 'qwen2-72b-instruct', name: 'Qwen 2 72B Instruct', provider: 'APILLM', category: 'standard' as const },
+    { id: 'gemma-2-27b-instruct', name: 'Gemma 2 27B Instruct', provider: 'APILLM', category: 'standard' as const },
+    { id: 'phi-3-medium-128k-instruct', name: 'Phi-3 Medium Instruct', provider: 'APILLM', category: 'standard' as const },
+    { id: 'mixtral-8x7b-instruct', name: 'Mixtral 8x7B Instruct', provider: 'APILLM', category: 'fast' as const },
   ],
   'xAI': [
     { id: 'grok-4-0709', name: 'Grok 4', provider: 'xAI', category: 'premium' as const },

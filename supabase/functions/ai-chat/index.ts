@@ -541,36 +541,30 @@ const callApillm = async (message: string, model: string) => {
 
   const modelLimits = getModelLimits(model);
 
-  // Map our model names to APILLM model names
-  let apillmModel = model;
-  if (model.includes('Llama-4-Scout') || model.includes('llama4-scout') || model === 'Llama-4-Scout-17B-16E-Instruct-FP8') {
-    apillmModel = 'llama4-scout';
-  } else if (model.includes('Llama-4-Maverick') || model.includes('llama4-maverick') || model === 'Llama-4-Maverick-17B-128E-Instruct-FP8') {
-    apillmModel = 'llama4-maverick';
-  } else if (model.includes('Llama-4') && model.includes('Maverick')) {
-    apillmModel = 'llama4-maverick';
-  } else if (model.includes('Llama-4') && model.includes('Scout')) {
-    apillmModel = 'llama4-scout';
-  } else if (model.includes('llama3.3') || model === 'llama3.3-70b-instruct') {
-    apillmModel = 'llama3.3-70b';
-  }
-
-  console.log('Modelo mapeado para APILLM:', apillmModel);
+  console.log('Modelo APILLM:', model);
 
   try {
-    const response = await fetch('https://api.llama-api.com/chat/completions', {
+    const response = await fetch('https://api.apillm.com/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: apillmModel,
+        model: model,
         messages: [
-          { role: 'user', content: message }
+          {
+            role: 'system',
+            content: 'Você é um assistente de IA prestativo, preciso e versátil.'
+          },
+          { 
+            role: 'user', 
+            content: message 
+          }
         ],
         max_tokens: modelLimits.maxTokens,
         temperature: 0.7,
+        stream: false,
       }),
     });
 
