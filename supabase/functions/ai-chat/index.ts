@@ -367,6 +367,61 @@ const callAnthropic = async (message: string, model: string) => {
   }
 };
 
+const callGoogleGemini = async (message: string, model: string) => {
+  console.log('Chamando Google Gemini com modelo:', model);
+  
+  const apiKey = Deno.env.get('GOOGLE_API_KEY');
+  if (!apiKey) {
+    throw new Error('GOOGLE_API_KEY não configurada');
+  }
+
+  const modelLimits = getModelLimits(model);
+
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            parts: [
+              { text: message }
+            ]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: modelLimits.maxTokens,
+        }
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      console.error('Erro da API Google Gemini:', response.status, '-', errorData.error?.message || 'Erro desconhecido');
+      throw new Error(`Erro da API Google Gemini: ${response.status} - ${errorData.error?.message || 'Erro desconhecido'}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.candidates || data.candidates.length === 0) {
+      throw new Error('Nenhuma resposta gerada pelo modelo Gemini');
+    }
+
+    const candidate = data.candidates[0];
+    if (candidate.finishReason === 'SAFETY') {
+      throw new Error('Resposta bloqueada por filtros de segurança do Gemini');
+    }
+
+    return candidate.content.parts[0].text;
+  } catch (error) {
+    console.error('Erro ao chamar Google Gemini:', error);
+    throw error;
+  }
+};
+
 const processLargePdf = async (content: string, userMessage: string, model: string) => {
   const modelLimits = getModelLimits(model);
   const estimatedTokens = estimateTokens(content);
@@ -381,6 +436,8 @@ const processLargePdf = async (content: string, userMessage: string, model: stri
       return await callOpenAI(optimizedPrompt, model);
     } else if (model.includes('claude')) {
       return await callAnthropic(optimizedPrompt, model);
+    } else if (model.includes('gemini')) {
+      return await callGoogleGemini(optimizedPrompt, model);
     }
   }
   
@@ -411,6 +468,8 @@ ${chunks.length > 1 ? `(Esta é apenas uma parte do documento completo)` : ''}`;
         response = await callOpenAI(chunkPrompt, model);
       } else if (model.includes('claude')) {
         response = await callAnthropic(chunkPrompt, model);
+      } else if (model.includes('gemini')) {
+        response = await callGoogleGemini(chunkPrompt, model);
       } else {
         throw new Error('Modelo não suportado para processamento de PDF');
       }
@@ -447,6 +506,8 @@ Crie um resumo consolidado que:
         return await callOpenAI(finalSummaryPrompt, model);
       } else if (model.includes('claude')) {
         return await callAnthropic(finalSummaryPrompt, model);
+      } else if (model.includes('gemini')) {
+        return await callGoogleGemini(finalSummaryPrompt, model);
       }
     } catch (error) {
       console.log('Erro ao criar resumo final, retornando resumos parciais');
@@ -501,6 +562,8 @@ serve(async (req) => {
         response = await callOpenAI(message, model);
       } else if (model.includes('claude')) {
         response = await callAnthropic(message, model);
+      } else if (model.includes('gemini')) {
+        response = await callGoogleGemini(message, model);
       } else {
         throw new Error(`Modelo não suportado: ${model}`);
       }
