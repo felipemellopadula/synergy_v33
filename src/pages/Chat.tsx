@@ -1,3 +1,5 @@
+// Salve este código como: src/components/Chat.tsx (ou onde ele estiver no seu projeto)
+
 import { MessageCircle, ArrowLeft, Paperclip, Mic, Globe, Star, Trash2, Plus, ChevronDown, ChevronUp, Copy, Menu, ArrowUp, ArrowDown, MoreHorizontal, Edit3, Square, FileText, Loader2 } from "lucide-react";
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -13,7 +15,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTokens } from "@/hooks/useTokens";
 import { supabase } from "@/integrations/supabase/client";
-import { PdfProcessor } from "@/utils/PdfProcessor";// Certifique-se que o caminho está correto
+import { PdfProcessor } from "@/utils/PdfProcessor"; // Verifique se o caminho para o PdfProcessor está correto
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet";
@@ -178,22 +180,17 @@ const Chat = () => {
   const [expandedReasoning, setExpandedReasoning] = useState<{ [key: string]: boolean }>({});
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
 
-  // Estados para o PDF (lógica do primeiro arquivo)
+  // Estados para o PDF
   const [pdfContent, setPdfContent] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
   const [pdfInfo, setPdfInfo] = useState<{ pages?: number; size?: number } | null>(null);
   const [isProcessingPdf, setIsProcessingPdf] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const recordingTimeoutRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  // --- LÓGICA DE NEGÓCIO ---
-  
   useEffect(() => {
     if (!loading && !user) navigate('/');
   }, [user, loading, navigate]);
@@ -233,13 +230,6 @@ const Chat = () => {
   useEffect(() => {
     if (!selectedModel) setSelectedModel('synergy-ia');
   }, [selectedModel]);
-
-  const handleModelChange = async (newModel: string) => {
-    if (selectedModel && selectedModel !== newModel && messages.length > 0) {
-      await createNewConversation();
-    }
-    setSelectedModel(newModel);
-  };
 
   const toSerializable = (msgs: Message[]) => msgs.map(m => ({...m, timestamp: m.timestamp.toISOString()}));
   const fromSerializable = (msgs: any[]): Message[] => (msgs || []).map((m) => ({...m, timestamp: new Date(m.timestamp)}));
@@ -356,12 +346,16 @@ const Chat = () => {
     let displayMessage = inputValue || `Análise do arquivo: ${fileName}`;
 
     if (pdfContent && pdfInfo) {
-      if (inputValue.toLowerCase().includes('resumo') || inputValue.toLowerCase().includes('resume') || !inputValue.trim()) {
-        messageContent = `Aqui está o conteúdo de um PDF com ${pdfInfo.pages} páginas chamado "${fileName}". Por favor, crie um resumo executivo completo e bem estruturado, destacando os pontos-chave, conclusões principais e quaisquer dados ou números importantes.\n\nCONTEÚDO DO PDF:\n"""\n${pdfContent}\n"""`;
+      // *** MUDANÇA CRUCIAL AQUI ***
+      // Usando os métodos do PdfProcessor para criar prompts otimizados
+      const isSummaryRequest = inputValue.toLowerCase().includes('resumo') || !inputValue.trim();
+      
+      if (isSummaryRequest) {
+        messageContent = PdfProcessor.createSummaryPrompt(pdfContent, pdfInfo.pages || 0);
         displayMessage = `Resumo do PDF: ${fileName}`;
       } else {
-        messageContent = `Use o seguinte conteúdo do PDF com ${pdfInfo.pages} páginas chamado "${fileName}" como contexto principal para responder à pergunta do usuário. Forneça uma resposta detalhada e precisa baseada exclusivamente nas informações do documento.\n\nCONTEÚDO DO PDF:\n"""\n${pdfContent}\n"""\n\nPERGUNTA DO USUÁRIO:\n"""\n${inputValue}\n"""`;
-        displayMessage = `Análise sobre: ${inputValue}`;
+        messageContent = PdfProcessor.createAnalysisPrompt(pdfContent, pdfInfo.pages || 0, inputValue);
+        displayMessage = `Sobre "${inputValue}" no PDF: ${fileName}`;
       }
     }
 
@@ -369,9 +363,9 @@ const Chat = () => {
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setIsLoading(true);
-    setInputValue(''); // Limpar input aqui
+    setInputValue(''); 
 
-    // Limpar PDF após preparar a mensagem
+    // Limpa o estado do PDF logo após o envio
     setPdfContent('');
     setFileName('');
     setPdfInfo(null);
@@ -392,7 +386,7 @@ const Chat = () => {
         const internalModel = selectedModel === 'synergy-ia' ? 'gpt-4o-mini' : selectedModel;
         const { data: fnData, error: fnError } = await supabase.functions.invoke('ai-chat', {
              body: { 
-                message: messageContent, // Enviamos o prompt completo com o texto do PDF
+                message: messageContent, 
                 model: internalModel 
             } 
         });
@@ -405,35 +399,22 @@ const Chat = () => {
 
         const botMessageId = (Date.now() + 1).toString();
         const placeholderBotMessage: Message = { 
-            id: botMessageId, 
-            content: '', 
-            sender: 'bot', 
-            timestamp: new Date(), 
-            model: selectedModel, 
-            reasoning: reasoning || undefined,
-            isStreaming: true 
+            id: botMessageId, content: '', sender: 'bot', timestamp: new Date(), 
+            model: selectedModel, reasoning: reasoning || undefined, isStreaming: true 
         };
         setMessages(prev => [...newMessages, placeholderBotMessage]);
 
         let charIndex = 0;
         typingIntervalRef.current = setInterval(() => {
             if (charIndex < fullBotText.length) {
-                setMessages(prev => prev.map(msg => 
-                    msg.id === botMessageId 
-                    ? { ...msg, content: fullBotText.slice(0, charIndex + 1) } 
-                    : msg
-                ));
+                setMessages(prev => prev.map(msg => msg.id === botMessageId ? { ...msg, content: fullBotText.slice(0, charIndex + 1) } : msg));
                 charIndex++;
             } else {
-                if (typingIntervalRef.current) {
-                    clearInterval(typingIntervalRef.current);
-                    typingIntervalRef.current = null;
-                }
-                
+                if (typingIntervalRef.current) clearInterval(typingIntervalRef.current);
+                typingIntervalRef.current = null;
                 const finalBotMessage: Message = { ...placeholderBotMessage, content: fullBotText, isStreaming: false };
                 const finalMessages = [...newMessages, finalBotMessage];
                 setMessages(finalMessages);
-                
                 upsertConversation(finalMessages, convId);
                 setIsLoading(false);
             }
@@ -441,8 +422,8 @@ const Chat = () => {
 
     } catch (error) {
         console.error('Error sending message:', error);
-        toast({ title: "Erro", description: "Não foi possível enviar a mensagem.", variant: "destructive" });
-        setMessages(newMessages); // Reverter para mensagens antes da falha
+        toast({ title: "Erro", description: "Não foi possível enviar a mensagem. O PDF pode ser muito grande para o modelo processar.", variant: "destructive" });
+        setMessages(newMessages);
         setIsLoading(false);
     }
   };
@@ -452,11 +433,7 @@ const Chat = () => {
     if (!file) return;
 
     if (file.type !== 'application/pdf') {
-      toast({
-        title: "Erro de Arquivo",
-        description: "Por favor, selecione apenas arquivos PDF.",
-        variant: "destructive",
-      });
+      toast({ title: "Erro de Arquivo", description: "Por favor, selecione apenas arquivos PDF.", variant: "destructive" });
       return;
     }
 
@@ -467,59 +444,30 @@ const Chat = () => {
       if (result.success && result.content) {
         setPdfContent(result.content);
         setFileName(file.name);
-        setPdfInfo({
-          pages: result.pageCount,
-          size: result.fileSize
-        });
-        toast({
-          title: "PDF processado com sucesso",
-          description: `${file.name} - ${result.pageCount} páginas (${result.fileSize}MB)`,
-        });
+        setPdfInfo({ pages: result.pageCount, size: result.fileSize });
+        toast({ title: "PDF processado com sucesso", description: `${file.name} - ${result.pageCount} páginas (${result.fileSize}MB)` });
       } else {
-        let errorMessage = result.error || "Erro desconhecido ao processar o PDF.";
-        if (result.isPasswordProtected) {
-          errorMessage = "PDF protegido por senha. Não é possível processar.";
-        }
-        toast({
-          title: "Erro ao processar PDF",
-          description: errorMessage,
-          variant: "destructive",
-        });
-        setPdfContent('');
-        setFileName('');
-        setPdfInfo(null);
+        toast({ title: "Erro ao processar PDF", description: result.error || "Ocorreu um erro desconhecido.", variant: "destructive" });
+        setPdfContent(''); setFileName(''); setPdfInfo(null);
       }
     } catch (error) {
       console.error('Erro ao processar PDF:', error);
-      toast({
-        title: "Erro Interno",
-        description: "Ocorreu um erro inesperado ao processar o arquivo PDF.",
-        variant: "destructive",
-      });
-      setPdfContent('');
-      setFileName('');
-      setPdfInfo(null);
+      toast({ title: "Erro Interno", description: "Ocorreu um erro inesperado ao processar o arquivo PDF.", variant: "destructive" });
+      setPdfContent(''); setFileName(''); setPdfInfo(null);
     } finally {
       setIsProcessingPdf(false);
-      // Limpar o valor do input para permitir o re-upload do mesmo arquivo
-      if (event.target) {
-        event.target.value = '';
-      }
+      if (event.target) event.target.value = '';
     }
   };
   
-  const startRecording = async () => {};
-  const stopRecording = () => {};
-  const transcribeAudio = async (audioBlob: Blob) => {};
-
   // --- RENDERIZAÇÃO ---
   if (loading) return <div className="h-screen bg-background flex items-center justify-center"><div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div></div>;
   if (!user || !profile) return null;
 
   return (
     <div className="h-screen max-h-screen bg-background flex flex-col">
-      {/* ===== CABEÇALHO ===== */}
-      <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
+      {/* ... (O resto do seu JSX do Header e Sidebar permanece o mesmo) ... */}
+       <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
         <div className="container mx-auto px-4 py-3 flex justify-between items-center">
             <div className="flex items-center gap-3 md:gap-4">
                <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="flex items-center gap-2 hover:bg-muted">
@@ -533,7 +481,7 @@ const Chat = () => {
                </div>
             </div>
             <div className="hidden md:flex items-center gap-4">
-                <ModelSelector onModelSelect={handleModelChange} selectedModel={selectedModel} />
+                <ModelSelector onModelSelect={(model) => setSelectedModel(model)} selectedModel={selectedModel} />
                 <UserProfile />
                 <div className="flex-shrink-0">
                   <ThemeToggle />
@@ -555,7 +503,7 @@ const Chat = () => {
                         </SheetHeader>
                         <div className="p-4 space-y-4 border-b">
                            <UserProfile />
-                           <ModelSelector onModelSelect={handleModelChange} selectedModel={selectedModel} />
+                           <ModelSelector onModelSelect={(model) => setSelectedModel(model)} selectedModel={selectedModel} />
                         </div>
                         <div className="flex-1 flex flex-col overflow-hidden">
                             <ConversationSidebar
@@ -575,7 +523,6 @@ const Chat = () => {
         </div>
       </header>
 
-      {/* ===== CORPO PRINCIPAL ===== */}
       <div className="flex-1 flex flex-row overflow-hidden">
         <aside className="w-80 flex-shrink-0 hidden md:flex flex-col bg-background">
           <ConversationSidebar
@@ -596,15 +543,14 @@ const Chat = () => {
                 <div className="flex items-center justify-center h-full text-muted-foreground" style={{minHeight: 'calc(100vh - 250px)'}}>
                   <div className="text-center">
                     <h3 className="text-2xl font-bold mb-2">Olá, {profile.name}!</h3>
-                    <p>Selecione uma conversa ou inicie uma nova.</p>
+                    <p>Como posso te ajudar hoje?</p>
                     <p className="mt-2 text-sm">Você tem {tokenBalance.toLocaleString()} tokens disponíveis.</p>
                   </div>
                 </div>
               ) : (
                 messages.map((message) => (
                   <div key={message.id} className={`flex items-start gap-3 ${message.sender === 'user' ? 'justify-end' : ''}`}>
-                    
-                    {message.sender === 'bot' ? (
+                     {message.sender === 'bot' ? (
                         <>
                             <Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback></Avatar>
                             <div className="max-w-[85%] rounded-lg px-4 py-3 bg-muted">
@@ -645,35 +591,14 @@ const Chat = () => {
                                   </div>
                                 </div>
                               </div>
-                              <div className="pr-2 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-                                <TooltipProvider>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 mt-1 hover:bg-muted/50"
-                                        onClick={() => {
-                                          navigator.clipboard.writeText(message.content);
-                                          toast({ title: "Copiado!" });
-                                        }}
-                                      >
-                                        <Copy className="h-3.5 w-3.5 text-muted-foreground" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>Copiar</TooltipContent>
-                                  </Tooltip>
-                                </TooltipProvider>
-                              </div>
                             </div>
                             <Avatar className="h-8 w-8 shrink-0"><AvatarFallback>U</AvatarFallback></Avatar>
                         </>
                     )}
-                    
                   </div>
                 ))
               )}
-              {isLoading && (
+              {isLoading && !messages.some(m => m.isStreaming) && (
                 <div className="flex gap-3"><Avatar className="h-8 w-8 shrink-0"><AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback></Avatar><div className="bg-muted rounded-lg px-4 py-2 flex items-center"><div className="flex space-x-1"><div className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></div><div className="w-2 h-2 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></div><div className="w-2 h-2 bg-current rounded-full animate-bounce"></div></div></div></div>
               )}
               <div ref={messagesEndRef} />
@@ -686,10 +611,8 @@ const Chat = () => {
             </Button>
           )}
 
-          {/* ===== ÁREA DE INPUT ===== */}
           <div className="flex-shrink-0 border-t border-border bg-background px-4 pt-4 pb-8">
             <div className="max-w-4xl mx-auto space-y-3">
-              {/* Status do PDF Anexado */}
               {fileName && (
                 <Card className="bg-primary/5 border-primary/20">
                   <CardContent className="p-3">
@@ -698,34 +621,15 @@ const Chat = () => {
                         <FileText className="h-4 w-4 text-primary" />
                         <div>
                           <span className="text-foreground font-medium">Anexado: {fileName}</span>
-                          {pdfInfo && (
-                            <div className="text-xs text-muted-foreground mt-1">
-                              {pdfInfo.pages} páginas • {pdfInfo.size}MB
-                            </div>
-                          )}
+                          {pdfInfo && ( <div className="text-xs text-muted-foreground mt-1"> {pdfInfo.pages} páginas • {pdfInfo.size}MB </div> )}
                         </div>
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          setPdfContent('');
-                          setFileName('');
-                          setPdfInfo(null);
-                          if (fileInputRef.current) {
-                            fileInputRef.current.value = '';
-                          }
-                        }}
-                        className="text-muted-foreground hover:text-foreground"
-                      >
-                        Remover
-                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => { setPdfContent(''); setFileName(''); setPdfInfo(null); if (fileInputRef.current) fileInputRef.current.value = ''; }} className="text-muted-foreground hover:text-foreground">Remover</Button>
                     </div>
                   </CardContent>
                 </Card>
               )}
 
-              {/* Status de Processamento do PDF */}
               {isProcessingPdf && (
                 <Card className="bg-secondary/5 border-secondary/20">
                   <CardContent className="p-3">
@@ -733,9 +637,7 @@ const Chat = () => {
                       <Loader2 className="h-4 w-4 animate-spin text-secondary" />
                       <div>
                         <span className="text-foreground font-medium">Processando PDF...</span>
-                        <div className="text-xs text-muted-foreground mt-1">
-                          Aguarde, isto pode levar alguns segundos.
-                        </div>
+                        <div className="text-xs text-muted-foreground mt-1">Aguarde, arquivos grandes podem levar alguns minutos.</div>
                       </div>
                     </div>
                   </CardContent>
@@ -747,71 +649,25 @@ const Chat = () => {
                   <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" accept=".pdf" />
                   <div className="absolute left-2 top-3 z-10">
                       <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                              <Button type="button" variant="ghost" size="icon" className="h-8 w-8"><Plus className="h-4 w-4" /></Button>
-                          </DropdownMenuTrigger>
+                          <DropdownMenuTrigger asChild><Button type="button" variant="ghost" size="icon" className="h-8 w-8"><Plus className="h-4 w-4" /></Button></DropdownMenuTrigger>
                           <DropdownMenuContent side="top" align="start" className="mb-2">
                               <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="cursor-pointer" disabled={isProcessingPdf}>
-                                {isProcessingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Paperclip className="h-4 w-4 mr-2" />}
-                                Anexar PDF
+                                {isProcessingPdf ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Paperclip className="h-4 w-4 mr-2" />} Anexar PDF
                               </DropdownMenuItem>
                               <DropdownMenuItem onClick={() => setIsWebSearchMode(p => !p)} className="cursor-pointer"><Globe className="h-4 w-4 mr-2" />{isWebSearchMode ? 'Desativar Busca Web' : 'Busca Web'}</DropdownMenuItem>
                           </DropdownMenuContent>
                       </DropdownMenu>
                   </div>
-                  <Textarea
-                    value={inputValue}
-                    onChange={(e) => {
-                      setInputValue(e.target.value);
-                      const target = e.target as HTMLTextAreaElement;
-                      target.style.height = 'auto';
-                      target.style.height = `${Math.min(target.scrollHeight, 128)}px`;
-                    }}
-                    placeholder={
-                        pdfContent 
-                          ? "Faça uma pergunta sobre o PDF ou digite 'resumo'..." 
-                          : isWebSearchMode 
-                            ? "Digite para buscar na web..." 
-                            : "Pergunte alguma coisa..."
-                    }
-                    disabled={isLoading || isProcessingPdf}
-                    className="w-full pl-14 pr-24 py-3 rounded-lg resize-none min-h-[52px] max-h-[128px]"
-                    rows={1}
-                    onKeyDown={(e) => { 
-                      if (e.key === 'Enter' && !isMobile && !e.shiftKey) { 
-                        e.preventDefault(); 
-                        handleSendMessage(e as any);
-                        const target = e.target as HTMLTextAreaElement;
-                        target.style.height = '52px';
-                      } 
-                    }}
-                  />
+                  <Textarea value={inputValue} onChange={(e) => { setInputValue(e.target.value); const target = e.target as HTMLTextAreaElement; target.style.height = 'auto'; target.style.height = `${Math.min(target.scrollHeight, 128)}px`; }}
+                    placeholder={ pdfContent ? "Faça uma pergunta sobre o PDF ou digite 'resumo'..." : "Pergunte alguma coisa..." }
+                    disabled={isLoading || isProcessingPdf} className="w-full pl-14 pr-24 py-3 rounded-lg resize-none min-h-[52px] max-h-[128px]" rows={1}
+                    onKeyDown={(e) => { if (e.key === 'Enter' && !isMobile && !e.shiftKey) { e.preventDefault(); handleSendMessage(e as any); const target = e.target as HTMLTextAreaElement; target.style.height = '52px'; } }} />
                   <div className="absolute right-3 top-3 flex gap-1">
-                    <TooltipProvider><Tooltip><TooltipTrigger asChild>
-                      <Button type="button" variant="ghost" size="icon" onClick={isRecording ? stopRecording : startRecording} className={`h-8 w-8 ${isRecording ? 'text-red-500' : ''}`}><Mic className="h-4 w-4" /></Button>
-                    </TooltipTrigger><TooltipContent>Gravar áudio</TooltipContent></Tooltip></TooltipProvider>
-                    
                     {isLoading ? (
-                      <Button
-                        type="button"
-                        onClick={handleStopGeneration}
-                        size="icon"
-                        variant="destructive"
-                        className="h-8 w-8 rounded-full"
-                      >
-                        <Square className="h-4 w-4" />
-                      </Button>
+                      <Button type="button" onClick={handleStopGeneration} size="icon" variant="destructive" className="h-8 w-8 rounded-full"><Square className="h-4 w-4" /></Button>
                     ) : (
-                      <Button
-                        type="submit"
-                        disabled={(!inputValue.trim() && !pdfContent) || isProcessingPdf}
-                        size="icon"
-                        className="h-8 w-8 rounded-full"
-                      >
-                        <ArrowUp className="h-4 w-4" />
-                      </Button>
+                      <Button type="submit" disabled={(!inputValue.trim() && !pdfContent) || isProcessingPdf} size="icon" className="h-8 w-8 rounded-full"><ArrowUp className="h-4 w-4" /></Button>
                     )}
-
                   </div>
                 </div>
               </form>
