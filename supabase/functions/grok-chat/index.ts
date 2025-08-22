@@ -6,29 +6,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Helper function to estimate token count (rough estimate: 1 token ≈ 4 characters)
+// Function to estimate token count (rough approximation)
 function estimateTokenCount(text: string): number {
-  return Math.ceil(text.length / 4);
+  // Rough approximation: 1 token ≈ 4 characters for Portuguese text
+  return Math.ceil(text.length / 3);
 }
 
-// Function to split text into chunks based on token limits
+// Function to split text into chunks
 function splitIntoChunks(text: string, maxTokens: number): string[] {
-  const words = text.split(' ');
-  const chunks: string[] = [];
-  let currentChunk = '';
+  const maxChars = maxTokens * 3; // Convert tokens to approximate characters
+  const chunks = [];
   
-  for (const word of words) {
-    const testChunk = currentChunk + (currentChunk ? ' ' : '') + word;
-    if (estimateTokenCount(testChunk) > maxTokens && currentChunk) {
-      chunks.push(currentChunk);
-      currentChunk = word;
-    } else {
-      currentChunk = testChunk;
-    }
-  }
-  
-  if (currentChunk) {
-    chunks.push(currentChunk);
+  for (let i = 0; i < text.length; i += maxChars) {
+    chunks.push(text.slice(i, i + maxChars));
   }
   
   return chunks;
@@ -41,178 +31,102 @@ serve(async (req) => {
   }
 
   try {
-    const { message, model = 'grok-beta' } = await req.json();
+    const { message, model = 'grok-3' } = await req.json();
     
-    if (!message) {
-      throw new Error('Message is required');
+    const xaiApiKey = Deno.env.get('XAI_API_KEY');
+    if (!xaiApiKey) {
+      throw new Error('XAI_API_KEY não configurada');
     }
 
-    // Get API key
-    const apiKey = Deno.env.get('XAI_API_KEY');
-    if (!apiKey) {
-      throw new Error('XAI_API_KEY not configured');
-    }
+    // Define token limits for different xAI models
+    const getModelLimits = (modelName: string) => {
+      if (modelName.includes('grok-4')) return { input: 128000, output: 8192 };
+      if (modelName.includes('grok-3-mini')) return { input: 32000, output: 4096 };
+      if (modelName.includes('grok-3')) return { input: 128000, output: 8192 };
+      return { input: 128000, output: 8192 }; // Default for Grok models
+    };
 
-    console.log(`🤖 Processando com Grok modelo: ${model}`);
-    console.log(`📝 Tamanho da mensagem: ${message.length} caracteres`);
-
-    // Check if this is a large message (likely PDF content)
-    const isLargeMessage = message.length > 50000;
-    const tokenCount = estimateTokenCount(message);
+    const limits = getModelLimits(model);
+    const estimatedTokens = estimateTokenCount(message);
     
-    console.log(`🔢 Tokens estimados: ${tokenCount}`);
-
-    let responseContent = '';
-
-    if (isLargeMessage && tokenCount > 25000) {
-      console.log('📄 PDF grande detectado, processando em chunks...');
-      
-      // Split into chunks for large PDFs
-      const maxTokensPerChunk = 25000; // Conservative limit for Grok
-      const chunks = splitIntoChunks(message, maxTokensPerChunk);
-      
-      console.log(`📊 Dividido em ${chunks.length} chunks`);
-
-      const summaries: string[] = [];
-
-      // Process each chunk
-      for (let i = 0; i < chunks.length; i++) {
-        console.log(`🔄 Processando chunk ${i + 1}/${chunks.length}`);
-        
-        const chunkPrompt = `Por favor, analise e resuma este conteúdo (parte ${i + 1} de ${chunks.length}):
-
-${chunks[i]}
-
-Forneça um resumo conciso e detalhado dos pontos principais desta seção.`;
-
-        const chunkResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: model,
-            messages: [
-              {
-                role: 'user',
-                content: chunkPrompt
-              }
-            ],
-            max_tokens: 2000,
-            temperature: 0.7
-          }),
-        });
-
-        if (!chunkResponse.ok) {
-          const errorText = await chunkResponse.text();
-          console.error(`❌ Erro no chunk ${i + 1}:`, errorText);
-          throw new Error(`Grok API error for chunk ${i + 1}: ${chunkResponse.status} - ${errorText}`);
-        }
-
-        const chunkData = await chunkResponse.json();
-        const chunkSummary = chunkData.choices[0]?.message?.content || `Resumo do chunk ${i + 1} não disponível`;
-        summaries.push(`**Parte ${i + 1}:**\n${chunkSummary}`);
-        
-        // Add delay between chunks to respect rate limits
-        if (i < chunks.length - 1) {
-          await new Promise(resolve => setTimeout(resolve, 1000));
-        }
-      }
-
-      // Create final comprehensive summary
-      const finalPrompt = `Com base nos seguintes resumos de um documento, forneça uma análise final completa e bem estruturada:
-
-${summaries.join('\n\n')}
-
-Por favor, forneça:
-1. Um resumo executivo
-2. Os principais pontos identificados
-3. Conclusões e insights importantes
-
-Organize a resposta de forma clara e estruturada.`;
-
-      console.log('📋 Gerando resumo final...');
-
-      const finalResponse = await fetch('https://api.x.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: [
-            {
-              role: 'user',
-              content: finalPrompt
-            }
-          ],
-          max_tokens: 3000,
-          temperature: 0.7
-        }),
-      });
-
-      if (!finalResponse.ok) {
-        const errorText = await finalResponse.text();
-        console.error('❌ Erro no resumo final:', errorText);
-        throw new Error(`Grok API error for final summary: ${finalResponse.status} - ${errorText}`);
-      }
-
-      const finalData = await finalResponse.json();
-      responseContent = `## 📄 Análise Completa do Documento
-
-${finalData.choices[0]?.message?.content || 'Análise final não disponível'}
-
----
-*Documento processado em ${chunks.length} partes pelo Grok*`;
-
-    } else {
-      // Regular message processing
-      console.log('💬 Processando mensagem regular...');
-      
-      const response = await fetch('https://api.x.ai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: model,
-          messages: [
-            {
-              role: 'user',
-              content: message
-            }
-          ],
-          max_tokens: 4000,
-          temperature: 0.7
-        }),
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('❌ Erro na API do Grok:', errorText);
-        throw new Error(`Grok API error: ${response.status} - ${errorText}`);
-      }
-
-      const data = await response.json();
-      responseContent = data.choices[0]?.message?.content || 'Resposta não disponível';
-    }
-
-    console.log('✅ Resposta gerada com sucesso');
-
-    return new Response(JSON.stringify({ 
-      response: responseContent 
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    console.log('Token estimation:', { 
+      estimatedTokens, 
+      inputLimit: limits.input, 
+      model,
+      messageLength: message.length 
     });
 
+    let processedMessage = message;
+    let responsePrefix = '';
+
+    // If message is too large, split into chunks and summarize
+    if (estimatedTokens > limits.input * 0.4) { // Use 40% of limit to avoid TPM limits
+      console.log('Message too large, processing in chunks...');
+      
+      // For Grok models, use smaller chunks similar to GPT-5
+      let maxChunkTokens;
+      if (model.includes('grok-3-mini')) {
+        maxChunkTokens = Math.min(10000, Math.floor(limits.input * 0.3)); // Smaller chunks for mini
+      } else {
+        maxChunkTokens = Math.min(20000, Math.floor(limits.input * 0.4)); // Medium chunks for full models
+      }
+      
+      const chunks = splitIntoChunks(message, maxChunkTokens);
+      
+      if (chunks.length > 1) {
+        responsePrefix = `⚠️ Documento muito grande para ${model}. Processando em ${chunks.length} partes:\n\n`;
+        
+        // Process first chunk with instructions to summarize
+        processedMessage = `Analise e resuma este trecho de um documento extenso (parte 1 de ${chunks.length}). Foque nos pontos principais:\n\n${chunks[0]}`;
+      }
+    }
+    
+    const requestBody = {
+      model: model,
+      messages: [{
+        role: 'user',
+        content: processedMessage
+      }],
+      max_tokens: limits.output,
+      temperature: 0.7,
+    };
+
+    console.log('Sending request to xAI with model:', model);
+    console.log('Request config:', { 
+      model, 
+      maxTokens: requestBody.max_tokens,
+      temperature: requestBody.temperature 
+    });
+
+    const response = await fetch('https://api.x.ai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${xaiApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error('xAI API error:', errorData);
+      throw new Error(`Erro da API xAI: ${response.status} - ${errorData}`);
+    }
+
+    const data = await response.json();
+    const generatedText = data.choices?.[0]?.message?.content || 'Não foi possível gerar resposta';
+    
+    // Add prefix if message was processed in chunks
+    const finalResponse = responsePrefix + generatedText;
+
+    console.log('xAI response received successfully');
+
+    return new Response(JSON.stringify({ response: finalResponse }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (error) {
-    console.error('❌ Erro na função grok-chat:', error);
-    return new Response(JSON.stringify({ 
-      error: error.message || 'Erro interno do servidor' 
-    }), {
+    console.error('Erro na função xai-chat:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
