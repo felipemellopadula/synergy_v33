@@ -31,7 +31,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, model = 'claude-sonnet-4-20250514' } = await req.json();
+    const { message, model = 'claude-sonnet-4-20250514', files } = await req.json();
     
     const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!anthropicApiKey) {
@@ -49,16 +49,37 @@ serve(async (req) => {
     };
 
     const limits = getModelLimits(model);
-    const estimatedTokens = estimateTokenCount(message);
+    
+    // Log files information
+    if (files && files.length > 0) {
+      console.log('Files received:', files.map(f => ({ name: f.name, type: f.type, hasContent: !!f.pdfContent })));
+    }
+    
+    // Process PDF files if present
+    let finalMessage = message;
+    if (files && files.length > 0) {
+      const pdfFiles = files.filter(f => f.type === 'application/pdf' && f.pdfContent);
+      
+      if (pdfFiles.length > 0) {
+        const pdfContents = pdfFiles.map(pdf => 
+          `[Arquivo PDF: ${pdf.name}]\n\n${pdf.pdfContent}`
+        );
+        finalMessage = `${message}\n\n${pdfContents.join('\n\n---\n\n')}`;
+        console.log('Final message with PDF content length:', finalMessage.length);
+      }
+    }
+    
+    const estimatedTokens = estimateTokenCount(finalMessage);
     
     console.log('Token estimation:', { 
       estimatedTokens, 
       inputLimit: limits.input, 
       model,
-      messageLength: message.length 
+      messageLength: finalMessage.length,
+      hasPdfFiles: files && files.some(f => f.type === 'application/pdf')
     });
 
-    let processedMessage = message;
+    let processedMessage = finalMessage;
     let responsePrefix = '';
 
     // If message is too large, split into chunks and summarize
@@ -73,7 +94,7 @@ serve(async (req) => {
         maxChunkTokens = Math.min(40000, Math.floor(limits.input * 0.5)); // Larger chunks for Opus/Sonnet
       }
       
-      const chunks = splitIntoChunks(message, maxChunkTokens);
+      const chunks = splitIntoChunks(finalMessage, maxChunkTokens);
       
       if (chunks.length > 1) {
         responsePrefix = `⚠️ Documento muito grande para ${model}. Processando em ${chunks.length} partes:\n\n`;
