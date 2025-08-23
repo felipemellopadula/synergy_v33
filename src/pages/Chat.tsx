@@ -196,8 +196,14 @@ const Chat = () => {
     const formattedLines = lines.map((line, index) => {
       const trimmedLine = line.trim();
       
+      // Remove símbolos # dos títulos e marca como bold
+      if (trimmedLine.startsWith('#')) {
+        const titleText = trimmedLine.replace(/^#+\s*/, '');
+        return `**${titleText}**`;
+      }
+      
       // Handle bold titles (lines that end with : or are short and descriptive)
-      if (trimmedLine.endsWith(':') || (trimmedLine.length < 50 && !trimmedLine.startsWith('•') && !trimmedLine.startsWith('-') && trimmedLine.match(/^[A-Z][^.!?]*$/))) {
+      if (trimmedLine.endsWith(':') || (trimmedLine.length < 50 && !trimmedLine.startsWith('•') && !trimmedLine.startsWith('-') && !trimmedLine.startsWith('*') && !trimmedLine.match(/^\d+\./) && trimmedLine.match(/^[A-ZÁÊÇÕÜÉ][^.!?]*$/))) {
         return `**${trimmedLine}**`;
       }
       
@@ -206,7 +212,7 @@ const Chat = () => {
         return `• ${trimmedLine.replace(/^[•\-*]\s*/, '')}`;
       }
       
-      // Handle numbered lists
+      // Handle numbered lists - manter como está
       if (trimmedLine.match(/^\d+\./)) {
         return trimmedLine;
       }
