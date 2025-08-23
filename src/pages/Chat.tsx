@@ -670,15 +670,15 @@ const Chat = () => {
         
         // Prepare message with PDF and Word content if exists
         let messageWithPdf = currentInput;
-        if (fileData.length > 0) {
-          const pdfFiles = fileData.filter(f => f.type === 'application/pdf' && 'pdfContent' in f);
+        if (attachedFiles.length > 0) {
+          const pdfFiles = attachedFiles.filter(f => f.type === 'application/pdf');
           const wordFiles = attachedFiles.filter(f => f.type.includes('word') || f.name.endsWith('.docx') || f.name.endsWith('.doc'));
           
           if (pdfFiles.length > 0 || wordFiles.length > 0) {
             console.log('Files detected:', {
               pdfs: pdfFiles.map(f => ({ 
                 name: f.name, 
-                contentLength: ('pdfContent' in f) ? (f as any).pdfContent?.length || 0 : 0 
+                contentLength: processedPdfs.get(f.name)?.length || 0 
               })),
               words: wordFiles.map(f => ({
                 name: f.name,
@@ -690,9 +690,10 @@ const Chat = () => {
             const contents = [];
             
             if (pdfFiles.length > 0) {
-              const pdfContents = pdfFiles.map(pdf => 
-                `[Arquivo PDF: ${pdf.name}]\n\n${('pdfContent' in pdf) ? (pdf as any).pdfContent || 'Conteúdo não disponível' : 'Conteúdo não disponível'}`
-              );
+              const pdfContents = pdfFiles.map(pdf => {
+                const pdfContent = processedPdfs.get(pdf.name);
+                return `[Arquivo PDF: ${pdf.name}]\n\n${pdfContent || 'Conteúdo não disponível'}`;
+              });
               contents.push(...pdfContents);
             }
             
