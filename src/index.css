@@ -137,12 +137,13 @@
 
   /* ===== MARKDOWN/PROSE STYLING FOR CHAT MESSAGES ===== */
   .prose {
-    /* Títulos com melhor formatação */
+    /* Títulos com melhor formatação - SEMPRE em bold */
     h1, h2, h3, h4, h5, h6 {
       @apply font-bold text-foreground;
       margin-top: 1.5em;
       margin-bottom: 0.75em;
       line-height: 1.3;
+      font-weight: 700 !important; /* Força bold para todos os títulos */
     }
 
     h1 { @apply text-lg; }
