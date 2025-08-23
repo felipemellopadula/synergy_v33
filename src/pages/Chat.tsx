@@ -1,4 +1,4 @@
-import { MessageCircle, ArrowLeft, Paperclip, Mic, Globe, Star, Trash2, Plus, ChevronDown, ChevronUp, Copy, Menu, ArrowUp, ArrowDown, MoreHorizontal, Edit3, Square, Check } from "lucide-react";
+import { MessageCircle, ArrowLeft, Paperclip, Mic, Globe, Star, Trash2, Plus, ChevronDown, ChevronUp, Copy, Menu, ArrowUp, ArrowDown, MoreHorizontal, Edit3, Square, Check, FileText, File, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import React, { useState, useRef, useEffect } from "react";
@@ -28,7 +28,7 @@ interface Message {
   model?: string;
   reasoning?: string;
   isStreaming?: boolean;
-  files?: { name: string; type: string }[];
+  files?: { name: string; type: string; url?: string }[];
 }
 
 interface ChatConversation {
@@ -173,6 +173,7 @@ const Chat = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [isWebSearchMode, setIsWebSearchMode] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [filePreviewUrls, setFilePreviewUrls] = useState<Map<string, string>>(new Map());
   const [processedPdfs, setProcessedPdfs] = useState<Map<string, string>>(new Map());
   const [processedWords, setProcessedWords] = useState<Map<string, string>>(new Map());
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
@@ -187,6 +188,49 @@ const Chat = () => {
   const recordingTimeoutRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+
+  // Função para renderizar ícone de anexo com base no tipo
+  const renderFileIcon = (fileName: string, fileType: string, fileUrl?: string) => {
+    const isImage = fileType.startsWith('image/');
+    const isPdf = fileType === 'application/pdf' || fileName.toLowerCase().endsWith('.pdf');
+    const isWord = fileType.includes('word') || fileName.toLowerCase().endsWith('.docx') || fileName.toLowerCase().endsWith('.doc');
+
+    return (
+      <div className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg border max-w-xs">
+        <div className="flex-shrink-0">
+          {isImage && fileUrl ? (
+            <div className="w-12 h-12 rounded-md overflow-hidden border">
+              <img 
+                src={fileUrl} 
+                alt={fileName}
+                className="w-full h-full object-cover"
+              />
+            </div>
+          ) : isPdf ? (
+            <div className="w-12 h-12 rounded-md bg-red-100 dark:bg-red-900/30 flex items-center justify-center border">
+              <FileText className="w-6 h-6 text-red-600 dark:text-red-400" />
+            </div>
+          ) : isWord ? (
+            <div className="w-12 h-12 rounded-md bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center border">
+              <FileText className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            </div>
+          ) : (
+            <div className="w-12 h-12 rounded-md bg-gray-100 dark:bg-gray-800 flex items-center justify-center border">
+              <File className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-foreground truncate" title={fileName}>
+            {fileName}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            {isPdf ? 'PDF' : isWord ? 'Word' : isImage ? 'Imagem' : 'Arquivo'}
+          </p>
+        </div>
+      </div>
+    );
+  };
 
   // Função para formatar a resposta da IA
   const formatAIResponse = (text: string) => {
@@ -529,9 +573,13 @@ const Chat = () => {
     setCurrentConversationId(null);
     setMessages([]);
     setInputValue('');
-    setAttachedFiles([]);
-    setProcessedPdfs(new Map());
-    setProcessedWords(new Map());
+      setAttachedFiles([]);
+      setProcessedPdfs(new Map());
+      setProcessedWords(new Map());
+      
+      // Limpar URLs de preview para evitar vazamentos de memória
+      filePreviewUrls.forEach(url => URL.revokeObjectURL(url));
+      setFilePreviewUrls(new Map());
   };
 
   // --- INÍCIO DA MODIFICAÇÃO: TOAST REMOVIDO ---
@@ -580,6 +628,12 @@ const Chat = () => {
     setInputValue('');
     setAttachedFiles([]);
     setProcessedPdfs(new Map());
+    setProcessedWords(new Map());
+    
+    // Limpar URLs de preview para evitar vazamentos de memória
+    filePreviewUrls.forEach(url => URL.revokeObjectURL(url));
+    setFilePreviewUrls(new Map());
+    
     if (fileInputRef.current) fileInputRef.current.value = '';
 
     const canProceed = await consumeTokens(selectedModel, currentInput);
@@ -590,7 +644,11 @@ const Chat = () => {
         return file.type === 'application/pdf' ? { ...baseData, pdfContent: processedPdfs.get(file.name) || '' } : baseData;
     }));
 
-    const userMessage: Message = { id: Date.now().toString(), content: currentInput, sender: 'user', timestamp: new Date(), files: currentFiles.map(f => ({ name: f.name, type: f.type }))};
+    const userMessage: Message = { id: Date.now().toString(), content: currentInput, sender: 'user', timestamp: new Date(), files: currentFiles.map(f => ({ 
+      name: f.name, 
+      type: f.type, 
+      url: f.type.startsWith('image/') ? filePreviewUrls.get(f.name) : undefined 
+    }))};
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
     setIsLoading(true);
@@ -756,10 +814,21 @@ const Chat = () => {
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
+    
+    // Criar URLs de preview para imagens
+    const newPreviewUrls = new Map(filePreviewUrls);
+    
     for (const file of files) {
         const isValidType = file.type.startsWith('image/') || file.type.includes('pdf') || file.type.includes('word') || file.type.includes('document') || file.name.endsWith('.doc') || file.name.endsWith('.docx');
         if (!isValidType || file.size > 50 * 1024 * 1024) continue;
+        
         setAttachedFiles(prev => [...prev, file]);
+        
+        // Gerar preview URL para imagens
+        if (file.type.startsWith('image/')) {
+          const url = URL.createObjectURL(file);
+          newPreviewUrls.set(file.name, url);
+        }
         if (file.type === 'application/pdf') {
             console.log('Processing PDF:', file.name, 'Size:', file.size);
             try {
@@ -801,6 +870,10 @@ const Chat = () => {
             }
         }
     }
+    
+    // Atualizar URLs de preview
+    setFilePreviewUrls(newPreviewUrls);
+    
     if (event.target) event.target.value = '';
   };
   
@@ -1008,7 +1081,15 @@ const Chat = () => {
                         <div className="group flex flex-col items-end max-w-[90%]">
                           <div className="rounded-lg px-4 py-3 bg-primary text-primary-foreground">
                             <div className="space-y-3">
-                              {message.files && (<div className="flex flex-wrap gap-2">{message.files.map((file, idx) => (<div key={idx} className="bg-background/50 px-3 py-1 rounded-full text-xs">📎 {file.name}</div>))}</div>)}
+                              {message.files && (
+                                <div className="flex flex-wrap gap-2 mb-3">
+                                  {message.files.map((file, idx) => (
+                                    <div key={idx}>
+                                      {renderFileIcon(file.name, file.type, file.url)}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
                                <div className="text-sm max-w-none break-words overflow-hidden">
                                  {renderFormattedText(message.content, true)}
                                </div>
@@ -1058,11 +1139,41 @@ const Chat = () => {
           <div className="flex-shrink-0 border-t border-border bg-background px-4 pt-4 pb-8">
             <div className="max-w-4xl mx-auto">
                 {attachedFiles.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-3">
+                  <div className="flex flex-wrap gap-3 mb-4">
                     {attachedFiles.map((file, idx) => (
-                      <div key={idx} className="bg-muted px-3 py-1 rounded-full text-sm flex items-center gap-2">
-                        📎 {file.name}
-                        <button onClick={() => { setAttachedFiles(p => p.filter((_, i) => i !== idx)); if (file.type === 'application/pdf') setProcessedPdfs(p => { const n = new Map(p); n.delete(file.name); return n; }); }} className="text-red-500 hover:text-red-700 ml-1 text-lg leading-none">&times;</button>
+                      <div key={idx} className="relative">
+                        {renderFileIcon(file.name, file.type, file.type.startsWith('image/') ? filePreviewUrls.get(file.name) : undefined)}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => {
+                            // Revogar URL se for uma imagem
+                            if (file.type.startsWith('image/')) {
+                              const url = filePreviewUrls.get(file.name);
+                              if (url) URL.revokeObjectURL(url);
+                            }
+                            
+                            setAttachedFiles(prev => prev.filter((_, i) => i !== idx));
+                            setFilePreviewUrls(prev => {
+                              const newMap = new Map(prev);
+                              newMap.delete(file.name);
+                              return newMap;
+                            });
+                            setProcessedPdfs(prev => {
+                              const newMap = new Map(prev);
+                              newMap.delete(file.name);
+                              return newMap;
+                            });
+                            setProcessedWords(prev => {
+                              const newMap = new Map(prev);
+                              newMap.delete(file.name);
+                              return newMap;
+                            });
+                          }}
+                          className="absolute -top-2 -right-2 h-6 w-6 p-0 bg-destructive/80 hover:bg-destructive text-destructive-foreground rounded-full"
+                        >
+                          ×
+                        </Button>
                       </div>
                     ))}
                   </div>
