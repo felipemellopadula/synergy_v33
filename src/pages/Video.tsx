@@ -226,7 +226,6 @@ const VideoPage = () => {
       if (error) throw error;
       const { data: publicData } = supabase.storage.from('images').getPublicUrl(data.path);
       urlSetter(publicData.publicUrl);
-      toast({ title: 'Upload concluído', description: 'Imagem carregada com sucesso.' });
     } catch (e) {
       toast({ title: 'Erro no upload', description: 'Tente novamente.', variant: 'destructive' });
     } finally {
