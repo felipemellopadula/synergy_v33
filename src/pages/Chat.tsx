@@ -957,24 +957,20 @@ const Chat = () => {
     // Aguardar conclusão de todos os processamentos
     const results = await Promise.all(processingPromises);
     
-    // Mostrar resultados
+    // Log silencioso dos resultados sem mostrar toast
     const successful = results.filter(r => r.success).length;
     const failed = results.filter(r => !r.success).length;
     
-    if (successful > 0) {
-      toast({
-        title: `${successful} arquivo(s) processado(s) com sucesso`,
-        description: failed > 0 ? `${failed} arquivo(s) falharam no processamento` : "Todos os arquivos estão prontos para análise"
-      });
-    }
+    console.log('File processing results:', {
+      successful,
+      failed,
+      details: results
+    });
     
+    // Apenas mostrar toast se houver erros críticos
     if (failed > 0) {
       const failedFiles = results.filter(r => !r.success);
-      toast({
-        title: `Erro ao processar ${failed} arquivo(s)`,
-        description: failedFiles.map(f => `${f.fileName}: ${f.error}`).join('; '),
-        variant: "destructive",
-      });
+      console.error('Failed file processing:', failedFiles);
     }
   };
 
