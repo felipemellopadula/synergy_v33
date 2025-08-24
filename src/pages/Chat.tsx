@@ -176,6 +176,9 @@ const Chat = () => {
   const [filePreviewUrls, setFilePreviewUrls] = useState<Map<string, string>>(new Map());
   const [processedPdfs, setProcessedPdfs] = useState<Map<string, string>>(new Map());
   const [processedWords, setProcessedWords] = useState<Map<string, string>>(new Map());
+  const [fileProcessingStatus, setFileProcessingStatus] = useState<Map<string, 'processing' | 'completed' | 'error'>>(new Map());
+  const [processedDocuments, setProcessedDocuments] = useState<Map<string, { content: string; type: string; pages?: number; fileSize?: number }>>(new Map());
+  const [comparativeAnalysisEnabled, setComparativeAnalysisEnabled] = useState(false);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
   const [expandedReasoning, setExpandedReasoning] = useState<{ [key: string]: boolean }>({});
@@ -618,6 +621,9 @@ const Chat = () => {
     setAttachedFiles([]);
     setProcessedPdfs(new Map());
     setProcessedWords(new Map());
+    setProcessedDocuments(new Map());
+    setFileProcessingStatus(new Map());
+    setComparativeAnalysisEnabled(false);
     
     // Limpar URLs de preview para evitar vazamentos de memória
     filePreviewUrls.forEach(url => URL.revokeObjectURL(url));
@@ -654,13 +660,18 @@ const Chat = () => {
     try {
         const internalModel = selectedModel === 'synergy-ia' ? 'gpt-4o-mini' : selectedModel;
         
-        // Prepare message with PDF and Word content if exists
+        // Prepare message with file content
         let messageWithPdf = currentInput;
-        if (attachedFiles.length > 0) {
-          const pdfFiles = attachedFiles.filter(f => f.type === 'application/pdf');
-          const wordFiles = attachedFiles.filter(f => f.type.includes('word') || f.name.endsWith('.docx') || f.name.endsWith('.doc'));
+        
+        // Usar análise comparativa se houver múltiplos documentos processados
+        if (processedDocuments.size > 1 && comparativeAnalysisEnabled) {
+          messageWithPdf = generateComparativePrompt(currentInput, processedDocuments);
+        } else if (attachedFiles.length > 0) {
+          const pdfFiles = attachedFiles.filter(f => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+          const wordFiles = attachedFiles.filter(f => f.type.includes('word') || f.name.toLowerCase().endsWith('.docx') || f.name.toLowerCase().endsWith('.doc'));
+          const imageFiles = attachedFiles.filter(f => f.type.startsWith('image/'));
           
-          if (pdfFiles.length > 0 || wordFiles.length > 0) {
+          if (pdfFiles.length > 0 || wordFiles.length > 0 || imageFiles.length > 0) {
             console.log('Files detected:', {
               pdfs: pdfFiles.map(f => ({ 
                 name: f.name, 
@@ -669,7 +680,8 @@ const Chat = () => {
               words: wordFiles.map(f => ({
                 name: f.name,
                 contentLength: processedWords.get(f.name)?.length || 0
-              }))
+              })),
+              images: imageFiles.map(f => ({ name: f.name, type: f.type }))
             });
             
             // Include file contents in the message
@@ -688,6 +700,13 @@ const Chat = () => {
                 `[Arquivo Word: ${word.name}]\n\n${processedWords.get(word.name) || 'Conteúdo não disponível'}`
               );
               contents.push(...wordContents);
+            }
+            
+            if (imageFiles.length > 0) {
+              const imageContents = imageFiles.map(image => 
+                `[Imagem anexada: ${image.name}]`
+              );
+              contents.push(...imageContents);
             }
             
             messageWithPdf = `${currentInput}\n\n${contents.join('\n\n---\n\n')}`;
@@ -810,66 +829,181 @@ const Chat = () => {
     const files = Array.from(event.target.files || []);
     if (files.length === 0) return;
     
+    // Verificar limite de 5 arquivos
+    const totalFiles = attachedFiles.length + files.length;
+    if (totalFiles > 5) {
+      toast({
+        title: "Limite de arquivos excedido",
+        description: `Você pode anexar no máximo 5 arquivos. Atualmente: ${attachedFiles.length} + ${files.length} = ${totalFiles}`,
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    // Filtrar arquivos válidos
+    const validFiles = files.filter(file => {
+      const isValidType = file.type.startsWith('image/') || 
+                         file.type === 'application/pdf' || 
+                         file.type.includes('word') || 
+                         file.name.toLowerCase().endsWith('.pdf') ||
+                         file.name.toLowerCase().endsWith('.doc') || 
+                         file.name.toLowerCase().endsWith('.docx');
+      return isValidType && file.size <= 50 * 1024 * 1024; // 50MB limit
+    });
+    
+    if (validFiles.length === 0) {
+      toast({
+        title: "Nenhum arquivo válido",
+        description: "Selecione apenas imagens, PDFs ou documentos Word (máx. 50MB cada).",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    setAttachedFiles(prev => [...prev, ...validFiles]);
+    
+    // Ativar análise comparativa se houver mais de um arquivo
+    if (attachedFiles.length + validFiles.length > 1) {
+      setComparativeAnalysisEnabled(true);
+    }
+    
+    // Processar arquivos em paralelo
+    await processFilesInParallel(validFiles);
+    
+    if (event.target) event.target.value = '';
+  };
+
+  // Função para processar múltiplos arquivos em paralelo
+  const processFilesInParallel = async (files: File[]) => {
     // Criar URLs de preview para imagens
     const newPreviewUrls = new Map(filePreviewUrls);
     
-    for (const file of files) {
-        const isValidType = file.type.startsWith('image/') || file.type.includes('pdf') || file.type.includes('word') || file.type.includes('document') || file.name.endsWith('.doc') || file.name.endsWith('.docx');
-        if (!isValidType || file.size > 50 * 1024 * 1024) continue;
-        
-        setAttachedFiles(prev => [...prev, file]);
-        
-        // Gerar preview URL para imagens
+    const processingPromises = files.map(async (file) => {
+      const fileName = file.name;
+      
+      // Marcar como processando
+      setFileProcessingStatus(prev => new Map(prev.set(fileName, 'processing')));
+      
+      try {
         if (file.type.startsWith('image/')) {
+          // Para imagens, criar URL de preview
           const url = URL.createObjectURL(file);
-          newPreviewUrls.set(file.name, url);
+          newPreviewUrls.set(fileName, url);
+          setProcessedDocuments(prev => new Map(prev.set(fileName, {
+            content: `Imagem anexada: ${fileName}`,
+            type: 'image',
+            fileSize: file.size
+          })));
+          setFileProcessingStatus(prev => new Map(prev.set(fileName, 'completed')));
+          return { fileName, success: true };
+          
+        } else if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
+          console.log('Processing PDF:', fileName, 'Size:', file.size);
+          const result = await PdfProcessor.processPdf(file);
+          if (result.success && result.content) {
+            console.log('PDF processed successfully:', {
+              fileName: fileName,
+              pageCount: result.pageCount,
+              contentLength: result.content.length,
+              contentPreview: result.content.substring(0, 200) + '...'
+            });
+            setProcessedDocuments(prev => new Map(prev.set(fileName, {
+              content: result.content!,
+              type: 'pdf',
+              pages: result.pageCount,
+              fileSize: file.size
+            })));
+            setProcessedPdfs(prev => new Map(prev).set(fileName, result.content || ''));
+            setFileProcessingStatus(prev => new Map(prev.set(fileName, 'completed')));
+            return { fileName, success: true };
+          } else {
+            throw new Error(result.error || 'Erro ao processar PDF');
+          }
+          
+        } else if (file.type.includes('word') || file.name.toLowerCase().endsWith('.docx') || file.name.toLowerCase().endsWith('.doc')) {
+          console.log('Processing Word:', fileName, 'Size:', file.size);
+          const result = await WordProcessor.processWord(file);
+          if (result.success && result.content) {
+            console.log('Word processed successfully:', {
+              fileName: fileName,
+              contentLength: result.content.length,
+              contentPreview: result.content.substring(0, 200) + '...'
+            });
+            setProcessedDocuments(prev => new Map(prev.set(fileName, {
+              content: result.content!,
+              type: 'word',
+              fileSize: file.size
+            })));
+            setProcessedWords(prev => new Map(prev).set(fileName, result.content || ''));
+            setFileProcessingStatus(prev => new Map(prev.set(fileName, 'completed')));
+            return { fileName, success: true };
+          } else {
+            throw new Error(result.error || 'Erro ao processar Word');
+          }
         }
-        if (file.type === 'application/pdf') {
-            console.log('Processing PDF:', file.name, 'Size:', file.size);
-            try {
-                const result = await PdfProcessor.processPdf(file);
-                if (result.success && result.content) {
-                    console.log('PDF processed successfully:', {
-                      fileName: file.name,
-                      pageCount: result.pageCount,
-                      contentLength: result.content.length,
-                      contentPreview: result.content.substring(0, 200) + '...'
-                    });
-                     setProcessedPdfs(prev => new Map(prev).set(file.name, result.content || ''));
-                } else {
-                    console.error('PDF processing failed:', result.error);
-                    toast({ title: "Erro ao processar PDF", description: result.error || `Falha em ${file.name}.`, variant: "destructive" });
-                }
-            } catch (error) {
-                console.error('PDF processing error:', error);
-                toast({ title: "Erro ao processar PDF", description: `Falha em ${file.name}.`, variant: "destructive" });
-            }
-        } else if (file.type.includes('word') || file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
-            console.log('Processing Word:', file.name, 'Size:', file.size);
-            try {
-                const result = await WordProcessor.processWord(file);
-                if (result.success && result.content) {
-                    console.log('Word processed successfully:', {
-                      fileName: file.name,
-                      contentLength: result.content.length,
-                      contentPreview: result.content.substring(0, 200) + '...'
-                    });
-                     setProcessedWords(prev => new Map(prev).set(file.name, result.content || ''));
-                } else {
-                    console.error('Word processing failed:', result.error);
-                    toast({ title: "Erro ao processar Word", description: result.error || `Falha em ${file.name}.`, variant: "destructive" });
-                }
-            } catch (error) {
-                console.error('Word processing error:', error);
-                toast({ title: "Erro ao processar Word", description: `Falha em ${file.name}.`, variant: "destructive" });
-            }
-        }
-    }
+        
+        return { fileName, success: false, error: 'Tipo de arquivo não suportado' };
+        
+      } catch (error: any) {
+        console.error(`Erro ao processar ${fileName}:`, error);
+        setFileProcessingStatus(prev => new Map(prev.set(fileName, 'error')));
+        return { fileName, success: false, error: error.message };
+      }
+    });
     
     // Atualizar URLs de preview
     setFilePreviewUrls(newPreviewUrls);
     
-    if (event.target) event.target.value = '';
+    // Aguardar conclusão de todos os processamentos
+    const results = await Promise.all(processingPromises);
+    
+    // Mostrar resultados
+    const successful = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success).length;
+    
+    if (successful > 0) {
+      toast({
+        title: `${successful} arquivo(s) processado(s) com sucesso`,
+        description: failed > 0 ? `${failed} arquivo(s) falharam no processamento` : "Todos os arquivos estão prontos para análise"
+      });
+    }
+    
+    if (failed > 0) {
+      const failedFiles = results.filter(r => !r.success);
+      toast({
+        title: `Erro ao processar ${failed} arquivo(s)`,
+        description: failedFiles.map(f => `${f.fileName}: ${f.error}`).join('; '),
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Função para gerar prompt de análise comparativa
+  const generateComparativePrompt = (userMessage: string, documents: Map<string, any>) => {
+    if (documents.size <= 1) return userMessage;
+    
+    const documentList = Array.from(documents.entries()).map(([fileName, doc], index) => {
+      return `DOCUMENTO ${index + 1}: ${fileName} (${doc.type.toUpperCase()}${doc.pages ? `, ${doc.pages} páginas` : ''})
+Conteúdo: ${doc.content.substring(0, 2000)}${doc.content.length > 2000 ? '...' : ''}`;
+    }).join('\n\n');
+    
+    return `ANÁLISE COMPARATIVA DE MÚLTIPLOS DOCUMENTOS
+
+Você recebeu ${documents.size} documentos para análise. Realize uma análise comparativa inteligente considerando:
+
+1. IDENTIFICAÇÃO E CONTEXTO de cada documento
+2. PONTOS DE CONVERGÊNCIA entre os documentos
+3. DIVERGÊNCIAS e CONTRASTES identificados
+4. SÍNTESE INTEGRADA das informações
+5. INSIGHTS e CONCLUSÕES baseadas na comparação
+
+DOCUMENTOS FORNECIDOS:
+${documentList}
+
+PERGUNTA/SOLICITAÇÃO DO USUÁRIO:
+${userMessage}
+
+Por favor, forneça uma resposta abrangente que integre informações de todos os documentos, destacando semelhanças, diferenças e insights únicos que emergem da análise conjunta.`;
   };
   
   const startRecording = async () => {
@@ -1143,55 +1277,129 @@ const Chat = () => {
           <div className="flex-shrink-0 border-t border-border bg-background px-4 pt-4 pb-8">
             <div className="max-w-4xl mx-auto">
                 {attachedFiles.length > 0 && (
-                  <div className="flex flex-wrap gap-3 mb-4">
-                    {attachedFiles.map((file, idx) => (
-                      <div key={idx} className="relative">
-                        {renderFileIcon(file.name, file.type, file.type.startsWith('image/') ? filePreviewUrls.get(file.name) : undefined)}
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => {
-                            // Revogar URL se for uma imagem
-                            if (file.type.startsWith('image/')) {
-                              const url = filePreviewUrls.get(file.name);
-                              if (url) URL.revokeObjectURL(url);
-                            }
-                            
-                            setAttachedFiles(prev => prev.filter((_, i) => i !== idx));
-                            setFilePreviewUrls(prev => {
-                              const newMap = new Map(prev);
-                              newMap.delete(file.name);
-                              return newMap;
-                            });
-                            setProcessedPdfs(prev => {
-                              const newMap = new Map(prev);
-                              newMap.delete(file.name);
-                              return newMap;
-                            });
-                            setProcessedWords(prev => {
-                              const newMap = new Map(prev);
-                              newMap.delete(file.name);
-                              return newMap;
-                            });
-                          }}
-                          className="absolute -top-2 -right-2 h-6 w-6 p-0 bg-destructive/80 hover:bg-destructive text-destructive-foreground rounded-full"
-                        >
-                          ×
-                        </Button>
+                  <div className="space-y-3 mb-4">
+                    {/* Indicador de análise comparativa */}
+                    {comparativeAnalysisEnabled && (
+                      <div className="flex items-center gap-2 p-3 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <div className="flex items-center gap-1">
+                          <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                          <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                            Análise Comparativa Ativa
+                          </span>
+                        </div>
+                        <span className="text-xs text-blue-600 dark:text-blue-400">
+                          {attachedFiles.length} documentos serão comparados e analisados em conjunto
+                        </span>
                       </div>
-                    ))}
+                    )}
+                    
+                    {/* Lista de arquivos */}
+                    <div className="flex flex-wrap gap-3">
+                      {attachedFiles.map((file, idx) => {
+                        const status = fileProcessingStatus.get(file.name);
+                        const isProcessing = status === 'processing';
+                        const isCompleted = status === 'completed';
+                        const hasError = status === 'error';
+                        
+                        return (
+                          <div key={idx} className="relative group">
+                            <div className={`relative ${isProcessing ? 'opacity-60' : ''}`}>
+                              {renderFileIcon(file.name, file.type, file.type.startsWith('image/') ? filePreviewUrls.get(file.name) : undefined)}
+                              
+                              {/* Status overlay */}
+                              {isProcessing && (
+                                <div className="absolute inset-0 bg-black/20 rounded-lg flex items-center justify-center">
+                                  <div className="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent"></div>
+                                </div>
+                              )}
+                              
+                              {isCompleted && (
+                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
+                                  <Check className="h-3 w-3 text-white" />
+                                </div>
+                              )}
+                              
+                              {hasError && (
+                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                                  <span className="text-white text-xs">!</span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            {/* Botão de remoção */}
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                // Revogar URL se for uma imagem
+                                if (file.type.startsWith('image/')) {
+                                  const url = filePreviewUrls.get(file.name);
+                                  if (url) URL.revokeObjectURL(url);
+                                }
+                                
+                                setAttachedFiles(prev => {
+                                  const newFiles = prev.filter((_, i) => i !== idx);
+                                  // Desativar análise comparativa se sobrar apenas 1 arquivo
+                                  if (newFiles.length <= 1) {
+                                    setComparativeAnalysisEnabled(false);
+                                  }
+                                  return newFiles;
+                                });
+                                
+                                // Limpar todos os estados relacionados ao arquivo
+                                setFilePreviewUrls(prev => {
+                                  const newMap = new Map(prev);
+                                  newMap.delete(file.name);
+                                  return newMap;
+                                });
+                                setProcessedPdfs(prev => {
+                                  const newMap = new Map(prev);
+                                  newMap.delete(file.name);
+                                  return newMap;
+                                });
+                                setProcessedWords(prev => {
+                                  const newMap = new Map(prev);
+                                  newMap.delete(file.name);
+                                  return newMap;
+                                });
+                                setProcessedDocuments(prev => {
+                                  const newMap = new Map(prev);
+                                  newMap.delete(file.name);
+                                  return newMap;
+                                });
+                                setFileProcessingStatus(prev => {
+                                  const newMap = new Map(prev);
+                                  newMap.delete(file.name);
+                                  return newMap;
+                                });
+                              }}
+                              className="absolute -top-2 -right-2 h-6 w-6 p-0 bg-destructive/80 hover:bg-destructive text-destructive-foreground rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                              ×
+                            </Button>
+                            
+                            {/* Status tooltip */}
+                            {(isProcessing || hasError) && (
+                              <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 translate-y-full mt-1 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap">
+                                {isProcessing ? 'Processando...' : hasError ? 'Erro no processamento' : ''}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
               <form onSubmit={handleSendMessage} className="flex items-end gap-2">
                 <div className="flex-1 relative">
-                  <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" multiple accept="image/*,.pdf,.doc,.docx" />
+                  <input type="file" ref={fileInputRef} onChange={handleFileUpload} className="hidden" multiple accept="image/*,.pdf,.doc,.docx" max="5" />
                   <div className="absolute left-2 top-3 z-10">
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button type="button" variant="ghost" size="icon" className="h-8 w-8"><Plus className="h-4 w-4" /></Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent side="top" align="start" className="mb-2">
-                            <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="cursor-pointer"><Paperclip className="h-4 w-4 mr-2" />Anexar</DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => fileInputRef.current?.click()} className="cursor-pointer"><Paperclip className="h-4 w-4 mr-2" />Anexar Arquivos (até 5)</DropdownMenuItem>
                             <DropdownMenuItem onClick={() => setIsWebSearchMode(p => !p)} className="cursor-pointer"><Globe className="h-4 w-4 mr-2" />{isWebSearchMode ? 'Desativar Busca Web' : 'Busca Web'}</DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
