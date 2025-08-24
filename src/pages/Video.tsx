@@ -152,6 +152,8 @@ const VideoPage = () => {
   const [savedVideos, setSavedVideos] = useState<string[]>([]);
   const [shareOpen, setShareOpen] = useState(false);
   const [shareData, setShareData] = useState<{ url: string; title: string; text: string }>({ url: "", title: "", text: "" });
+  const [isDragOverStart, setIsDragOverStart] = useState(false);
+  const [isDragOverEnd, setIsDragOverEnd] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('savedVideos');
@@ -229,6 +231,62 @@ const VideoPage = () => {
       toast({ title: 'Erro no upload', description: 'Tente novamente.', variant: 'destructive' });
     } finally {
       setter(false);
+    }
+  };
+
+  const handleDragEnter = (e: React.DragEvent, isStart: boolean) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (isStart) {
+      setIsDragOverStart(true);
+    } else {
+      setIsDragOverEnd(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent, isStart: boolean) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only set drag state to false if leaving the drop area itself
+    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+    const x = e.clientX;
+    const y = e.clientY;
+    
+    if (x < rect.left || x >= rect.right || y < rect.top || y >= rect.bottom) {
+      if (isStart) {
+        setIsDragOverStart(false);
+      } else {
+        setIsDragOverEnd(false);
+      }
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  const handleDrop = (e: React.DragEvent, isStart: boolean) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (isStart) {
+      setIsDragOverStart(false);
+    } else {
+      setIsDragOverEnd(false);
+    }
+
+    const files = Array.from(e.dataTransfer.files);
+    const imageFile = files.find(file => file.type.startsWith('image/'));
+    
+    if (imageFile) {
+      uploadImage(imageFile, isStart);
+    } else {
+      toast({ 
+        title: 'Tipo de arquivo inválido', 
+        description: 'Por favor, arraste apenas arquivos de imagem.', 
+        variant: 'destructive' 
+      });
     }
   };
 
@@ -425,9 +483,16 @@ const VideoPage = () => {
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <Label>Frame Inicial (opcional)</Label>
-                  <label htmlFor="start-upload" className="border border-border rounded-md p-4 text-center cursor-pointer hover:bg-accent flex flex-col items-center justify-center h-28">
+                  <label 
+                    htmlFor="start-upload" 
+                    className={`border border-border rounded-md p-4 text-center cursor-pointer hover:bg-accent flex flex-col items-center justify-center h-28 transition-colors ${isDragOverStart ? 'bg-accent border-primary border-dashed' : ''}`}
+                    onDragEnter={(e) => handleDragEnter(e, true)}
+                    onDragLeave={(e) => handleDragLeave(e, true)}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, true)}
+                  >
                     <Upload className="h-6 w-6 mb-1 text-muted-foreground" />
-                    <span className="text-sm">Carregar Imagem</span>
+                    <span className="text-sm">{isDragOverStart ? 'Solte a imagem aqui' : 'Carregar ou Arrastar Imagem'}</span>
                   </label>
                   <Input type="file" accept="image/*" className="hidden" id="start-upload" onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0], true)} />
                   <Input placeholder="Ou cole a URL aqui" value={frameStartUrl} onChange={(e) => setFrameStartUrl(e.target.value)} className="mt-2" />
@@ -455,9 +520,16 @@ const VideoPage = () => {
                 </div>
                 <div>
                   <Label>Frame Final (opcional)</Label>
-                  <label htmlFor="end-upload" className="border border-border rounded-md p-4 text-center cursor-pointer hover:bg-accent flex flex-col items-center justify-center h-28">
+                  <label 
+                    htmlFor="end-upload" 
+                    className={`border border-border rounded-md p-4 text-center cursor-pointer hover:bg-accent flex flex-col items-center justify-center h-28 transition-colors ${isDragOverEnd ? 'bg-accent border-primary border-dashed' : ''}`}
+                    onDragEnter={(e) => handleDragEnter(e, false)}
+                    onDragLeave={(e) => handleDragLeave(e, false)}
+                    onDragOver={handleDragOver}
+                    onDrop={(e) => handleDrop(e, false)}
+                  >
                     <Upload className="h-6 w-6 mb-1 text-muted-foreground" />
-                    <span className="text-sm">Carregar Imagem</span>
+                    <span className="text-sm">{isDragOverEnd ? 'Solte a imagem aqui' : 'Carregar ou Arrastar Imagem'}</span>
                   </label>
                   <Input type="file" accept="image/*" className="hidden" id="end-upload" onChange={(e) => e.target.files?.[0] && uploadImage(e.target.files[0], false)} />
                   <Input placeholder="Ou cole a URL aqui" value={frameEndUrl} onChange={(e) => setFrameEndUrl(e.target.value)} className="mt-2" />
