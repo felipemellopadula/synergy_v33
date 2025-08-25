@@ -187,19 +187,19 @@ serve(async (req) => {
         }
       }
 
-      // Configure chunk size based on model for GPT-5 TPM limits
+      // Configure chunk size based on model for GPT-5 TPM limits (much more conservative)
       let maxChunkTokens;
       let delayBetweenChunks;
       
       if (model.includes('gpt-5-nano')) {
-        maxChunkTokens = 8000;  // Smaller chunks for nano
-        delayBetweenChunks = 500;
+        maxChunkTokens = 4000;  // Much smaller chunks for nano
+        delayBetweenChunks = 2000; // 2 second delay
       } else if (model.includes('gpt-5-mini')) {
-        maxChunkTokens = 12000; // Medium chunks for mini
-        delayBetweenChunks = 1000;
+        maxChunkTokens = 6000;  // Much smaller chunks for mini to respect TPM
+        delayBetweenChunks = 3000; // 3 second delay to respect 200k TPM limit
       } else if (model.includes('gpt-5')) {
-        maxChunkTokens = 15000; // Larger chunks for regular GPT-5
-        delayBetweenChunks = 1000;
+        maxChunkTokens = 8000;  // Smaller chunks for regular GPT-5
+        delayBetweenChunks = 2000; // 2 second delay
       } else {
         maxChunkTokens = Math.floor(limits.input * 0.6); // Legacy models
         delayBetweenChunks = 300;
