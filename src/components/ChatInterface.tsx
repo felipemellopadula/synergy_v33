@@ -154,7 +154,10 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
         if (model.includes('claude')) {
           return 'anthropic-chat';
         }
-        if (model.includes('llama') || model.includes('deepseek')) {
+        if (model.includes('deepseek')) {
+          return 'deepseek-chat'; // Função específica para DeepSeek
+        }
+        if (model.includes('llama')) {
           return 'apillm-chat';
         }
         return 'ai-chat'; // Fallback to original function

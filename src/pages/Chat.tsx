@@ -736,7 +736,10 @@ const Chat = () => {
           if (model.includes('grok')) {
             return 'grok-chat'; // Função específica para Grok com suporte a PDFs
           }
-          if (model.includes('llama') || model.includes('deepseek')) {
+          if (model.includes('deepseek')) {
+            return 'deepseek-chat'; // Função específica para DeepSeek
+          }
+          if (model.includes('llama')) {
             return 'apillm-chat';
           }
           return 'ai-chat'; // Fallback to original function
