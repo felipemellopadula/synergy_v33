@@ -822,8 +822,8 @@ const Chat = () => {
             return 1;  // Short texts: 1 char at once
         };
         
-        const chunkSize = getChunkSize(fullBotText.length);
-        const interval = 3;  // Ultra-fast 3ms interval
+        const chunkSize = Math.max(3, Math.ceil(fullBotText.length / 100)); // Chunks muito maiores
+        const interval = 1;  // Mega rápido - 1ms interval
         
         typingIntervalRef.current = setInterval(() => {
             if (charIndex < fullBotText.length) {
@@ -835,10 +835,10 @@ const Chat = () => {
                  ));
                  charIndex = nextIndex;
                  
-                 // Auto-scroll durante o streaming se o usuário estiver próximo do final
-                 if (isNearBottom) {
-                   setTimeout(() => autoScrollToBottom(), 10);
-                 }
+                  // Auto-scroll durante o streaming se o usuário estiver próximo do final
+                  if (isNearBottom) {
+                    setTimeout(() => autoScrollToBottom(), 1);
+                  }
             } else {
                 if (typingIntervalRef.current) {
                     clearInterval(typingIntervalRef.current);
