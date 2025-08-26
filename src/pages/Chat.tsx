@@ -170,37 +170,340 @@ const Chat = () => {
   const [inputValue, setInputValue] = useState('');
   const [selectedModel, setSelectedModel] = useState<string | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
-  const [isRecording, setIsRecording] = useState(false);
-  const [isWebSearchMode, setIsWebSearchMode] = useState(false);
-  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
-  const [filePreviewUrls, setFilePreviewUrls] = useState<Map<string, string>>(new Map());
-  const [processedPdfs, setProcessedPdfs] = useState<Map<string, string>>(new Map());
-  const [processedWords, setProcessedWords] = useState<Map<string, string>>(new Map());
-  const [fileProcessingStatus, setFileProcessingStatus] = useState<Map<string, 'processing' | 'completed' | 'error'>>(new Map());
-  const [processedDocuments, setProcessedDocuments] = useState<Map<string, { content: string; type: string; pages?: number; fileSize?: number }>>(new Map());
-  const [comparativeAnalysisEnabled, setComparativeAnalysisEnabled] = useState(false);
   const [conversations, setConversations] = useState<ChatConversation[]>([]);
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null);
-  const [expandedReasoning, setExpandedReasoning] = useState<{ [key: string]: boolean }>({});
-  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
-  const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null);
-  const [isNearBottom, setIsNearBottom] = useState(true);
-  const [isDragOver, setIsDragOver] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const typingIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
-  const recordingTimeoutRef = useRef<number | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const chatContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Funções básicas
+  useEffect(() => {
+    if (!loading && !user) navigate('/');
+  }, [loading, user, navigate]);
+
+  const loadConversations = async () => {
+    if (!user) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('chat_conversations')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false });
+      
+      if (error) {
+        console.error('Erro ao carregar conversas:', error);
+        return;
+      }
+      
+      const formattedConversations = (data || []).map(conv => ({
+        ...conv,
+        messages: Array.isArray(conv.messages) ? conv.messages : []
+      }));
+      
+      setConversations(formattedConversations);
+    } catch (error) {
+      console.error('Erro ao carregar conversas:', error);
+    }
+  };
+
+  useEffect(() => {
+    if (user) {
+      loadConversations();
+    }
+  }, [user]);
+
+  const handleNewConversation = () => {
+    setCurrentConversationId(null);
+    setMessages([]);
+  };
+
+  const handleSelectConversation = (conv: ChatConversation) => {
+    setCurrentConversationId(conv.id);
+    const formattedMessages = conv.messages.map((msg: any) => ({
+      ...msg,
+      timestamp: new Date(msg.timestamp)
+    }));
+    setMessages(formattedMessages);
+  };
+
+  const handleDeleteConversation = async (id: string) => {
+    try {
+      await supabase.from('chat_conversations').delete().eq('id', id);
+      await loadConversations();
+      if (currentConversationId === id) {
+        handleNewConversation();
+      }
+      toast({ title: "Conversa deletada com sucesso" });
+    } catch (error) {
+      toast({ title: "Erro ao deletar conversa", variant: "destructive" });
+    }
+  };
+
+  const handleToggleFavorite = async (conv: ChatConversation) => {
+    try {
+      await supabase
+        .from('chat_conversations')
+        .update({ is_favorite: !conv.is_favorite })
+        .eq('id', conv.id);
+      await loadConversations();
+    } catch (error) {
+      toast({ title: "Erro ao atualizar favorito", variant: "destructive" });
+    }
+  };
+
+  const handleRenameConversation = async (id: string, newTitle: string) => {
+    try {
+      await supabase
+        .from('chat_conversations')
+        .update({ title: newTitle })
+        .eq('id', id);
+      await loadConversations();
+    } catch (error) {
+      toast({ title: "Erro ao renomear conversa", variant: "destructive" });
+    }
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputValue.trim() || !selectedModel || !user) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      content: inputValue,
+      sender: 'user',
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setIsLoading(true);
+    setInputValue('');
+
+    try {
+      const { data, error } = await supabase.functions.invoke('ai-chat', {
+        body: {
+          message: inputValue,
+          model: selectedModel,
+        }
+      });
+
+      if (error) throw error;
+
+      const botMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        content: data.response || 'Erro ao processar resposta',
+        sender: 'bot',
+        timestamp: new Date(),
+        model: selectedModel,
+      };
+
+      setMessages(prev => [...prev, botMessage]);
+
+      // Salvar conversa
+      const updatedMessages = [...messages, userMessage, botMessage];
+      const title = currentConversationId ? conversations.find(c => c.id === currentConversationId)?.title || inputValue.slice(0, 50) : inputValue.slice(0, 50);
+
+      // Converter messages para formato compatível com JSON
+      const messagesForDb = updatedMessages.map(msg => ({
+        id: msg.id,
+        content: msg.content,
+        sender: msg.sender,
+        timestamp: msg.timestamp.toISOString(),
+        model: msg.model,
+        reasoning: msg.reasoning,
+        isStreaming: msg.isStreaming,
+        files: msg.files
+      }));
+
+      if (currentConversationId) {
+        await supabase
+          .from('chat_conversations')
+          .update({ 
+            messages: messagesForDb as any,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', currentConversationId);
+      } else {
+        const { data: newConv } = await supabase
+          .from('chat_conversations')
+          .insert({
+            user_id: user.id,
+            title: title,
+            messages: messagesForDb as any,
+            is_favorite: false
+          })
+          .select()
+          .single();
+        
+        if (newConv) {
+          setCurrentConversationId(newConv.id);
+        }
+      }
+
+      await loadConversations();
+      await consumeTokens(selectedModel, inputValue);
+
+    } catch (error) {
+      console.error('Erro ao enviar mensagem:', error);
+      toast({
+        title: "Erro ao enviar mensagem",
+        description: "Tente novamente",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="flex h-screen items-center justify-center">Carregando...</div>;
+  }
 
   return (
     <div className="flex h-screen bg-background">
+      {/* Sidebar Desktop */}
+      {!isMobile && (
+        <div className="w-80 flex-shrink-0">
+          <ConversationSidebar
+            conversations={conversations}
+            currentConversationId={currentConversationId}
+            onSelectConversation={handleSelectConversation}
+            onNewConversation={handleNewConversation}
+            onDeleteConversation={handleDeleteConversation}
+            onToggleFavorite={handleToggleFavorite}
+            onRenameConversation={handleRenameConversation}
+          />
+        </div>
+      )}
+
+      {/* Main Chat Area */}
       <div className="flex-1 flex flex-col">
-        <main className="flex-1 flex overflow-hidden">
-          <div className="flex-1 flex flex-col">
-            <div className="flex-1 overflow-y-auto" ref={chatContainerRef}>
-              {/* Chat content */}
+        {/* Header */}
+        <header className="border-b border-border bg-background p-4 flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            {isMobile && (
+              <Sheet>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <Menu className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-80 p-0">
+                  <SheetHeader className="p-4">
+                    <SheetTitle>Conversas</SheetTitle>
+                  </SheetHeader>
+                  <ConversationSidebar
+                    conversations={conversations}
+                    currentConversationId={currentConversationId}
+                    onSelectConversation={handleSelectConversation}
+                    onNewConversation={handleNewConversation}
+                    onDeleteConversation={handleDeleteConversation}
+                    onToggleFavorite={handleToggleFavorite}
+                    onRenameConversation={handleRenameConversation}
+                    isMobile={true}
+                  />
+                </SheetContent>
+              </Sheet>
+            )}
+            
+            <div className="flex items-center gap-2">
+              <MessageCircle className="h-6 w-6 text-primary" />
+              <h1 className="text-xl font-semibold">Chat</h1>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <ModelSelector selectedModel={selectedModel} onModelSelect={setSelectedModel} />
+            <ThemeToggle />
+            <UserProfile />
+          </div>
+        </header>
+
+        {/* Messages Area */}
+        <main className="flex-1 overflow-hidden">
+          <div className="h-full flex flex-col">
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              {messages.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-full text-center">
+                  <MessageCircle className="h-12 w-12 text-muted-foreground mb-4" />
+                  <h2 className="text-2xl font-semibold mb-2">Bem-vindo ao Chat</h2>
+                  <p className="text-muted-foreground max-w-md">
+                    Comece uma nova conversa selecionando um modelo e digitando sua mensagem.
+                  </p>
+                </div>
+              ) : (
+                messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex gap-3 ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[70%] ${message.sender === 'user' ? 'order-2' : 'order-1'}`}>
+                      <div
+                        className={`rounded-lg p-4 ${
+                          message.sender === 'user'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted'
+                        }`}
+                      >
+                        <div className="whitespace-pre-wrap">{message.content}</div>
+                        {message.model && (
+                          <div className="text-xs mt-2 opacity-70">
+                            {getModelDisplayName(message.model)}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground mt-1">
+                        {message.timestamp.toLocaleTimeString('pt-BR', { 
+                          hour: '2-digit', 
+                          minute: '2-digit' 
+                        })}
+                      </div>
+                    </div>
+                    <Avatar className={`w-8 h-8 ${message.sender === 'user' ? 'order-1' : 'order-2'}`}>
+                      <AvatarFallback>
+                        {message.sender === 'user' ? profile?.name?.[0] || 'U' : 'AI'}
+                      </AvatarFallback>
+                    </Avatar>
+                  </div>
+                ))
+              )}
+              {isLoading && (
+                <div className="flex gap-3">
+                  <Avatar className="w-8 h-8">
+                    <AvatarFallback>AI</AvatarFallback>
+                  </Avatar>
+                  <div className="bg-muted rounded-lg p-4">
+                    <div className="flex space-x-1">
+                      <div className="w-2 h-2 bg-current rounded-full animate-bounce"></div>
+                      <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                      <div className="w-2 h-2 bg-current rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Input Area */}
+            <div className="border-t border-border p-4">
+              <div className="flex gap-2">
+                <Textarea
+                  value={inputValue}
+                  onChange={(e) => setInputValue(e.target.value)}
+                  placeholder={selectedModel ? "Digite sua mensagem..." : "Selecione um modelo primeiro"}
+                  disabled={!selectedModel || isLoading}
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault();
+                      handleSendMessage();
+                    }
+                  }}
+                  className="flex-1 min-h-[44px] max-h-32 resize-none"
+                />
+                <Button 
+                  onClick={handleSendMessage}
+                  disabled={!inputValue.trim() || !selectedModel || isLoading}
+                  size="icon"
+                  className="h-11 w-11"
+                >
+                  <ArrowUp className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </main>
