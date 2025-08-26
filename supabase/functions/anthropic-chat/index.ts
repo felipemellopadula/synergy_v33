@@ -52,20 +52,37 @@ serve(async (req) => {
     
     // Log files information
     if (files && files.length > 0) {
-      console.log('Files received:', files.map(f => ({ name: f.name, type: f.type, hasContent: !!f.pdfContent })));
+      console.log('Files received:', files.map(f => ({ 
+        name: f.name, 
+        type: f.type, 
+        hasPdfContent: !!f.pdfContent,
+        hasWordContent: !!f.wordContent
+      })));
     }
     
-    // Process PDF files if present
+    // Process PDF and DOC files if present
     let finalMessage = message;
     if (files && files.length > 0) {
       const pdfFiles = files.filter(f => f.type === 'application/pdf' && f.pdfContent);
+      const docFiles = files.filter(f => f.wordContent);
+      
+      const fileContents = [];
       
       if (pdfFiles.length > 0) {
-        const pdfContents = pdfFiles.map(pdf => 
+        fileContents.push(...pdfFiles.map(pdf => 
           `[Arquivo PDF: ${pdf.name}]\n\n${pdf.pdfContent}`
-        );
-        finalMessage = `${message}\n\n${pdfContents.join('\n\n---\n\n')}`;
-        console.log('Final message with PDF content length:', finalMessage.length);
+        ));
+      }
+      
+      if (docFiles.length > 0) {
+        fileContents.push(...docFiles.map(doc => 
+          `[Arquivo Word: ${doc.name}]\n\n${doc.wordContent}`
+        ));
+      }
+      
+      if (fileContents.length > 0) {
+        finalMessage = `${message}\n\n${fileContents.join('\n\n---\n\n')}`;
+        console.log('Final message with file content length:', finalMessage.length);
       }
     }
     
@@ -73,13 +90,19 @@ serve(async (req) => {
     let messages = [];
     
     if (contextEnabled && conversationHistory.length > 0) {
-      // Add conversation history for context
+      // Add conversation history for context (but keep it simple for large files)
       console.log('Building conversation context with', conversationHistory.length, 'previous messages');
       
-      messages = conversationHistory.map((historyMsg) => ({
-        role: historyMsg.role,
-        content: historyMsg.content
-      }));
+      // Only add recent context if the main message isn't too large
+      const mainMessageTokens = estimateTokenCount(finalMessage);
+      if (mainMessageTokens < limits.input * 0.4) {
+        // Add limited conversation history
+        const recentHistory = conversationHistory.slice(-3); // Only last 3 messages
+        messages = recentHistory.map((historyMsg) => ({
+          role: historyMsg.role,
+          content: historyMsg.content
+        }));
+      }
     }
     
     // Add current user message
@@ -97,37 +120,37 @@ serve(async (req) => {
       inputLimit: limits.input, 
       model,
       messageLength: totalText.length,
-      hasPdfFiles: files && files.some(f => f.type === 'application/pdf'),
+      hasFiles: files && files.length > 0,
       contextMessages: messages.length - 1
     });
 
     let processedMessages = messages;
     let responsePrefix = '';
 
-    // If conversation is too large, truncate older messages but keep recent context
+    // If message is too large, process in chunks
     if (estimatedTokens > limits.input * 0.6) {
-      console.log('Conversation too large, truncating older messages...');
+      console.log('Message too large, processing in chunks...');
       
-      // Keep the current message and try to fit as many recent messages as possible
-      const currentMessage = messages[messages.length - 1];
-      let keptMessages = [currentMessage];
-      let currentTokens = estimateTokenCount(currentMessage.content);
-      
-      // Add messages from most recent backwards until we hit the limit
-      for (let i = messages.length - 2; i >= 0; i--) {
-        const msgTokens = estimateTokenCount(messages[i].content);
-        if (currentTokens + msgTokens < limits.input * 0.6) {
-          keptMessages.unshift(messages[i]);
-          currentTokens += msgTokens;
-        } else {
-          break;
-        }
+      // Claude models have high context window, use larger chunks
+      let maxChunkTokens;
+      if (model.includes('haiku')) {
+        maxChunkTokens = Math.min(25000, Math.floor(limits.input * 0.4)); // Smaller chunks for Haiku
+      } else {
+        maxChunkTokens = Math.min(40000, Math.floor(limits.input * 0.5)); // Larger chunks for Opus/Sonnet
       }
       
-      processedMessages = keptMessages;
+      const chunks = splitIntoChunks(finalMessage, maxChunkTokens);
       
-      if (keptMessages.length < messages.length) {
-        responsePrefix = `ℹ️ Mantendo contexto das últimas ${keptMessages.length - 1} mensagens da conversa.\n\n`;
+      if (chunks.length > 1) {
+        responsePrefix = `⚠️ Documento muito grande para ${model}. Processando em ${chunks.length} partes:\n\n`;
+        
+        // Process first chunk with instructions to summarize
+        const processedMessage = `Analise e resuma este trecho de um documento extenso (parte 1 de ${chunks.length}). Foque nos pontos principais:\n\n${chunks[0]}`;
+        
+        processedMessages = [{
+          role: 'user',
+          content: processedMessage
+        }];
       }
     }
     
