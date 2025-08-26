@@ -22,14 +22,6 @@ export class WordProcessor {
         };
       }
 
-      // Arquivos .doc (formato antigo) não são suportados pela biblioteca mammoth
-      if (isDoc && !isDocx) {
-        return {
-          success: false,
-          error: 'Arquivos .doc (formato antigo) não são suportados. Por favor, converta para .docx ou use um arquivo .docx.'
-        };
-      }
-
       console.log('Convertendo Word para texto...');
 
       const arrayBuffer = await file.arrayBuffer();
