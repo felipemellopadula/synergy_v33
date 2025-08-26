@@ -192,22 +192,7 @@ const VideoPage = () => {
   }, [videoUrl]);
 
   useEffect(() => {
-    document.title = "Gerar Vídeo com IA | Synergy AI";
-    const desc = "Crie vídeos com Seedance 1.0 Lite. Escolha resolução, duração e referências.";
-    let meta = document.querySelector('meta[name="description"]');
-    if (!meta) {
-      meta = document.createElement("meta");
-      meta.setAttribute("name", "description");
-      document.head.appendChild(meta);
-    }
-    meta.setAttribute("content", desc);
-    let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
-    if (!link) {
-      link = document.createElement("link");
-      link.rel = "canonical";
-      document.head.appendChild(link);
-    }
-    link.href = `${window.location.origin}/video`;
+    document.title = "Gerar Videos com Ia";
   }, []);
 
   const res = useMemo(() => RESOLUTIONS.find(r => r.id === resolution)!, [resolution]);

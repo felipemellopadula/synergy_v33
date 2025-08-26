@@ -1,4 +1,5 @@
 import { useNavigate, Link } from "react-router-dom";
+import { useEffect } from "react";
 import {
   MessageCircle,
   Video,
@@ -17,6 +18,10 @@ import { useAuth } from "@/contexts/AuthContext";
 const Dashboard = () => {
   const navigate = useNavigate();
   const { signOut } = useAuth();
+
+  useEffect(() => {
+    document.title = "Synergy Ai Hub";
+  }, []);
 
   const handleSignOut = async () => {
     await signOut();

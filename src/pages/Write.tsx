@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,6 +16,10 @@ const Write = () => {
   const [selectedFormat, setSelectedFormat] = useState("Ensaio");
   const [selectedTone, setSelectedTone] = useState("Formal");
   const [selectedLength, setSelectedLength] = useState("Médio");
+
+  useEffect(() => {
+    document.title = "Gerar textos com Ia";
+  }, []);
 
   const formatOptions = [
     { id: "Ensaio", label: "Ensaio", icon: FileText },

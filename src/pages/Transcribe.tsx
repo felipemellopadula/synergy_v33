@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,10 @@ export default function Transcribe() {
   const [transcription, setTranscription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+
+  useEffect(() => {
+    document.title = "Transcrever Audio com Ia";
+  }, []);
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();

@@ -278,6 +278,10 @@ const Chat = () => {
   };
   // --- LÓGICA DE NEGÓCIO ---
   useEffect(() => {
+    document.title = "Gerar textos com Ia";
+  }, []);
+
+  useEffect(() => {
     if (!loading && !user) navigate('/');
   }, [loading, user, navigate]);
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, Languages, ArrowUpDown, Sparkles, Copy, Volume2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,10 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 const TranslatorPage = () => {
   const { toast } = useToast();
   const { checkTokenBalance, consumeTokens, getModelDisplayName } = useTokens();
+  
+  useEffect(() => {
+    document.title = "Tradutor e Humanizar com Ia";
+  }, []);
   
   // Translation state
   const [sourceText, setSourceText] = useState("");
