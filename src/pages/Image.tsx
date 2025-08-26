@@ -24,7 +24,7 @@ const QUALITY_SETTINGS = [
 
 const MODELS = [
     { id: "openai:1@1", label: "Gpt-Image 1" },
-    { id: "bytedance:3@1", label: "Seedream 3.0" },
+    { id: "ideogram:4@1", label: "Ideogram 3.0" },
     { id: "runware:108@1", label: "Qwen-Image" },
 ];
 
