@@ -840,6 +840,10 @@ const Chat = () => {
                     await upsertConversation([...messages, userMessage, botMessage], currentConversationId);
                   }
                   
+                  // Clear loading state
+                  setIsLoading(false);
+                  setInputValue('');
+                  
                   return; // Exit early, don't continue with normal flow
                 } catch (error) {
                   console.error('Image analysis error:', error);
@@ -848,6 +852,7 @@ const Chat = () => {
                     description: "Não foi possível analisar a imagem. Verifique se as chaves API estão configuradas.",
                     variant: "destructive",
                   });
+                  setIsLoading(false);
                   return;
                 }
               } else {
