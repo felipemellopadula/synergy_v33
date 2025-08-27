@@ -21,8 +21,8 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
 type Resolution = { id: string; label: string; w: number; h: number };
 
 const MODELS = [
-  { id: "bytedance:1@1", label: "Seedance 1.0 Lite (ByteDance)", provider: "bytedance" as const },
-  { id: "google:3@1", label: "Veo 3 Fast (Google)", provider: "google" as const },
+  { id: "bytedance:1@1", label: "ByteDance Seedance 1.0 Lite", provider: "bytedance" as const },
+  { id: "google:3@1", label: "Googke Veo 3 Fast", provider: "google" as const },
   { id: "klingai:5@3", label: "KlingAI 2.1 Master", provider: "klingai" as const }, // Código solicitado pelo cliente
 ];
 
