@@ -7,6 +7,7 @@ import { ModelSelector } from "./ModelSelector";
 import { Send, Bot, User, Paperclip } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PdfProcessor } from "@/utils/PdfProcessor";
+import { WordProcessor } from "@/utils/WordProcessor";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -28,60 +29,87 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
   const [inputValue, setInputValue] = useState("");
   const [selectedModel, setSelectedModel] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
-  const [isProcessingPdf, setIsProcessingPdf] = useState(false);
-  const [pdfContent, setPdfContent] = useState<string>('');
+  const [isProcessingFile, setIsProcessingFile] = useState(false);
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [fileContent, setFileContent] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
-  const [pdfPages, setPdfPages] = useState<number>(0);
+  const [filePages, setFilePages] = useState<number>(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Helper function to convert file to base64
+  const convertFileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (file.type !== 'application/pdf') {
-      toast.error('Apenas arquivos PDF são suportados');
+    const isImage = file.type.startsWith('image/');
+    const isPdf = file.type === 'application/pdf';
+    const isWord = file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' || 
+                   file.type === 'application/msword';
+
+    if (!isImage && !isPdf && !isWord) {
+      toast.error('Apenas arquivos PDF, Word e imagens são suportados');
       return;
     }
 
-    setIsProcessingPdf(true);
+    setIsProcessingFile(true);
     
     try {
-      const result = await PdfProcessor.processPdf(file);
-      
-      if (result.success && result.content) {
-        console.log('PDF processado com sucesso:', {
-          fileName: file.name,
-          pageCount: result.pageCount,
-          contentLength: result.content.length,
-          contentPreview: result.content.substring(0, 200) + '...'
-        });
-        setPdfContent(result.content);
+      if (isImage) {
+        // Para imagens, apenas armazenar o arquivo
+        setAttachedFiles([file]);
         setFileName(file.name);
-        setPdfPages(result.pageCount || 0);
-        toast.success(`PDF processado com sucesso! ${result.pageCount} páginas (${result.fileSize}MB)`);
-      } else {
-        let errorMessage = result.error || "Erro desconhecido";
+        toast.success(`Imagem anexada: ${file.name}`);
+      } else if (isPdf) {
+        const result = await PdfProcessor.processPdf(file);
         
-        if (result.isPasswordProtected) {
-          errorMessage = "PDF protegido por senha. Não é possível processar arquivos protegidos.";
-        }
+        if (result.success && result.content) {
+          console.log('PDF processado com sucesso:', {
+            fileName: file.name,
+            pageCount: result.pageCount,
+            contentLength: result.content.length,
+            contentPreview: result.content.substring(0, 200) + '...'
+          });
+          setFileContent(result.content);
+          setFileName(file.name);
+          setFilePages(result.pageCount || 0);
+          toast.success(`PDF processado com sucesso! ${result.pageCount} páginas (${result.fileSize}MB)`);
+        } else {
+          let errorMessage = result.error || "Erro desconhecido";
+          
+          if (result.isPasswordProtected) {
+            errorMessage = "PDF protegido por senha. Não é possível processar arquivos protegidos.";
+          }
 
-        toast.error(errorMessage);
+          toast.error(errorMessage);
+          clearFileData();
+        }
+      } else if (isWord) {
+        const result = await WordProcessor.processWord(file);
         
-        // Limpar campos em caso de erro
-        setPdfContent('');
-        setFileName('');
-        setPdfPages(0);
+        if (result.success && result.content) {
+          setFileContent(result.content);
+          setFileName(file.name);
+          toast.success(`Documento Word processado: ${file.name} (${result.wordCount} palavras)`);
+        } else {
+          toast.error(result.error || 'Erro ao processar documento Word');
+          clearFileData();
+        }
       }
     } catch (error) {
-      console.error('Erro ao processar PDF:', error);
-      toast.error('Erro interno ao processar PDF');
-      
-      setPdfContent('');
-      setFileName('');
-      setPdfPages(0);
+      console.error('Erro ao processar arquivo:', error);
+      toast.error('Erro interno ao processar arquivo');
+      clearFileData();
     } finally {
-      setIsProcessingPdf(false);
+      setIsProcessingFile(false);
       // Reset file input
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -89,30 +117,105 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
     }
   };
 
+  const clearFileData = () => {
+    setFileContent('');
+    setFileName('');
+    setFilePages(0);
+    setAttachedFiles([]);
+  };
+
   const handleSendMessage = async () => {
     console.log('handleSendMessage called:', {
       inputValue: inputValue.trim(),
-      pdfContent: pdfContent ? `${pdfContent.length} chars` : 'none',
+      fileContent: fileContent ? `${fileContent.length} chars` : 'none',
+      attachedFiles: attachedFiles.length,
       fileName,
-      pdfPages,
+      filePages,
       selectedModel
     });
     
-    if ((!inputValue.trim() && !pdfContent) || !selectedModel) return;
+    if ((!inputValue.trim() && !fileContent && !attachedFiles.length) || !selectedModel) return;
 
     let messageContent = inputValue;
     let displayMessage = inputValue || `Análise do arquivo: ${fileName}`;
 
-    // Se há PDF anexado, criar prompts otimizados usando PdfProcessor
-    if (pdfContent && pdfPages) {
-      console.log('PDF detected, creating optimized prompt');
+    // Check if we have images and should use image analysis
+    const hasImages = attachedFiles.some(file => file.type.startsWith('image/'));
+    
+    if (hasImages && ['OpenAI GPT-4o', 'Anthropic Claude', 'Google Gemini', 'xAI Grok'].includes(selectedModel)) {
+      // Use image analysis function for vision models
+      const imageFile = attachedFiles.find(file => file.type.startsWith('image/'));
+      if (imageFile) {
+        const userMessage: Message = {
+          id: crypto.randomUUID(),
+          content: displayMessage,
+          sender: 'user',
+          timestamp: new Date(),
+        };
+
+        setMessages(prev => [...prev, userMessage]);
+        setInputValue("");
+        setIsLoading(true);
+        clearFileData();
+
+        try {
+          const base64 = await convertFileToBase64(imageFile);
+          const base64Data = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
+          
+          let aiProvider = 'openai';
+          if (selectedModel.includes('Claude')) aiProvider = 'claude';
+          else if (selectedModel.includes('Gemini')) aiProvider = 'gemini';
+          else if (selectedModel.includes('Grok')) aiProvider = 'grok';
+          
+          const response = await supabase.functions.invoke('image-analysis', {
+            body: {
+              imageBase64: base64Data,
+              prompt: inputValue || 'Analise esta imagem e descreva o que você vê.',
+              aiProvider,
+              analysisType: 'general'
+            },
+          });
+
+          if (response.error) {
+            throw new Error(response.error.message || 'Erro na análise da imagem');
+          }
+
+          const aiMessage: Message = {
+            id: crypto.randomUUID(),
+            content: response.data.analysis,
+            sender: 'bot',
+            timestamp: new Date(),
+            model: selectedModel,
+          };
+
+          setMessages(prev => [...prev, aiMessage]);
+        } catch (error) {
+          console.error('Error analyzing image:', error);
+          const errorMessage: Message = {
+            id: crypto.randomUUID(),
+            content: 'Desculpe, ocorreu um erro ao analisar a imagem. Verifique se as chaves API estão configuradas corretamente.',
+            sender: 'bot',
+            timestamp: new Date(),
+            model: selectedModel,
+          };
+          setMessages(prev => [...prev, errorMessage]);
+        } finally {
+          setIsLoading(false);
+        }
+        return;
+      }
+    }
+
+    // Se há arquivo de texto anexado, criar prompts otimizados
+    if (fileContent && filePages) {
+      console.log('Text file detected, creating optimized prompt');
       if (inputValue.toLowerCase().includes('resumo') || inputValue.toLowerCase().includes('resume') || !inputValue.trim()) {
         // Usar prompt de resumo automático
-        messageContent = PdfProcessor.createSummaryPrompt(pdfContent, pdfPages);
-        displayMessage = `Resumo do PDF: ${fileName}`;
+        messageContent = PdfProcessor.createSummaryPrompt(fileContent, filePages);
+        displayMessage = `Resumo do arquivo: ${fileName}`;
       } else {
         // Usar prompt de análise detalhada
-        messageContent = PdfProcessor.createAnalysisPrompt(pdfContent, pdfPages, inputValue);
+        messageContent = PdfProcessor.createAnalysisPrompt(fileContent, filePages, inputValue);
         displayMessage = `Análise sobre: ${inputValue}`;
       }
       console.log('Final messageContent length:', messageContent.length);
@@ -155,12 +258,12 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
           return 'anthropic-chat';
         }
         if (model.includes('deepseek')) {
-          return 'deepseek-chat'; // Função específica para DeepSeek
+          return 'deepseek-chat';
         }
         if (model.includes('llama')) {
           return 'apillm-chat';
         }
-        return 'ai-chat'; // Fallback to original function
+        return 'ai-chat';
       };
 
       const functionName = getEdgeFunctionName(selectedModel);
@@ -191,10 +294,8 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
         )
       );
       
-      // Limpar PDF após o envio
-      setPdfContent('');
-      setFileName('');
-      setPdfPages(0);
+      // Limpar dados do arquivo após o envio
+      clearFileData();
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
@@ -218,6 +319,8 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
   };
 
   if (!isOpen) return null;
+
+  const hasAttachedFile = fileContent || attachedFiles.length > 0;
 
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -306,7 +409,7 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
             <input
               ref={fileInputRef}
               type="file"
-              accept=".pdf"
+              accept=".pdf,.docx,.doc,image/*"
               onChange={handleFileSelect}
               className="hidden"
             />
@@ -314,7 +417,7 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
               variant="outline"
               size="icon"
               onClick={() => fileInputRef.current?.click()}
-              disabled={isProcessingPdf || isLoading}
+              disabled={isProcessingFile || isLoading}
               className="shrink-0"
             >
               <Paperclip className="h-4 w-4" />
@@ -323,28 +426,28 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
               placeholder={
-                isProcessingPdf
-                  ? "Processando PDF..."
-                  : pdfContent && fileName
-                  ? `PDF anexado: ${fileName}. Digite 'resumo' ou faça perguntas específicas...`
+                isProcessingFile
+                  ? "Processando arquivo..."
+                  : hasAttachedFile && fileName
+                  ? `Arquivo anexado: ${fileName}. Digite sua pergunta...`
                   : selectedModel
-                  ? "Digite sua mensagem ou anexe um PDF..."
+                  ? "Digite sua mensagem ou anexe um arquivo (PDF, Word, imagem)..."
                   : "Selecione um modelo primeiro"
               }
-              disabled={!selectedModel || isProcessingPdf}
-              onKeyPress={(e) => e.key === 'Enter' && !isProcessingPdf && handleSendMessage()}
+              disabled={!selectedModel || isProcessingFile}
+              onKeyPress={(e) => e.key === 'Enter' && !isProcessingFile && handleSendMessage()}
               className="flex-1 bg-background border-border"
             />
             <Button 
               onClick={handleSendMessage}
-              disabled={(!inputValue.trim() && !pdfContent) || !selectedModel || isLoading || isProcessingPdf}
+              disabled={(!inputValue.trim() && !hasAttachedFile) || !selectedModel || isLoading || isProcessingFile}
               className="bg-primary hover:bg-primary-glow text-primary-foreground"
             >
               <Send className="h-4 w-4" />
             </Button>
           </div>
           <div className="text-xs text-muted-foreground mt-2">
-            {PdfProcessor.getMaxFileInfo()}
+            Suporte para PDF, Word e imagens (JPEG, PNG, GIF, WEBP)
           </div>
         </div>
       </Card>
