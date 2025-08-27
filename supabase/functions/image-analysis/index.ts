@@ -9,7 +9,7 @@ const corsHeaders = {
 interface ImageAnalysisRequest {
   imageBase64: string;
   prompt: string;
-  aiProvider?: 'openai' | 'claude' | 'gemini' | 'grok' | 'deepseek';
+  aiProvider?: 'openai' | 'claude' | 'gemini' | 'grok';
   analysisType?: 'general' | 'detailed' | 'technical' | 'creative';
 }
 
@@ -42,9 +42,6 @@ serve(async (req) => {
         break;
       case 'grok':
         response = await analyzeWithGrok(imageBase64, prompt, analysisType);
-        break;
-      case 'deepseek':
-        response = await analyzeWithDeepseek(imageBase64, prompt, analysisType);
         break;
       default:
         throw new Error(`Unsupported AI provider: ${aiProvider}`);
@@ -88,7 +85,7 @@ async function analyzeWithOpenAI(imageBase64: string, prompt: string, analysisTy
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-5-2025-08-07',
+      model: 'gpt-4o',
       messages: [
         { 
           role: 'system', 
@@ -108,7 +105,8 @@ async function analyzeWithOpenAI(imageBase64: string, prompt: string, analysisTy
           ]
         }
       ],
-      max_completion_tokens: 1000,
+      max_tokens: 1000,
+      temperature: 0.7,
     }),
   });
 
@@ -123,9 +121,9 @@ async function analyzeWithOpenAI(imageBase64: string, prompt: string, analysisTy
 }
 
 async function analyzeWithClaude(imageBase64: string, prompt: string, analysisType: string): Promise<string> {
-  const CLAUDE_API_KEY = Deno.env.get('ANTHROPIC_API_KEY');
+  const CLAUDE_API_KEY = Deno.env.get('CLAUDE_API_KEY');
   if (!CLAUDE_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY is not configured. Please add it to use Claude for image analysis.');
+    throw new Error('CLAUDE_API_KEY is not configured. Please add it to use Claude for image analysis.');
   }
 
   const systemPrompts = {
@@ -143,7 +141,7 @@ async function analyzeWithClaude(imageBase64: string, prompt: string, analysisTy
       'anthropic-version': '2023-06-01'
     },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-3-sonnet-20240229',
       max_tokens: 1000,
       system: systemPrompts[analysisType as keyof typeof systemPrompts] || systemPrompts.general,
       messages: [{
@@ -188,7 +186,7 @@ async function analyzeWithGemini(imageBase64: string, prompt: string, analysisTy
 
   const fullPrompt = `${systemPrompts[analysisType as keyof typeof systemPrompts] || systemPrompts.general}\n\n${prompt || 'Analise esta imagem e descreva o que você vê.'}`;
 
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-pro:generateContent?key=${GEMINI_API_KEY}`, {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro-vision:generateContent?key=${GEMINI_API_KEY}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -219,9 +217,9 @@ async function analyzeWithGemini(imageBase64: string, prompt: string, analysisTy
 }
 
 async function analyzeWithGrok(imageBase64: string, prompt: string, analysisType: string): Promise<string> {
-  const GROK_API_KEY = Deno.env.get('XAI_API_KEY');
+  const GROK_API_KEY = Deno.env.get('GROK_API_KEY');
   if (!GROK_API_KEY) {
-    throw new Error('XAI_API_KEY is not configured. Please add it to use Grok for image analysis.');
+    throw new Error('GROK_API_KEY is not configured. Please add it to use Grok for image analysis.');
   }
 
   const systemPrompts = {
@@ -266,60 +264,6 @@ async function analyzeWithGrok(imageBase64: string, prompt: string, analysisType
     const errorData = await response.text();
     console.error('Grok API error:', errorData);
     throw new Error(`Grok API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
-}
-
-async function analyzeWithDeepseek(imageBase64: string, prompt: string, analysisType: string): Promise<string> {
-  const DEEPSEEK_API_KEY = Deno.env.get('DEEPSEEK_API_KEY');
-  if (!DEEPSEEK_API_KEY) {
-    throw new Error('DEEPSEEK_API_KEY is not configured. Please add it to use Deepseek for image analysis.');
-  }
-
-  const systemPrompts = {
-    general: 'Você é um assistente especializado em análise de imagens. Descreva o que vê de forma clara e objetiva.',
-    detailed: 'Você é um especialista em análise detalhada de imagens. Forneça uma análise completa e minuciosa da imagem.',
-    technical: 'Você é um especialista técnico em análise de imagens. Foque em aspectos técnicos, composição, qualidade e elementos visuais.',
-    creative: 'Você é um analista criativo de imagens. Explore aspectos artísticos, emocionais e interpretativos da imagem.'
-  };
-
-  const response = await fetch('https://api.deepseek.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${DEEPSEEK_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'deepseek-vl',
-      messages: [
-        { 
-          role: 'system', 
-          content: systemPrompts[analysisType as keyof typeof systemPrompts] || systemPrompts.general
-        },
-        { 
-          role: 'user', 
-          content: [
-            { type: 'text', text: prompt || 'Analise esta imagem e descreva o que você vê.' },
-            { 
-              type: 'image_url', 
-              image_url: { 
-                url: `data:image/jpeg;base64,${imageBase64}` 
-              } 
-            }
-          ]
-        }
-      ],
-      max_tokens: 1000,
-      temperature: 0.7,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.text();
-    console.error('Deepseek API error:', errorData);
-    throw new Error(`Deepseek API error: ${response.status}`);
   }
 
   const data = await response.json();
