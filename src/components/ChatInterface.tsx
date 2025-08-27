@@ -153,6 +153,7 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
     
     // Lista de modelos que suportam visão
     const visionModels = [
+      'synergy-ia', // SynergyIA também suporta visão
       'gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'o4-mini', // OpenAI
       'claude-opus-4-20250514', 'claude-sonnet-4-20250514', 'claude-3-5-haiku-20241022', // Anthropic  
       'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite', // Google
@@ -190,7 +191,8 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
           const base64Data = base64.split(',')[1]; // Remove data:image/jpeg;base64, prefix
           
           let aiProvider = 'openai';
-          if (selectedModel.includes('claude')) aiProvider = 'claude';
+          if (selectedModel === 'synergy-ia') aiProvider = 'openai'; // SynergyIA usa OpenAI
+          else if (selectedModel.includes('claude')) aiProvider = 'claude';
           else if (selectedModel.includes('gemini')) aiProvider = 'gemini';
           else if (selectedModel.includes('grok')) aiProvider = 'grok';
           else if (selectedModel.includes('deepseek')) aiProvider = 'deepseek';
