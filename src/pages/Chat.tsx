@@ -754,10 +754,90 @@ const Chat = () => {
             }
             
             if (imageFiles.length > 0) {
-              const imageContents = imageFiles.map(image => 
-                `[Imagem anexada: ${image.name}]`
-              );
-              contents.push(...imageContents);
+              console.log('=== IMAGES DETECTED IN CHAT.TSX ===');
+              console.log('imageFiles:', imageFiles);
+              console.log('selectedModel:', internalModel);
+              
+              // Check if model supports vision
+              const visionModels = [
+                'synergy-ia', 'gpt-5', 'gpt-5-mini', 'gpt-5-nano', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano', 'o4-mini',
+                'claude-opus-4-20250514', 'claude-sonnet-4-20250514', 'claude-3-5-haiku-20241022',
+                'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
+                'grok-4-0709', 'grok-3', 'grok-3-mini'
+              ];
+              
+              const isVisionModel = visionModels.includes(internalModel);
+              console.log('isVisionModel:', isVisionModel);
+              
+              if (isVisionModel && imageFiles.length > 0) {
+                console.log('=== USING IMAGE ANALYSIS ===');
+                // Use image analysis for vision models
+                const imageFile = imageFiles[0]; // Use first image
+                
+                try {
+                  // Convert file to base64
+                  const base64 = await new Promise<string>((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result as string);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(imageFile);
+                  });
+                  const base64Data = base64.split(',')[1];
+                  
+                  let aiProvider = 'openai';
+                  if (internalModel === 'synergy-ia') aiProvider = 'openai';
+                  else if (internalModel.includes('claude')) aiProvider = 'claude';
+                  else if (internalModel.includes('gemini')) aiProvider = 'gemini';
+                  else if (internalModel.includes('grok')) aiProvider = 'grok';
+                  
+                  console.log('Calling image-analysis with provider:', aiProvider);
+                  
+                  const { data: analysisResult, error: analysisError } = await supabase.functions.invoke('image-analysis', {
+                    body: {
+                      imageBase64: base64Data,
+                      prompt: currentInput || 'Analise esta imagem e descreva o que você vê.',
+                      aiProvider,
+                      analysisType: 'general'
+                    },
+                  });
+
+                  if (analysisError) {
+                    throw new Error(analysisError.message);
+                  }
+
+                  // Add bot response
+                  const botMessage: Message = {
+                    id: Date.now().toString(),
+                    content: analysisResult.analysis,
+                    sender: 'bot',
+                    timestamp: new Date(),
+                    model: internalModel,
+                  };
+
+                  setMessages(prev => [...prev, botMessage]);
+                  
+                  // Save conversation 
+                  if (user?.id) {
+                    await upsertConversation([...messages, userMessage, botMessage], currentConversationId);
+                  }
+                  
+                  return; // Exit early, don't continue with normal flow
+                } catch (error) {
+                  console.error('Image analysis error:', error);
+                  toast({
+                    title: "Erro na análise de imagem",
+                    description: "Não foi possível analisar a imagem. Verifique se as chaves API estão configuradas.",
+                    variant: "destructive",
+                  });
+                  return;
+                }
+              } else {
+                // For non-vision models, just show image name
+                const imageContents = imageFiles.map(image => 
+                  `[Imagem anexada: ${image.name}]`
+                );
+                contents.push(...imageContents);
+              }
             }
             
             messageWithPdf = `${currentInput}\n\n${contents.join('\n\n---\n\n')}`;
