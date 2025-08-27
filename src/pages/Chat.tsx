@@ -709,7 +709,7 @@ const Chat = () => {
     const userMessage: Message = { id: Date.now().toString(), content: currentInput, sender: 'user', timestamp: new Date(), files: currentFiles.map(f => ({ 
       name: f.name, 
       type: f.type, 
-      url: f.type.startsWith('image/') ? filePreviewUrls.get(f.name) : undefined 
+      url: f.type.startsWith('image/') ? URL.createObjectURL(f) : undefined 
     }))};
     const newMessages = [...messages, userMessage];
     setMessages(newMessages);
