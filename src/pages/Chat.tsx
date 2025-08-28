@@ -18,6 +18,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose 
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 // --- INTERFACES ---
 interface Message {
@@ -253,45 +254,6 @@ const Chat = () => {
     );
   };
 
-  // Função para formatar a resposta da IA - versão simplificada baseada no código fornecido
-  const formatAIResponse = (text: string, model?: string) => {
-    if (!text) return text;
-    
-    // Remove # e * symbols
-    let cleanText = text.replace(/#+\s*/g, '').replace(/\*/g, '');
-    
-    const lines = cleanText.split('\n');
-    const formattedLines = lines.map((line) => {
-      let trimmedLine = line.trim();
-      
-      if (!trimmedLine || trimmedLine === '•' || trimmedLine === '-' || trimmedLine === '*' || trimmedLine === ':' || trimmedLine === '#') {
-        return '';
-      }
-      
-      // Remove stray bullet points
-      trimmedLine = trimmedLine.replace(/\s•\s/g, ' ');
-      
-      // Handle numbered titles
-      if (trimmedLine.match(/^\d+[\.\-]\s+[A-Za-zÀ-ÿ]/)) {
-        return `**${trimmedLine}**`;
-      }
-      
-      // Handle titles ending with : or short descriptive lines
-      if (trimmedLine.endsWith(':') || (trimmedLine.length < 50 && !trimmedLine.startsWith('•') && !trimmedLine.startsWith('-') && trimmedLine.match(/^[A-Z][^.!?]*$/))) {
-        const titleText = trimmedLine.endsWith(':') ? trimmedLine.slice(0, -1) : trimmedLine;
-        return `**${titleText}**`;
-      }
-      
-      // Handle bullet points
-      if (trimmedLine.startsWith('•') || trimmedLine.startsWith('-')) {
-        return `• ${trimmedLine.replace(/^[•\-]\s*/, '')}`;
-      }
-      
-      return line;
-    });
-    
-    return formattedLines.filter(line => line !== '').join('\n');
-  };
   // --- LÓGICA DE NEGÓCIO ---
   useEffect(() => {
     document.title = "Gerar textos com Ia";
@@ -402,53 +364,6 @@ const Chat = () => {
   };
 
   
-  // Função para renderizar texto formatado
-  const renderFormattedText = (text: string, isUser: boolean, model?: string) => {
-    if (isUser) {
-      return text;
-    }
-    
-    const formattedText = formatAIResponse(text, model);
-    const parts = formattedText.split(/(\*\*.*?\*\*)/g);
-    
-    return parts.map((part, index) => {
-      if (part.startsWith('**') && part.endsWith('**')) {
-        const boldText = part.slice(2, -2);
-        return (
-          <strong key={index} className="font-semibold text-foreground block mt-4 first:mt-0 mb-2">
-            {boldText}
-          </strong>
-        );
-      }
-      
-      // Handle regular text with bullet points
-      const lines = part.split('\n');
-      return (
-        <span key={index}>
-          {lines.map((line, lineIndex) => {
-            if (line.trim().startsWith('•')) {
-              return (
-                <div key={lineIndex} className="flex items-start gap-2 ml-4 mb-1">
-                  <span className="text-muted-foreground mt-1">•</span>
-                  <span>{line.trim().replace(/^•\s*/, '')}</span>
-                </div>
-              );
-            }
-            
-            if (line.trim()) {
-              return (
-                <div key={lineIndex} className="mb-2 last:mb-0">
-                  {line}
-                </div>
-              );
-            }
-            
-            return <br key={lineIndex} />;
-          })}
-        </span>
-      );
-    });
-  };
 
   // Função para scroll para o fim
   const scrollToBottom = () => {
@@ -476,69 +391,18 @@ const Chat = () => {
     }
   };
 
-  // Função para copiar com formatação HTML preservada para Word
+  // Função para copiar texto
   const copyWithFormatting = async (markdownText: string, isUser: boolean, messageId: string) => {
     try {
       setCopiedMessageId(messageId);
-      
-      if (isUser) {
-        await navigator.clipboard.writeText(markdownText);
-      } else {
-        // Formata o texto usando a mesma função de formatação
-        const formattedText = formatAIResponse(markdownText);
-        
-        // Converte para HTML preservando formatação
-        const htmlContent = formattedText
-          .split(/(\*\*.*?\*\*)/g)
-          .map(part => {
-            if (part.startsWith('**') && part.endsWith('**')) {
-              const boldText = part.slice(2, -2);
-              return `<strong>${boldText}</strong>`;
-            }
-            
-            // Processa linhas normais mantendo quebras e bullet points
-            const lines = part.split('\n');
-            return lines.map(line => {
-              const trimmedLine = line.trim();
-              
-              if (trimmedLine.startsWith('•')) {
-                return `<div style="margin-left: 20px; margin-bottom: 4px;">• ${trimmedLine.replace(/^•\s*/, '')}</div>`;
-              }
-              
-              if (trimmedLine) {
-                return `<div style="margin-bottom: 8px;">${trimmedLine}</div>`;
-              }
-              
-              return '<br>';
-            }).join('');
-          })
-          .join('');
-
-        // HTML completo com estilos para Word
-        const fullHtml = `
-          <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; font-size: 11pt;">
-            ${htmlContent}
-          </div>
-        `;
-
-        // Copia tanto texto simples quanto HTML formatado
-        const clipboardItem = new ClipboardItem({
-          'text/plain': new Blob([formattedText], { type: 'text/plain' }),
-          'text/html': new Blob([fullHtml], { type: 'text/html' })
-        });
-
-        await navigator.clipboard.write([clipboardItem]);
-      }
+      await navigator.clipboard.writeText(markdownText);
       
       // Volta ao ícone normal após 2 segundos
       setTimeout(() => {
         setCopiedMessageId(null);
       }, 2000);
     } catch (error) {
-      // Fallback para texto simples se HTML falhar
-      const fallbackText = isUser ? markdownText : formatAIResponse(markdownText);
-      await navigator.clipboard.writeText(fallbackText);
-      console.error('Erro ao copiar com formatação, usado fallback:', error);
+      console.error('Erro ao copiar:', error);
       
       // Volta ao ícone normal após 2 segundos mesmo com erro
       setTimeout(() => {
@@ -1420,9 +1284,9 @@ Por favor, forneça uma resposta abrangente que integre informações de todos o
                               </div>
                             )}
                              <div className="text-sm max-w-none break-words overflow-hidden">
-                              {renderFormattedText(message.content, false, message.model)}
-                              {message.isStreaming && <span className="inline-block w-2 h-4 bg-current ml-1 animate-pulse" />}
-                            </div>
+                               <MarkdownRenderer content={message.content} isUser={false} />
+                               {message.isStreaming && <span className="inline-block w-2 h-4 bg-current ml-1 animate-pulse" />}
+                             </div>
                             <div className="flex items-center justify-between pt-2 border-t border-border/50">
                               <p className="text-xs opacity-70">{getModelDisplayName(message.model)}</p>
                                   <TooltipProvider>
@@ -1459,7 +1323,7 @@ Por favor, forneça uma resposta abrangente que integre informações de todos o
                                 </div>
                               )}
                                <div className="text-sm max-w-none break-words overflow-hidden">
-                                 {renderFormattedText(message.content, true, message.model)}
+                                 <MarkdownRenderer content={message.content} isUser={true} />
                                </div>
                             </div>
                           </div>
