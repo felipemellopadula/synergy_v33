@@ -1589,22 +1589,18 @@ Por favor, forneça uma resposta abrangente que integre informações de todos o
                                     const immediateUserMessage = messageIndex > 0 ? messages[messageIndex - 1] : null;
                                     const hasAttachments = immediateUserMessage?.files && immediateUserMessage.files.length > 0;
                                     
-                                    // Debug logs
-                                    console.log('Debug comparação:', {
-                                      messageId: message.id,
-                                      messageIndex,
-                                      immediateUserMessage: immediateUserMessage,
-                                      hasAttachments,
-                                      senderType: immediateUserMessage?.sender
-                                    });
-                                    
-                                    // Só mostrar botões se não há anexos
-                                    if (hasAttachments || !immediateUserMessage || immediateUserMessage.sender !== 'user') {
-                                      console.log('Não mostrando botões - condição falhou');
+                                    // Só mostrar botões se:
+                                    // 1. Há uma mensagem do usuário anterior
+                                    // 2. A mensagem anterior é do usuário  
+                                    // 3. Não há anexos na mensagem anterior
+                                    // 4. A mensagem atual é do bot
+                                    if (!immediateUserMessage || 
+                                        immediateUserMessage.sender !== 'user' || 
+                                        hasAttachments ||
+                                        message.sender !== 'bot') {
                                       return null;
                                     }
-                                   
-                                    console.log('Renderizando botões de comparação');
+                                    
                                     return (
                                       <div className="flex items-center gap-1">
                                         {['gemini-2.5-flash', 'claude-opus-4-20250514', 'grok-4'].map((model) => {
