@@ -639,9 +639,9 @@ const VideoPage = () => {
                 )}
               </div>
 
-              <div className="grid md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Frame Inicial (opcional)</Label>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div className="flex flex-col">
+                  <Label className="mb-2">Frame Inicial (opcional)</Label>
                   <label
                     htmlFor="start-upload"
                     className={`border border-border rounded-md p-4 text-center cursor-pointer hover:bg-accent flex flex-col items-center justify-center h-28 transition-colors ${isDragOverStart ? "bg-accent border-primary border-dashed" : ""}`}
@@ -678,8 +678,8 @@ const VideoPage = () => {
                   )}
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between">
+                <div className="flex flex-col">
+                  <div className="flex items-center justify-between mb-2">
                     <Label>Frame Final (opcional)</Label>
                     {!supportsLastFrame && (
                       <span className="text-xs text-muted-foreground">Não suportado pelo modelo selecionado</span>
@@ -795,10 +795,6 @@ const VideoPage = () => {
                       const updatedVideos = savedVideos.filter(v => v !== urlToDelete);
                       setSavedVideos(updatedVideos);
                       localStorage.setItem("savedVideos", JSON.stringify(updatedVideos));
-                      toast({
-                        title: "Vídeo excluído",
-                        description: "O vídeo foi removido do histórico.",
-                      });
                     }}
                   />
                 ))}
