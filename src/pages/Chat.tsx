@@ -494,17 +494,101 @@ const Chat = () => {
     return typeof data.response === 'string' ? data.response : data.response?.content || 'Erro ao processar mensagem.';
   };
 
+  // Função para enviar mensagem para IA com arquivos (para comparações)
+  const sendToAIWithFiles = async (message: string, model: string, files: any[]): Promise<string> => {
+    const internalModel = model === 'synergy-ia' ? 'gpt-4o-mini' : model;
+    
+    const getEdgeFunctionName = (model: string) => {
+      if (model.includes('gpt-') || model.includes('o3') || model.includes('o4')) {
+        return 'openai-chat';
+      }
+      if (model.includes('gemini')) {
+        return 'gemini-chat';
+      }
+      if (model.includes('claude')) {
+        return 'anthropic-chat';
+      }
+      if (model.includes('grok')) {
+        return 'grok-chat';
+      }
+      if (model.includes('deepseek')) {
+        return 'deepseek-chat';
+      }
+      if (model.includes('llama')) {
+        return 'apillm-chat';
+      }
+      return 'ai-chat';
+    };
+
+    const functionName = getEdgeFunctionName(internalModel);
+    
+    // Preparar arquivos para envio
+    const preparedFiles = files.map(file => ({
+      name: file.name,
+      type: file.type,
+      hasPdfContent: !!file.pdfContent,
+      hasWordContent: !!file.wordContent,
+      pdfContent: file.pdfContent || '',
+      wordContent: file.wordContent || ''
+    }));
+    
+    const { data: fnData, error: fnError } = await supabase.functions.invoke(functionName, { 
+      body: { 
+        message, 
+        model: internalModel,
+        files: preparedFiles,
+        conversationHistory: [],
+        contextEnabled: false
+      }
+    });
+    
+    if (fnError) throw fnError;
+    
+    const data = fnData as any;
+    return typeof data.response === 'string' ? data.response : data.response?.content || 'Erro ao processar mensagem.';
+  };
+
   // Função para comparar com outro modelo
   const compareWithModel = async (messageId: string, modelToCompare: string, originalUserMessage: string) => {
     try {
+      // Mostrar toast de processamento
+      toast({
+        title: "Processando Comparação",
+        description: `Enviando para ${getModelDisplayName(modelToCompare)}...`,
+      });
+
       // Marcar como comparando
       setComparingModels(prev => ({
         ...prev,
         [messageId]: [...(prev[messageId] || []), modelToCompare]
       }));
 
-      // Enviar mensagem para o modelo de comparação
-      const response = await sendToAI(originalUserMessage, modelToCompare);
+      // Encontrar a mensagem original do usuário para pegar os arquivos anexados
+      const originalMessage = messages.find(m => m.id === messageId);
+      const userMessageIndex = messages.findIndex(m => m.id === messageId);
+      const previousUserMessage = messages.slice(0, userMessageIndex).reverse().find(m => m.sender === 'user');
+      
+      // Usar a mensagem anterior do usuário se a atual não tiver conteúdo ou arquivos
+      const sourceMessage = (originalMessage?.sender === 'user') ? originalMessage : previousUserMessage;
+      
+      let messageToSend = originalUserMessage;
+      let filesToSend: any[] = [];
+      
+      // Se a mensagem original tinha arquivos anexados, incluir no envio de comparação
+      if (sourceMessage?.files && sourceMessage.files.length > 0) {
+        filesToSend = sourceMessage.files.map(file => ({
+          name: file.name,
+          type: file.type,
+          // Para PDFs, buscar o conteúdo processado se disponível
+          pdfContent: file.type === 'application/pdf' ? processedPdfs.get(file.name) || '' : undefined,
+          wordContent: file.type.includes('word') ? processedWords.get(file.name) || '' : undefined
+        }));
+        
+        console.log('Enviando arquivos para comparação:', filesToSend.map(f => ({ name: f.name, type: f.type })));
+      }
+
+      // Enviar mensagem para o modelo de comparação com arquivos
+      const response = await sendToAIWithFiles(originalUserMessage, modelToCompare, filesToSend);
       
       if (response) {
         // Adicionar resposta de comparação às mensagens
@@ -1474,23 +1558,26 @@ Por favor, forneça uma resposta abrangente que integre informações de todos o
                                      <TooltipProvider key={model}>
                                        <Tooltip>
                                          <TooltipTrigger asChild>
-                                           <Button
-                                             variant="outline"
-                                             size="sm"
-                                             onClick={() => compareWithModel(message.id, model, userMessage)}
-                                             disabled={isComparing || !userMessage}
-                                             className="flex items-center gap-1 text-xs h-8 px-2"
-                                           >
-                                             {isComparing ? (
-                                               <RefreshCw className="h-3 w-3 animate-spin" />
-                                             ) : (
-                                               <div className="flex items-center gap-1">
-                                                 <RefreshCw className="h-3 w-3" />
-                                                 {model === 'gemini-2.5-flash' ? 'Gemini' : 
-                                                  model === 'claude-opus-4-20250514' ? 'Claude' : 'Grok'}
-                                               </div>
-                                             )}
-                                           </Button>
+                                            <Button
+                                              variant="outline"
+                                              size="sm"
+                                              onClick={() => compareWithModel(message.id, model, userMessage)}
+                                              disabled={isComparing || !userMessage}
+                                              className="flex items-center gap-1 text-xs h-8 px-2"
+                                            >
+                                              {isComparing ? (
+                                                <div className="flex items-center gap-1">
+                                                  <RefreshCw className="h-3 w-3 animate-spin" />
+                                                  <span>Processando...</span>
+                                                </div>
+                                              ) : (
+                                                <div className="flex items-center gap-1">
+                                                  <RefreshCw className="h-3 w-3" />
+                                                  {model === 'gemini-2.5-flash' ? 'Gemini' : 
+                                                   model === 'claude-opus-4-20250514' ? 'Claude' : 'Grok'}
+                                                </div>
+                                              )}
+                                            </Button>
                                          </TooltipTrigger>
                                          <TooltipContent>
                                            Comparar com {getModelDisplayName(model)}
