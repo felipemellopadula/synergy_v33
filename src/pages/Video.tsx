@@ -351,9 +351,27 @@ const VideoPage = () => {
     setter(true);
 
     try {
+      // Validar tipo de arquivo
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        throw new Error('Tipo de arquivo não suportado. Use JPEG, PNG ou WebP.');
+      }
+
+      // Validar tamanho (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        throw new Error('Arquivo muito grande. Máximo 10MB.');
+      }
+
+      // Criar nome de arquivo seguro (sem caracteres especiais)
+      const fileExtension = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const safeFileName = `${user?.id || 'temp'}_${Date.now()}.${fileExtension}`;
+
       const { data, error } = await supabase.storage
         .from("video-refs")
-        .upload(`${Date.now()}-${file.name}`, file);
+        .upload(safeFileName, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
       
       if (error) throw error;
       
@@ -361,12 +379,22 @@ const VideoPage = () => {
         .from("video-refs")
         .getPublicUrl(data.path);
       
+      // Verificar se a URL é válida
+      if (!publicData.publicUrl) {
+        throw new Error('Falha ao gerar URL pública');
+      }
+
       urlSetter(publicData.publicUrl);
+      
+      toast({
+        title: "Upload concluído",
+        description: "Imagem enviada com sucesso.",
+      });
     } catch (e: any) {
       console.error('Upload error:', e);
       toast({ 
         title: "Erro no upload", 
-        description: "Tente novamente.", 
+        description: e.message || "Tente novamente com uma imagem diferente.", 
         variant: "destructive" 
       });
     } finally {
