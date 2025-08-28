@@ -563,28 +563,71 @@ const Chat = () => {
         [messageId]: [...(prev[messageId] || []), modelToCompare]
       }));
 
-      // Encontrar a mensagem original do usuário para pegar os arquivos anexados
-      const originalMessage = messages.find(m => m.id === messageId);
-      const userMessageIndex = messages.findIndex(m => m.id === messageId);
-      const previousUserMessage = messages.slice(0, userMessageIndex).reverse().find(m => m.sender === 'user');
+      // Encontrar a mensagem do bot que estamos comparando
+      const botMessage = messages.find(m => m.id === messageId);
+      if (!botMessage) {
+        throw new Error('Mensagem não encontrada');
+      }
+
+      // Encontrar a mensagem do usuário que originou essa resposta do bot
+      const botMessageIndex = messages.findIndex(m => m.id === messageId);
+      const previousUserMessage = messages.slice(0, botMessageIndex).reverse().find(m => m.sender === 'user');
       
-      // Usar a mensagem anterior do usuário se a atual não tiver conteúdo ou arquivos
-      const sourceMessage = (originalMessage?.sender === 'user') ? originalMessage : previousUserMessage;
-      
+      if (!previousUserMessage) {
+        throw new Error('Mensagem do usuário não encontrada');
+      }
+
       let messageToSend = originalUserMessage;
       let filesToSend: any[] = [];
       
       // Se a mensagem original tinha arquivos anexados, incluir no envio de comparação
-      if (sourceMessage?.files && sourceMessage.files.length > 0) {
-        filesToSend = sourceMessage.files.map(file => ({
-          name: file.name,
-          type: file.type,
-          // Para PDFs, buscar o conteúdo processado se disponível
-          pdfContent: file.type === 'application/pdf' ? processedPdfs.get(file.name) || '' : undefined,
-          wordContent: file.type.includes('word') ? processedWords.get(file.name) || '' : undefined
-        }));
+      if (previousUserMessage.files && previousUserMessage.files.length > 0) {
+        console.log('Arquivos detectados na mensagem original:', previousUserMessage.files);
         
-        console.log('Enviando arquivos para comparação:', filesToSend.map(f => ({ name: f.name, type: f.type })));
+        // Buscar conteúdo processado dos arquivos
+        filesToSend = previousUserMessage.files.map(file => {
+          const fileData: any = {
+            name: file.name,
+            type: file.type,
+            hasPdfContent: false,
+            hasWordContent: false,
+            pdfContent: '',
+            wordContent: ''
+          };
+
+          // Para PDFs, buscar o conteúdo processado
+          if (file.type === 'application/pdf') {
+            const pdfContent = processedPdfs.get(file.name);
+            if (pdfContent) {
+              fileData.hasPdfContent = true;
+              fileData.pdfContent = pdfContent;
+              console.log(`PDF content found for ${file.name}:`, pdfContent.substring(0, 200) + '...');
+            } else {
+              console.warn(`No PDF content found for ${file.name} in processedPdfs`);
+              console.log('Available processed PDFs:', Array.from(processedPdfs.keys()));
+            }
+          }
+          
+          // Para documentos Word
+          if (file.type.includes('word') || file.name.toLowerCase().endsWith('.docx') || file.name.toLowerCase().endsWith('.doc')) {
+            const wordContent = processedWords.get(file.name);
+            if (wordContent) {
+              fileData.hasWordContent = true;
+              fileData.wordContent = wordContent;
+              console.log(`Word content found for ${file.name}:`, wordContent.substring(0, 200) + '...');
+            }
+          }
+
+          return fileData;
+        });
+        
+        console.log('Enviando arquivos para comparação:', filesToSend.map(f => ({ 
+          name: f.name, 
+          type: f.type, 
+          hasPdfContent: f.hasPdfContent, 
+          hasWordContent: f.hasWordContent,
+          contentLength: f.pdfContent?.length || f.wordContent?.length || 0
+        })));
       }
 
       // Enviar mensagem para o modelo de comparação com arquivos
