@@ -189,9 +189,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           }
         } else {
           setProfile(null);
-          // Ensure we're on homepage after signout
+          // Redirect to homepage only on explicit signout and if not already there
           if (event === 'SIGNED_OUT' && window.location.pathname !== '/') {
-            window.location.href = '/';
+            window.location.replace('/');
           }
         }
       }
@@ -250,18 +250,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const signOut = async () => {
     try {
-      // Clear local state immediately for instant UI feedback
-      setUser(null);
-      setProfile(null);
-      setSession(null);
-      
-      // Redirect to home page immediately
-      window.location.href = '/';
-      
-      // Then sign out from Supabase in background
+      // Sign out from Supabase first - this will trigger onAuthStateChange
       await supabase.auth.signOut();
+      // The onAuthStateChange will handle the redirect and state clearing
     } catch (error) {
       console.error('Error signing out:', error);
+      // Fallback redirect on error
+      window.location.href = '/';
     }
   };
 
