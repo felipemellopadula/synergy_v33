@@ -1,29 +1,29 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  MessageCircle,
   Sparkles,
   Zap,
-  Users,
   ThumbsUp,
   Activity,
   Stars,
   BrainCircuit,
-  Gem,
   Layers,
   FileText,
   FolderKanban,
   LineChart,
   ShieldCheck,
+  Users,
   Globe,
   Server,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { AuthModal } from "@/components/AuthModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { Switch } from "@/components/ui/switch";
+
+// Lazy load components that aren't immediately visible
+const AuthModal = lazy(() => import("@/components/AuthModal").then(module => ({ default: module.AuthModal })));
 
 const Index = () => {
   const navigate = useNavigate();
@@ -45,40 +45,52 @@ const Index = () => {
   };
   
   useEffect(() => {
-    // Pré-carregar ambas as imagens para evitar flash
-    const lightLogo = new Image();
-    lightLogo.src = "/lovable-uploads/d3026126-a31a-4979-b9d5-265db8e3f148.png";
-    
-    const darkLogo = new Image();
-    darkLogo.src = "/lovable-uploads/75b65017-8e97-493c-85a8-fe1b0f60ce9f.png";
-    
+    // Set document metadata immediately
     document.title = "Synergy AI Hub – Modelos de IA, Recursos e Planos";
-    const setMeta = (name: string, content: string) => {
-      let el = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
-      if (!el) {
-        el = document.createElement("meta");
-        el.setAttribute("name", name);
-        document.head.appendChild(el);
-      }
-      el.setAttribute("content", content);
-    };
-    setMeta(
-      "description",
-      "Acesse os melhores modelos de IA: ChatGPT, Claude, Gemini e mais. Recursos poderosos, preços simples e dashboard intuitivo."
-    );
-    let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
-    if (!link) {
-      link = document.createElement("link");
-      link.setAttribute("rel", "canonical");
-      document.head.appendChild(link);
-    }
-    link.setAttribute("href", window.location.href);
     
+    // Theme observer setup
     const apply = () => setIsLight(document.documentElement.classList.contains('light'));
     apply();
     const observer = new MutationObserver(apply);
     observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
+    
+    // Defer heavy operations
+    const timeoutId = setTimeout(() => {
+      // Pré-carregar imagens apenas após carregamento inicial
+      const lightLogo = new Image();
+      lightLogo.src = "/lovable-uploads/d3026126-a31a-4979-b9d5-265db8e3f148.png";
+      
+      const darkLogo = new Image();
+      darkLogo.src = "/lovable-uploads/75b65017-8e97-493c-85a8-fe1b0f60ce9f.png";
+      
+      // Set meta tags
+      const setMeta = (name: string, content: string) => {
+        let el = document.querySelector(`meta[name="${name}"]`) as HTMLMetaElement | null;
+        if (!el) {
+          el = document.createElement("meta");
+          el.setAttribute("name", name);
+          document.head.appendChild(el);
+        }
+        el.setAttribute("content", content);
+      };
+      setMeta(
+        "description",
+        "Acesse os melhores modelos de IA: ChatGPT, Claude, Gemini e mais. Recursos poderosos, preços simples e dashboard intuitivo."
+      );
+      
+      let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement | null;
+      if (!link) {
+        link = document.createElement("link");
+        link.setAttribute("rel", "canonical");
+        document.head.appendChild(link);
+      }
+      link.setAttribute("href", window.location.href);
+    }, 100);
+    
+    return () => {
+      observer.disconnect();
+      clearTimeout(timeoutId);
+    };
   }, []);
   
   if (loading) {
@@ -103,14 +115,14 @@ const Index = () => {
                 <img 
                   src="/lovable-uploads/d3026126-a31a-4979-b9d5-265db8e3f148.png" 
                   alt="Synergy AI logo" 
-                  className={`h-8 w-auto transition-opacity duration-200 ${isLight ? 'opacity-100' : 'opacity-0 absolute'}`}
-                  loading="eager"
+                     className={`h-8 w-auto transition-opacity duration-200 ${isLight ? 'opacity-100' : 'opacity-0 absolute'}`}
+                   loading="lazy"
                 />
                 <img 
                   src="/lovable-uploads/75b65017-8e97-493c-85a8-fe1b0f60ce9f.png" 
                   alt="Synergy AI logo" 
-                  className={`h-8 w-auto transition-opacity duration-200 ${!isLight ? 'opacity-100' : 'opacity-0 absolute'}`}
-                  loading="eager"
+                     className={`h-8 w-auto transition-opacity duration-200 ${!isLight ? 'opacity-100' : 'opacity-0 absolute'}`}
+                   loading="lazy"
                 />
               </div>
             </a>
@@ -469,7 +481,15 @@ const Index = () => {
           </footer>
         </main>
       </div>
-      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
+        {/* AuthModal */}
+        {showAuthModal && (
+          <Suspense fallback={<div className="fixed inset-0 bg-black/50 flex items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div></div>}>
+            <AuthModal 
+              isOpen={showAuthModal} 
+              onClose={() => setShowAuthModal(false)} 
+            />
+          </Suspense>
+        )}
     </div>
   );
 };

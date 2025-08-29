@@ -70,7 +70,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return md.avatar_url || md.picture || fromIdentity || null;
   };
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = async (userId: string, currentUser?: User) => {
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -87,12 +87,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Create a default profile if it doesn't exist
         const defaultProfile = {
           id: userId,
-          name: deriveNameFromMetadata(session?.user),
-          email: session?.user?.email || '',
+          name: deriveNameFromMetadata(currentUser),
+          email: currentUser?.email || '',
           subscription_type: 'paid' as const,
           tokens_remaining: 1000000,
-          avatar_url: extractAvatarFromUser(session?.user),
-          phone: (session?.user?.user_metadata?.phone as string) || null,
+          avatar_url: extractAvatarFromUser(currentUser),
+          phone: (currentUser?.user_metadata?.phone as string) || null,
         };
 
         const { data: inserted, error: insertError } = await supabase
@@ -110,32 +110,34 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         return;
       }
 
-      // If profile exists, backfill name/avatar from OAuth metadata when missing
-      const desiredName = deriveNameFromMetadata(session?.user);
-      const desiredAvatar = extractAvatarFromUser(session?.user);
-      const updates: Partial<Profile> = {};
-      if ((!data.avatar_url || data.avatar_url.length === 0) && desiredAvatar) {
-        updates.avatar_url = desiredAvatar;
-      }
-      if ((!data.name || data.name === 'Usuário') && desiredName) {
-        updates.name = desiredName;
-      }
+      // Quick check for updates needed
+      const desiredName = deriveNameFromMetadata(currentUser);
+      const desiredAvatar = extractAvatarFromUser(currentUser);
+      const needsNameUpdate = (!data.name || data.name === 'Usuário') && desiredName && desiredName !== data.name;
+      const needsAvatarUpdate = (!data.avatar_url || data.avatar_url.length === 0) && desiredAvatar;
 
-      if (Object.keys(updates).length > 0) {
-        const { data: updated, error: updateError } = await supabase
+      if (needsNameUpdate || needsAvatarUpdate) {
+        // Perform async update without blocking UI
+        const updates: Partial<Profile> = {};
+        if (needsNameUpdate) updates.name = desiredName;
+        if (needsAvatarUpdate) updates.avatar_url = desiredAvatar;
+
+        setProfile(data); // Set current data immediately
+        
+        // Update in background
+        supabase
           .from('profiles')
           .update(updates)
           .eq('id', userId)
           .select('*')
-          .single();
-        if (updateError) {
-          console.error('Error updating profile with OAuth metadata:', updateError);
-          setProfile(data);
-        } else if (updated) {
-          setProfile(updated);
-        } else {
-          setProfile(data);
-        }
+          .single()
+          .then(({ data: updated, error: updateError }) => {
+            if (updateError) {
+              console.error('Error updating profile:', updateError);
+            } else if (updated) {
+              setProfile(updated);
+            }
+          });
       } else {
         setProfile(data);
       }
@@ -146,22 +148,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshProfile = async () => {
     if (user) {
-      await fetchProfile(user.id);
+      await fetchProfile(user.id, user);
     }
   };
 
   useEffect(() => {
+    let mounted = true;
+
+    // Check for existing session first (faster)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
+      
+      setSession(session);
+      setUser(session?.user ?? null);
+      setLoading(false);
+      
+      if (session?.user) {
+        fetchProfile(session.user.id, session.user);
+      }
+    });
+
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        if (!mounted) return;
+        
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Defer profile fetch to avoid conflicts
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-          }, 0);
+          fetchProfile(session.user.id, session.user);
           
           // Redirect to dashboard after successful Google auth
           if (event === 'SIGNED_IN' && window.location.pathname === '/') {
@@ -170,26 +186,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } else {
           setProfile(null);
         }
-        
-        setLoading(false);
       }
     );
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        setTimeout(() => {
-          fetchProfile(session.user.id);
-        }, 0);
-      }
-      
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
