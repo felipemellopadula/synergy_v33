@@ -179,15 +179,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (session?.user) {
           fetchProfile(session.user.id, session.user);
           
-          // Redirect to dashboard after successful Google auth
-          if (event === 'SIGNED_IN' && window.location.pathname === '/') {
-            // Use navigate instead of window.location for faster navigation
+          // Redirect to dashboard after successful Google auth ONLY
+          if (event === 'SIGNED_IN' && 
+              window.location.pathname === '/' && 
+              session.user.app_metadata?.provider === 'google') {
             setTimeout(() => {
               window.location.href = '/dashboard';
             }, 100);
           }
         } else {
           setProfile(null);
+          // Ensure we're on homepage after signout
+          if (event === 'SIGNED_OUT' && window.location.pathname !== '/') {
+            window.location.href = '/';
+          }
         }
       }
     );
@@ -244,7 +249,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
 
   const signOut = async () => {
-    await supabase.auth.signOut();
+    try {
+      // Clear local state immediately for instant UI feedback
+      setUser(null);
+      setProfile(null);
+      setSession(null);
+      
+      // Redirect to home page immediately
+      window.location.href = '/';
+      
+      // Then sign out from Supabase in background
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   const updateProfile = async (updates: Partial<Profile>) => {

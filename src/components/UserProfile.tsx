@@ -26,7 +26,8 @@ const UserProfile = ({ tokens }: UserProfileProps) => {
   }
 
   const handleSignOut = async () => {
-    await signOut();
+    // Immediate logout without waiting
+    signOut();
   };
 
   return (

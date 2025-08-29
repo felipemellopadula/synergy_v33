@@ -35,8 +35,8 @@ const Dashboard = () => {
   }
 
   const handleSignOut = async () => {
-    await signOut();
-    navigate("/");
+    // Immediate logout without waiting
+    signOut();
   };
 
   const features = [
