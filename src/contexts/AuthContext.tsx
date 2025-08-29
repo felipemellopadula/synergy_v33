@@ -72,6 +72,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const fetchProfile = async (userId: string, currentUser?: User) => {
     try {
+      // For Google OAuth users, create optimistic profile immediately
+      const isGoogleOAuth = currentUser?.app_metadata?.provider === 'google';
+      
+      if (isGoogleOAuth) {
+        // Set temporary profile immediately for fast UI
+        const tempProfile = {
+          id: userId,
+          name: deriveNameFromMetadata(currentUser),
+          email: currentUser?.email || '',
+          subscription_type: 'paid' as const,
+          tokens_remaining: 1000000,
+          avatar_url: extractAvatarFromUser(currentUser),
+          phone: (currentUser?.user_metadata?.phone as string) || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+        setProfile(tempProfile);
+      }
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -84,7 +103,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       if (!data) {
-        // Create a default profile if it doesn't exist
+        // Create profile in background for Google users (already showing temp profile)
         const defaultProfile = {
           id: userId,
           name: deriveNameFromMetadata(currentUser),
@@ -95,22 +114,40 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           phone: (currentUser?.user_metadata?.phone as string) || null,
         };
 
-        const { data: inserted, error: insertError } = await supabase
-          .from('profiles')
-          .insert(defaultProfile)
-          .select()
-          .single();
+        if (isGoogleOAuth) {
+          // For Google users, create profile in background
+          setTimeout(() => {
+            supabase
+              .from('profiles')
+              .insert(defaultProfile)
+              .select()
+              .single()
+              .then(({ data: inserted, error: insertError }) => {
+                if (insertError) {
+                  console.error('Error creating profile:', insertError);
+                } else if (inserted) {
+                  setProfile(inserted);
+                }
+              });
+          }, 0);
+        } else {
+          // For regular users, create profile synchronously
+          const { data: inserted, error: insertError } = await supabase
+            .from('profiles')
+            .insert(defaultProfile)
+            .select()
+            .single();
 
-        if (insertError) {
-          console.error('Error creating default profile:', insertError);
-          return;
+          if (insertError) {
+            console.error('Error creating default profile:', insertError);
+            return;
+          }
+          setProfile(inserted);
         }
-
-        setProfile(inserted);
         return;
       }
 
-      // Set profile immediately for fast UI response
+      // Update profile with fetched data
       setProfile(data);
 
       // Check for updates needed and update in background
@@ -164,10 +201,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch profile in background, don't await
-          setTimeout(() => {
+          // For Google OAuth, fetch profile immediately to show optimistic UI
+          // For others, fetch in background  
+          const isGoogleOAuth = session.user.app_metadata?.provider === 'google';
+          if (isGoogleOAuth && event === 'SIGNED_IN') {
             fetchProfile(session.user.id, session.user);
-          }, 0);
+          } else {
+            setTimeout(() => {
+              fetchProfile(session.user.id, session.user);
+            }, 0);
+          }
           
           // Immediate redirect for login events
           if (event === 'SIGNED_IN' && window.location.pathname === '/') {
@@ -192,10 +235,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setLoading(false);
       
       if (session?.user) {
-        // Fetch profile in background
-        setTimeout(() => {
+        // Fetch profile - immediate for Google OAuth on page load, background for others
+        const isGoogleOAuth = session.user.app_metadata?.provider === 'google';
+        if (isGoogleOAuth) {
           fetchProfile(session.user.id, session.user);
-        }, 0);
+        } else {
+          setTimeout(() => {
+            fetchProfile(session.user.id, session.user);
+          }, 0);
+        }
       }
     });
 
