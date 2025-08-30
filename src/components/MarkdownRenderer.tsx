@@ -117,7 +117,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isUser = f
             return <ul className="ml-4 mb-4 list-disc space-y-1">{children}</ul>;
           },
           ol({ children }) {
-            return <ol className="ml-4 mb-4 list-decimal space-y-1">{children}</ol>;
+            return <ol className="ml-4 mb-4 list-decimal space-y-0">{children}</ol>;
           },
           li({ children }) {
             return <li className="leading-relaxed">{children}</li>;
