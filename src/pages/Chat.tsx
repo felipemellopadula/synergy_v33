@@ -428,6 +428,40 @@ const BotMessage = React.memo(
     const hasAttachments =
       immediateUserMessage?.files && immediateUserMessage.files.length > 0;
 
+    // Hook para animação de digitação
+    const [displayedContent, setDisplayedContent] = useState("");
+    const [isTyping, setIsTyping] = useState(false);
+
+    useEffect(() => {
+      if (message.content && !message.isStreaming) {
+        setIsTyping(true);
+        setDisplayedContent("");
+        
+        let index = 0;
+        const text = message.content;
+        
+        const typeInterval = setInterval(() => {
+          if (index < text.length) {
+            setDisplayedContent(text.slice(0, index + 1));
+            index++;
+          } else {
+            setIsTyping(false);
+            clearInterval(typeInterval);
+          }
+        }, 3); // Ultra rápido - 3ms por caractere
+        
+        return () => clearInterval(typeInterval);
+      } else if (message.isStreaming) {
+        setDisplayedContent(message.content);
+        setIsTyping(false);
+      }
+    }, [message.content, message.isStreaming]);
+
+    // Não renderizar se não há conteúdo para mostrar
+    if (!message.content && !message.isStreaming) {
+      return null;
+    }
+
     return (
       <>
         <Avatar className="h-8 w-8 shrink-0 mr-0.5">
@@ -466,11 +500,11 @@ const BotMessage = React.memo(
                   fallback={<div className="h-4 w-24 bg-muted rounded" />}
                 >
                   <MarkdownRendererLazy
-                    content={message.content}
+                    content={displayedContent}
                     isUser={false}
                   />
                 </Suspense>
-                {message.isStreaming && (
+                {(message.isStreaming || isTyping) && (
                   <span className="inline-block w-2 h-4 bg-current ml-1 animate-pulse" />
                 )}
               </div>
