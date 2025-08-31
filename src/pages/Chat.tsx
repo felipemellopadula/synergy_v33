@@ -442,10 +442,14 @@ const BotMessage = React.memo(
         let index = 0;
         const text = message.content;
         
+        // Digitação ultra rápida com chunks grandes
+        const chunkSize = Math.max(10, Math.ceil(text.length / 30)); // Pelo menos 10 caracteres por vez
+        
         const typeInterval = setInterval(() => {
           if (index < text.length) {
-            setDisplayedContent(text.slice(0, index + 1));
-            index++;
+            const nextIndex = Math.min(index + chunkSize, text.length);
+            setDisplayedContent(text.slice(0, nextIndex));
+            index = nextIndex;
           } else {
             setIsTyping(false);
             clearInterval(typeInterval);
@@ -454,7 +458,7 @@ const BotMessage = React.memo(
               scrollToBottom();
             }, 100);
           }
-        }, 1); // Mais rápido - 1ms por caractere
+        }, 1); // Ultra rápido - vários caracteres por ms
         
         return () => clearInterval(typeInterval);
       } else if (message.isStreaming) {
