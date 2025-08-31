@@ -408,6 +408,7 @@ const BotMessage = React.memo(
     comparingModels,
     compareWithModel,
     immediateUserMessage,
+    scrollToBottom,
   }: {
     message: Message;
     getModelDisplayName: (model?: string) => string;
@@ -424,6 +425,7 @@ const BotMessage = React.memo(
       originalUserMessage: string
     ) => Promise<void>;
     immediateUserMessage: Message | null;
+    scrollToBottom: () => void;
   }) => {
     const hasAttachments =
       immediateUserMessage?.files && immediateUserMessage.files.length > 0;
@@ -447,8 +449,12 @@ const BotMessage = React.memo(
           } else {
             setIsTyping(false);
             clearInterval(typeInterval);
+            // Auto-scroll quando terminar a digitação
+            setTimeout(() => {
+              scrollToBottom();
+            }, 100);
           }
-        }, 3); // Ultra rápido - 3ms por caractere
+        }, 1); // Mais rápido - 1ms por caractere
         
         return () => clearInterval(typeInterval);
       } else if (message.isStreaming) {
@@ -2098,6 +2104,7 @@ Forneça uma resposta abrangente que integre informações de todos os documento
                           comparingModels={comparingModels}
                           compareWithModel={compareWithModel}
                           immediateUserMessage={immediateUserMessage}
+                          scrollToBottom={scrollToBottom}
                         />
                       ) : (
                         <UserMessage
