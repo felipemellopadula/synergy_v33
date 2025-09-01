@@ -37,7 +37,7 @@ const KONTEXT_QUALITY_SETTINGS = [
 const IDEOGRAM_QUALITY_SETTINGS = [
     { id: "1:1", label: "1:1 (Square)", width: 1024, height: 1024, steps: 15 },
     { id: "21:10", label: "21:10 (Ultra-Wide / Landscape)", width: 1600, height: 762, steps: 15 },
-    { id: "16:13", label: "16:13 (Wide / Landscape)", width: 1280, height: 1040, steps: 15 },
+    { id: "16:13", label: "16:13 (Wide / Landscape)", width: 1024, height: 832, steps: 15 },
     { id: "4:3", label: "4:3 (Standard / Landscape)", width: 1024, height: 768, steps: 15 },
     { id: "3:2", label: "3:2 (Classic / Landscape)", width: 1536, height: 1024, steps: 15 },
     { id: "2:3", label: "2:3 (Classic / Portrait)", width: 1024, height: 1536, steps: 15 },
