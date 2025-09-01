@@ -62,9 +62,8 @@ const ThemeToggleLazy = lazy(() =>
 const UserProfileLazy = lazy(() =>
   import("@/components/UserProfile").then((m) => ({ default: m.UserProfile }))
 );
-const MarkdownRendererLazy = lazy(() =>
-  import("@/components/MarkdownRenderer").then((m) => ({ default: m.default }))
-);
+// Temporarily use static import to debug
+import MarkdownRendererLazy from "@/components/MarkdownRenderer";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTokens } from "@/hooks/useTokens";
@@ -478,17 +477,7 @@ const BotMessage = React.memo(
               )}
 
               <div className="text-sm max-w-full break-words whitespace-pre-wrap overflow-x-auto">
-                {/* [FIX] Fallback mostra texto puro enquanto o MarkdownRenderer carrega */}
-                <Suspense
-                  fallback={
-                    <div className="whitespace-pre-wrap break-words">
-                      {displayedContent}
-                    </div>
-                  }
-                >
-                  <MarkdownRendererLazy content={displayedContent} isUser={false} />
-                </Suspense>
-                {/* (cursor removido para evitar "box vazio") */}
+                <MarkdownRendererLazy content={displayedContent} isUser={false} />
               </div>
 
               <div className="flex items-center justify-between pt-2 border-t border-border/50 gap-2 flex-wrap">

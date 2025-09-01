@@ -1,11 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
-import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useTheme } from 'next-themes';
 import { Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface MarkdownRendererProps {
@@ -63,7 +62,7 @@ const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, isUser = f
                     </Button>
                   </div>
                   <SyntaxHighlighter
-                    style={theme === 'dark' ? oneDark : oneLight}
+                    style={vscDarkPlus}
                     language={language}
                     PreTag="div"
                     customStyle={{
