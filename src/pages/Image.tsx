@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { Download, Image as ImageIcon, Share2, ZoomIn, Loader2, X, ArrowLeft, Trash2 } from "lucide-react";
+import { Download, Image as ImageIcon, Share2, ZoomIn, Loader2, X, ArrowLeft, Trash2, Wand2 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserProfile } from "@/components/UserProfile";
 import { useAuth } from "@/contexts/AuthContext";
@@ -75,6 +75,7 @@ const ImagePage = () => {
     const [quality, setQuality] = useState(QUALITY_SETTINGS[0].id);
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
+    const [isEnhancingPrompt, setIsEnhancingPrompt] = useState(false);
     const [images, setImages] = useState<DatabaseImage[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(true);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -300,6 +301,30 @@ const ImagePage = () => {
         return publicData.publicUrl;
     };
 
+    const handleEnhancePrompt = async () => {
+        if (!prompt.trim()) {
+            toast({ title: "Digite um prompt primeiro", variant: "destructive" });
+            return;
+        }
+
+        setIsEnhancingPrompt(true);
+        try {
+            const { data, error } = await supabase.functions.invoke('enhance-prompt', {
+                body: { prompt: prompt.trim() }
+            });
+
+            if (error) throw error;
+
+            setPrompt(data.enhancedPrompt);
+            toast({ title: "Prompt melhorado com sucesso!", variant: "default" });
+        } catch (error) {
+            console.error('Error enhancing prompt:', error);
+            toast({ title: "Erro ao melhorar o prompt", variant: "destructive" });
+        } finally {
+            setIsEnhancingPrompt(false);
+        }
+    };
+
     return (
         <div className="min-h-screen bg-background" role="main">
             <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
@@ -326,9 +351,29 @@ const ImagePage = () => {
                     <Card>
                         <CardContent className="pt-6 space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
-                                <div className="md:col-span-7">
+                                <div className="md:col-span-7 space-y-2">
                                     <Label htmlFor="prompt">Descreva o que você quer ver</Label>
                                     <Textarea id="prompt" placeholder="Ex: retrato fotorealista de um astronauta..." value={prompt} onChange={(e) => setPrompt(e.target.value)} rows={3} />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleEnhancePrompt}
+                                        disabled={isEnhancingPrompt || !prompt.trim()}
+                                        className="w-full"
+                                    >
+                                        {isEnhancingPrompt ? (
+                                            <>
+                                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                                Melhorando prompt...
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Wand2 className="mr-2 h-4 w-4" />
+                                                ✨ Magic Prompt
+                                            </>
+                                        )}
+                                    </Button>
                                 </div>
                                 <div className="md:col-span-2">
                                     <Label>Modelo</Label>
