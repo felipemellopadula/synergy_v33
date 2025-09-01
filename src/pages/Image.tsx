@@ -50,20 +50,20 @@ const MODELS = [
     { id: "openai:1@1", label: "Gpt-Image 1" },
     { id: "ideogram:4@1", label: "Ideogram 3.0" },
     { id: "runware:108@1", label: "Qwen-Image" },
-  { id: "bfl:3@1", label: "FLUX.1 Kontext [max]" },
+    { id: "bfl:3@1", label: "FLUX.1 Kontext [max]" },
 ];
 
 const MAX_IMAGES_TO_FETCH = 10;
 
 interface DatabaseImage {
-  id: string;
-  user_id: string;
-  prompt: string | null;
-  image_path: string;
-  width: number | null;
-  height: number | null;
-  format: string | null;
-  created_at: string;
+    id: string;
+    user_id: string;
+    prompt: string | null;
+    image_path: string;
+    width: number | null;
+    height: number | null;
+    format: string | null;
+    created_at: string;
 }
 
 const ImagePage = () => {
@@ -270,13 +270,36 @@ const ImagePage = () => {
         }
     }, [user, toast, loadSavedImages]);
 
-    const downloadImage = (image: DatabaseImage) => {
+    // --- ALTERAÇÃO AQUI ---: Lógica de download corrigida para funcionar com cross-origin.
+    const downloadImage = useCallback(async (image: DatabaseImage) => {
         const { data: publicData } = supabase.storage.from('images').getPublicUrl(image.image_path);
-        const link = document.createElement('a');
-        link.href = publicData.publicUrl;
-        link.download = `imagem-${image.id}.${image.format || 'png'}`;
-        link.click();
-    };
+        const imageUrl = publicData.publicUrl;
+
+        try {
+            const response = await fetch(imageUrl);
+            if (!response.ok) throw new Error('Falha na resposta da rede');
+            
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            
+            const link = document.createElement('a');
+            link.href = objectUrl;
+            link.download = `synergy-ai-${image.id}.${image.format || 'png'}`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            URL.revokeObjectURL(objectUrl);
+        } catch (error) {
+            console.error("Erro ao baixar a imagem:", error);
+            toast({
+                title: "Não foi possível baixar automaticamente",
+                description: "Abrindo imagem em nova aba. Use 'Salvar como...' para baixar.",
+                variant: "destructive",
+            });
+            window.open(imageUrl, '_blank', 'noopener,noreferrer');
+        }
+    }, [toast]);
 
     const shareImage = async (image: DatabaseImage) => {
         const { data: publicData } = supabase.storage.from('images').getPublicUrl(image.image_path);
@@ -418,9 +441,9 @@ const ImagePage = () => {
                                               Imagem
                                             </Label>
                                           </TooltipTrigger>
-                                           <TooltipContent>
-                                             <p>Disponível nos modelos GPT-Image 1, Ideogram 3.0 e FLUX.1 Kontext</p>
-                                           </TooltipContent>
+                                            <TooltipContent>
+                                              <p>Disponível nos modelos GPT-Image 1, Ideogram 3.0 e FLUX.1 Kontext</p>
+                                            </TooltipContent>
                                         </Tooltip>
                                       </TooltipProvider>
                                     ) : (
@@ -477,17 +500,18 @@ const ImagePage = () => {
                                         <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/80 to-transparent hidden sm:flex items-center justify-between gap-2">
                                             <p className="text-white text-sm truncate flex-1 mr-2">{images[0].prompt}</p>
                                             <div className="flex gap-2">
-                                                <Button size="sm" variant="secondary" onClick={() => downloadImage(images[0])} className="bg-white/20 hover:bg-white/30 text-white border-white/20">
+                                                {/* --- ALTERAÇÃO AQUI ---: Adicionado e.stopPropagation() para evitar que o modal abra ao clicar nos botões */}
+                                                <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); downloadImage(images[0]); }} className="bg-white/20 hover:bg-white/30 text-white border-white/20">
                                                     <Download className="h-4 w-4" />
                                                 </Button>
-                                                <Button size="sm" variant="secondary" onClick={() => shareImage(images[0])} className="bg-white/20 hover:bg-white/30 text-white border-white/20">
+                                                <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); shareImage(images[0]); }} className="bg-white/20 hover:bg-white/30 text-white border-white/20">
                                                     <Share2 className="h-4 w-4" />
                                                 </Button>
-                                                <Button size="sm" variant="secondary" onClick={() => deleteImage(images[0].id, images[0].image_path)} className="bg-red-500/20 hover:bg-red-500/30 text-white border-red-500/20">
+                                                <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); deleteImage(images[0].id, images[0].image_path); }} className="bg-red-500/20 hover:bg-red-500/30 text-white border-red-500/20">
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                                 <Dialog>
-                                                    <DialogTrigger asChild>
+                                                    <DialogTrigger asChild onClick={(e) => e.stopPropagation()}>
                                                         <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-white/20">
                                                             <ZoomIn className="h-4 w-4" />
                                                         </Button>
@@ -500,17 +524,17 @@ const ImagePage = () => {
                                         </div>
                                         <div className="absolute bottom-4 left-4 right-4 sm:hidden">
                                             <div className="flex gap-2 justify-center">
-                                                <Button size="sm" variant="secondary" onClick={() => downloadImage(images[0])} className="bg-white/20 hover:bg-white/30 text-white border-white/20">
+                                                <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); downloadImage(images[0]); }} className="bg-white/20 hover:bg-white/30 text-white border-white/20">
                                                     <Download className="h-4 w-4" />
                                                 </Button>
-                                                <Button size="sm" variant="secondary" onClick={() => shareImage(images[0])} className="bg-white/20 hover:bg-white/30 text-white border-white/20">
+                                                <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); shareImage(images[0]); }} className="bg-white/20 hover:bg-white/30 text-white border-white/20">
                                                     <Share2 className="h-4 w-4" />
                                                 </Button>
-                                                <Button size="sm" variant="secondary" onClick={() => deleteImage(images[0].id, images[0].image_path)} className="bg-red-500/20 hover:bg-red-500/30 text-white border-red-500/20">
+                                                <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); deleteImage(images[0].id, images[0].image_path); }} className="bg-red-500/20 hover:bg-red-500/30 text-white border-red-500/20">
                                                     <Trash2 className="h-4 w-4" />
                                                 </Button>
                                                 <Dialog>
-                                                    <DialogTrigger asChild>
+                                                    <DialogTrigger asChild onClick={(e) => e.stopPropagation()}>
                                                         <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 text-white border-white/20">
                                                             <ZoomIn className="h-4 w-4" />
                                                         </Button>
