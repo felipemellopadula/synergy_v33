@@ -34,6 +34,18 @@ const KONTEXT_QUALITY_SETTINGS = [
     { id: "9:21", label: "9:21 (Ultra-Tall / Portrait)", width: 656, height: 1536, steps: 15 },
 ];
 
+const IDEOGRAM_QUALITY_SETTINGS = [
+    { id: "1:1", label: "1:1 (Square)", width: 1024, height: 1024, steps: 15 },
+    { id: "21:10", label: "21:10 (Ultra-Wide / Landscape)", width: 1600, height: 762, steps: 15 },
+    { id: "16:13", label: "16:13 (Wide / Landscape)", width: 1280, height: 1040, steps: 15 },
+    { id: "4:3", label: "4:3 (Standard / Landscape)", width: 1024, height: 768, steps: 15 },
+    { id: "3:2", label: "3:2 (Classic / Landscape)", width: 1536, height: 1024, steps: 15 },
+    { id: "2:3", label: "2:3 (Classic / Portrait)", width: 1024, height: 1536, steps: 15 },
+    { id: "3:4", label: "3:4 (Standard / Portrait)", width: 768, height: 1024, steps: 15 },
+    { id: "13:16", label: "13:16 (Tall / Portrait)", width: 1040, height: 1280, steps: 15 },
+    { id: "10:21", label: "10:21 (Ultra-Tall / Portrait)", width: 762, height: 1600, steps: 15 },
+];
+
 const MODELS = [
     { id: "openai:1@1", label: "Gpt-Image 1" },
     { id: "ideogram:4@1", label: "Ideogram 3.0" },
@@ -67,12 +79,16 @@ const ImagePage = () => {
     const [isLoadingHistory, setIsLoadingHistory] = useState(true);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     
-    // Habilita anexo apenas para GPT
-    const canAttachImage = useMemo(() => model === "openai:1@1", [model]);
+    // Habilita anexo para GPT, Ideogram e Kontext
+    const canAttachImage = useMemo(() => 
+        model === "openai:1@1" || model === "ideogram:4@1" || model === "bfl:3@1", 
+        [model]);
     
     // Seleciona as configurações de qualidade baseado no modelo
     const availableQualitySettings = useMemo(() => {
-        return model === "bfl:3@1" ? KONTEXT_QUALITY_SETTINGS : QUALITY_SETTINGS;
+        if (model === "bfl:3@1") return KONTEXT_QUALITY_SETTINGS;
+        if (model === "ideogram:4@1") return IDEOGRAM_QUALITY_SETTINGS;
+        return QUALITY_SETTINGS;
     }, [model]);
 
     useEffect(() => {
@@ -164,7 +180,7 @@ const ImagePage = () => {
                 height: selectedQualityInfo.height, 
                 numberResults: 1, 
                 outputFormat: "PNG", 
-                ...(inputImageBase64 && model === "openai:1@1" ? { inputImage: inputImageBase64 } : {}), 
+                ...(inputImageBase64 && (model === "openai:1@1" || model === "ideogram:4@1" || model === "bfl:3@1") ? { inputImage: inputImageBase64 } : {}),
             };
             
             const { data: apiData, error: apiError } = await supabase.functions.invoke('generate-image', { body });
@@ -324,7 +340,9 @@ const ImagePage = () => {
                                     </Select>
                                 </div>
                                 <div className="md:col-span-2">
-                                    <Label>{model === "bfl:3@1" ? "Formato" : "Qualidade"}</Label>
+                                    <Label>
+                                        {model === "bfl:3@1" || model === "ideogram:4@1" ? "Formato" : "Qualidade"}
+                                    </Label>
                                     <Select value={quality} onValueChange={setQuality}>
                                         <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
@@ -354,9 +372,9 @@ const ImagePage = () => {
                                               Imagem
                                             </Label>
                                           </TooltipTrigger>
-                                          <TooltipContent>
-                                            <p>Disponível apenas no modelo GPT-Image 1</p>
-                                          </TooltipContent>
+                                           <TooltipContent>
+                                             <p>Disponível nos modelos GPT-Image 1, Ideogram 3.0 e FLUX.1 Kontext</p>
+                                           </TooltipContent>
                                         </Tooltip>
                                       </TooltipProvider>
                                     ) : (
