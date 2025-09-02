@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Profile {
@@ -43,6 +44,7 @@ interface AuthProviderProps {
 }
 
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
+  const navigate = useNavigate();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -212,13 +214,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           
           // Redirect to dashboard only for explicit sign-in events
           if (event === 'SIGNED_IN' && window.location.pathname === '/') {
-            window.location.href = '/dashboard';
+            setTimeout(() => navigate('/dashboard', { replace: true }), 100);
           }
         } else {
           setProfile(null);
           // Only redirect if explicitly signed out
           if (event === 'SIGNED_OUT' && window.location.pathname !== '/') {
-            window.location.replace('/');
+            setTimeout(() => navigate('/', { replace: true }), 100);
           }
         }
       }
@@ -303,14 +305,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       
       console.log('Logout completed, redirecting...');
       
-      // Redirecionamento forçado
-      window.location.href = '/';
+      // Redirecionamento usando React Router
+      setTimeout(() => navigate('/', { replace: true }), 300);
     } catch (error) {
       console.error('Error signing out:', error);
       // Forçar limpeza em caso de erro
       localStorage.clear();
       sessionStorage.clear();
-      window.location.href = '/';
+      setTimeout(() => navigate('/', { replace: true }), 100);
     }
   };
 
