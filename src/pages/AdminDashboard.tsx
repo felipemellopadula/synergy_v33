@@ -25,14 +25,19 @@ interface AdminStats {
   totalTokens: number;
 }
 
-// OpenAI pricing (per million tokens)
+// OpenAI pricing (per million tokens) - Updated from official table
 const OPENAI_PRICING: Record<string, { input: number; output: number }> = {
-  'gpt-5': { input: 30.0, output: 120.0 },
-  'gpt-4.1': { input: 30.0, output: 120.0 },
-  'o4': { input: 30.0, output: 120.0 },
-  'gpt-4o': { input: 5.0, output: 15.0 },
-  'gpt-4o-mini': { input: 0.15, output: 0.6 }, // SynergyAi uses gpt-4o-mini
+  'gpt-5': { input: 1.25, output: 10.0 },
+  'gpt-5-mini': { input: 0.25, output: 2.0 },
+  'gpt-5-nano': { input: 0.05, output: 0.4 },
+  'gpt-4.1': { input: 3.0, output: 12.0 },
+  'gpt-4.1-mini': { input: 0.8, output: 3.2 },
+  'gpt-4.1-nano': { input: 0.2, output: 0.8 },
+  'o4-mini': { input: 4.0, output: 16.0 },
+  'gpt-4o-mini': { input: 0.15, output: 0.6 },
   'synergyai': { input: 0.15, output: 0.6 }, // Map SynergyAi to gpt-4o-mini pricing
+  // Legacy models
+  'gpt-4o': { input: 5.0, output: 15.0 },
   'gpt-4': { input: 30.0, output: 60.0 },
   'gpt-3.5-turbo': { input: 3.0, output: 6.0 }
 };
@@ -126,6 +131,10 @@ const AdminDashboard = () => {
 
     if (!authLoading) {
       fetchAdminData();
+      
+      // Auto-refresh every 30 seconds for real-time updates
+      const interval = setInterval(fetchAdminData, 30000);
+      return () => clearInterval(interval);
     }
   }, [isAdmin, authLoading, user]);
 
@@ -191,6 +200,10 @@ const AdminDashboard = () => {
           <Shield className="h-4 w-4" />
           <AlertDescription>
             Dashboard administrativo com visão completa de todos os custos e receitas do hub.
+            <br />
+            <span className="text-xs text-muted-foreground">
+              • Conversão: 4 caracteres = 1 token • Margem de lucro: 200% (3x custo) • Atualização automática a cada 30s
+            </span>
           </AlertDescription>
         </Alert>
 
