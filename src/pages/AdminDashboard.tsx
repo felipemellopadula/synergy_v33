@@ -153,8 +153,8 @@ const AdminDashboard = () => {
     if (!authLoading && isAdmin) {
       fetchAdminData();
       
-      // Auto-refresh every 5 seconds for real-time updates
-      const interval = setInterval(fetchAdminData, 5000);
+      // Auto-refresh every 30 seconds (reduced from 5s to improve performance)
+      const interval = setInterval(fetchAdminData, 30000);
       return () => clearInterval(interval);
     }
   }, [isAdmin, authLoading, user]);

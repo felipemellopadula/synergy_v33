@@ -173,21 +173,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         if (needsNameUpdate) updates.name = desiredName;
         if (needsAvatarUpdate) updates.avatar_url = desiredAvatar;
         
-        setTimeout(() => {
-          supabase
-            .from('profiles')
-            .update(updates)
-            .eq('id', userId)
-            .select('*')
-            .single()
-            .then(({ data: updated, error: updateError }) => {
-              if (updateError) {
-                console.error('Error updating profile:', updateError);
-              } else if (updated) {
-                setProfile(updated);
-              }
-            });
-        }, 0);
+        supabase
+          .from('profiles')
+          .update(updates)
+          .eq('id', userId)
+          .select('*')
+          .single()
+          .then(({ data: updated, error: updateError }) => {
+            if (updateError) {
+              console.error('Error updating profile:', updateError);
+            } else if (updated) {
+              setProfile(updated);
+            }
+          });
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
@@ -203,28 +201,26 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     let mounted = true;
 
+    // Set loading false immediately to start rendering
+    setLoading(false);
+
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!mounted) return;
         
-        console.log('Auth state change:', event, session?.user?.email);
-        
         setSession(session);
         setUser(session?.user ?? null);
-        setLoading(false); // Set loading false here after auth state is known
         
         if (session?.user && event !== 'SIGNED_OUT') {
-          setTimeout(() => {
-            fetchProfile(session.user.id, session.user);
-          }, 0);
+          fetchProfile(session.user.id, session.user);
           
           // Redirect to dashboard only for explicit sign-in events
           if (event === 'SIGNED_IN' && window.location.pathname === '/') {
             if (navigate) {
-              setTimeout(() => navigate('/dashboard', { replace: true }), 100);
+              navigate('/dashboard', { replace: true });
             } else {
-              setTimeout(() => window.location.replace('/dashboard'), 100);
+              window.location.replace('/dashboard');
             }
           }
         } else {
@@ -232,28 +228,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           // Only redirect if explicitly signed out
           if (event === 'SIGNED_OUT' && window.location.pathname !== '/') {
             if (navigate) {
-              setTimeout(() => navigate('/', { replace: true }), 100);
+              navigate('/', { replace: true });
             } else {
-              setTimeout(() => window.location.replace('/'), 100);
+              window.location.replace('/');
             }
           }
         }
       }
     );
 
-    // Check for existing session in background
+    // Check for existing session asynchronously
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
       
-      console.log('Initial session check:', session?.user?.email || 'No user');
       setSession(session);
       setUser(session?.user ?? null);
-      setLoading(false); // Set loading false after initial check
       
       if (session?.user) {
-        setTimeout(() => {
-          fetchProfile(session.user.id, session.user);
-        }, 0);
+        fetchProfile(session.user.id, session.user);
       }
     });
 

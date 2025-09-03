@@ -249,7 +249,22 @@ const Index = () => {
   }, []);
 
 
-  // Removed loading check - page loads immediately without waiting for auth
+  // Pre-connect to critical domains for faster loading
+  useEffect(() => {
+    const preconnects = [
+      'https://myqgnnqltemfpzdxwybj.supabase.co',
+      'https://fonts.googleapis.com',
+      'https://fonts.gstatic.com'
+    ];
+    
+    preconnects.forEach(href => {
+      const link = document.createElement('link');
+      link.rel = 'preconnect';
+      link.href = href;
+      link.crossOrigin = 'anonymous';
+      document.head.appendChild(link);
+    });
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">

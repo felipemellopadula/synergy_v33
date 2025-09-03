@@ -25,14 +25,8 @@ const Dashboard = () => {
     document.title = "Synergy Ai Hub";
   }, []);
 
-  // Show loading state while user is being fetched
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  // Render immediately, auth check is handled by ProtectedRoute
+  // No need to wait for user data to render the UI
 
   const handleSignOut = async () => {
     try {
