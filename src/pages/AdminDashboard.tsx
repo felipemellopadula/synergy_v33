@@ -116,21 +116,22 @@ const AdminDashboard = () => {
 
   useEffect(() => {
     const fetchAdminData = async () => {
-      if (!isAdmin && user !== null) return;
-
       try {
-        console.log('Fetching admin data...');
-        // Fetch all token usage data
-        const { data: allUsage, error } = await supabase
-          .from('token_usage')
-          .select('*')
-          .order('created_at', { ascending: false });
+        console.log('Fetching admin data via edge function...');
+        
+        // Call the admin-data edge function that bypasses RLS
+        const { data: response, error } = await supabase.functions.invoke('admin-data');
 
         if (error) {
-          console.error('Supabase error:', error);
+          console.error('Function error:', error);
           throw error;
         }
 
+        if (!response.success) {
+          throw new Error(response.error);
+        }
+
+        const allUsage = response.data;
         console.log('Token usage data fetched:', allUsage?.length, 'records');
 
         if (allUsage) {
@@ -144,11 +145,11 @@ const AdminDashboard = () => {
       }
     };
 
-    if (!authLoading) {
+    if (!authLoading && isAdmin) {
       fetchAdminData();
       
-      // Auto-refresh every 10 seconds for real-time updates
-      const interval = setInterval(fetchAdminData, 10000);
+      // Auto-refresh every 5 seconds for real-time updates
+      const interval = setInterval(fetchAdminData, 5000);
       return () => clearInterval(interval);
     }
   }, [isAdmin, authLoading, user]);
@@ -228,7 +229,7 @@ const AdminDashboard = () => {
             Dashboard administrativo com visão completa de todos os custos e receitas do hub.
             <br />
             <span className="text-xs text-muted-foreground">
-              • Conversão: 4 caracteres = 1 token • Margem de lucro: 200% (3x custo) • Atualização automática a cada 30s
+              • Conversão: 4 caracteres = 1 token • Margem de lucro: 200% (3x custo) • Atualização automática a cada 5s
             </span>
           </AlertDescription>
         </Alert>
