@@ -263,22 +263,22 @@ const AdminDashboard = () => {
                   return (
                     <div key={usage.id} className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
                       <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-4 mb-2">
                           <span className="font-medium text-sm">{usage.model_name}</span>
                           <span className="text-xs text-muted-foreground">
                             {tokens.toLocaleString()} tokens
                           </span>
+                          <span className="text-xs text-muted-foreground">
+                            {messageLength.toLocaleString()} caracteres
+                          </span>
                         </div>
-                        <p className="text-xs text-muted-foreground truncate max-w-md">
-                          {usage.message_content || 'Sem conteúdo'}
-                        </p>
                       </div>
                       <div className="text-right">
                         <div className="text-sm font-medium text-primary">
                           +${profit.toFixed(4)}
                         </div>
                         <div className="text-xs text-muted-foreground">
-                          ${cost.toFixed(4)} → ${revenue.toFixed(4)}
+                          Custo: ${cost.toFixed(4)} → Receita: ${revenue.toFixed(4)}
                         </div>
                       </div>
                     </div>
