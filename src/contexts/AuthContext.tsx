@@ -201,22 +201,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   useEffect(() => {
     let mounted = true;
 
-    // Set loading false immediately to start rendering
-    setLoading(false);
-
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!mounted) return;
         
+        console.log('Auth state change:', event, session?.user?.id);
+        
         setSession(session);
         setUser(session?.user ?? null);
+        setLoading(false);
         
         if (session?.user && event !== 'SIGNED_OUT') {
           fetchProfile(session.user.id, session.user);
           
-          // Redirect to dashboard only for explicit sign-in events
-          if (event === 'SIGNED_IN' && window.location.pathname === '/') {
+          // Redirect to dashboard for sign-in events or if on homepage with session
+          if ((event === 'SIGNED_IN' || (event === 'TOKEN_REFRESHED' && window.location.pathname === '/')) && 
+              (window.location.pathname === '/' || window.location.pathname === '/auth')) {
+            console.log('Redirecting to dashboard...');
             if (navigate) {
               navigate('/dashboard', { replace: true });
             } else {
@@ -241,11 +243,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!mounted) return;
       
+      console.log('Initial session check:', session?.user?.id);
+      
       setSession(session);
       setUser(session?.user ?? null);
+      setLoading(false);
       
       if (session?.user) {
         fetchProfile(session.user.id, session.user);
+        
+        // If user has session and is on homepage, redirect to dashboard
+        if (window.location.pathname === '/' || window.location.pathname === '/auth') {
+          console.log('Initial redirect to dashboard...');
+          if (navigate) {
+            navigate('/dashboard', { replace: true });
+          } else {
+            window.location.replace('/dashboard');
+          }
+        }
       }
     });
 
