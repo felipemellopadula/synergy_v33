@@ -86,6 +86,39 @@ export type Database = {
         }
         Relationships: []
       }
+      storage_cleanup_logs: {
+        Row: {
+          created_at: string | null
+          deleted_files: number | null
+          errors: string[] | null
+          freed_space_mb: number | null
+          id: string
+          success: boolean | null
+          total_files: number | null
+          triggered_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          deleted_files?: number | null
+          errors?: string[] | null
+          freed_space_mb?: number | null
+          id?: string
+          success?: boolean | null
+          total_files?: number | null
+          triggered_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          deleted_files?: number | null
+          errors?: string[] | null
+          freed_space_mb?: number | null
+          id?: string
+          success?: boolean | null
+          total_files?: number | null
+          triggered_by?: string | null
+        }
+        Relationships: []
+      }
       token_usage: {
         Row: {
           created_at: string | null
