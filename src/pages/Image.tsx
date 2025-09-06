@@ -55,8 +55,7 @@ const MODELS = [
     { id: "ideogram:4@1", label: "Ideogram 3.0" },
     { id: "runware:108@1", label: "Qwen-Image" },
     { id: "bfl:3@1", label: "FLUX.1 Kontext [max]" },
-  { id: "google:4@1", label: "Gemini Flash Image 2.5" },
-  
+    { id: "google:4@1", label: "Gemini Flash Image 2.5" },
 ];
 
 const MAX_IMAGES_TO_FETCH = 10;
