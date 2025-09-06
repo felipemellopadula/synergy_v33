@@ -1,16 +1,27 @@
-import { StrictMode } from "react";
+import { StrictMode, lazy, Suspense } from "react";
 import { createRoot } from 'react-dom/client'
-import App from './App.tsx'
 import './index.css'
-import { AuthProvider } from "@/contexts/AuthContext";
-import { ThemeProvider } from "next-themes";
+
+// Lazy load heavy providers and app to reduce initial bundle
+const ThemeProvider = lazy(() => import("next-themes").then(m => ({ default: m.ThemeProvider })));
+const AuthProvider = lazy(() => import("@/contexts/AuthContext").then(m => ({ default: m.AuthProvider })));
+const App = lazy(() => import('./App.tsx'));
+
+// Minimal loading fallback
+const AppLoader = () => (
+  <div className="min-h-screen bg-background flex items-center justify-center">
+    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+  </div>
+);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
-    </ThemeProvider>
+    <Suspense fallback={<AppLoader />}>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </ThemeProvider>
+    </Suspense>
   </StrictMode>
 );
