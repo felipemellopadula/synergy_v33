@@ -175,8 +175,8 @@ const Index = () => {
 
   // Logo único (evita baixar 2 imagens no topo). Mantém troca de tema.
   const logoSrc = isLight
-    ? "/images/logo-light-32px.webp"
-    : "/images/logo-dark-32px.webp";
+    ? "/lovable-uploads/5e06d662-7533-4ca8-a35e-3167dc0f31e6.png"
+    : "/lovable-uploads/76f92d5d-608b-47a5-a829-bdb436a60274.png";
 
   const handlePrimaryCta = useCallback(() => {
     if (user) navigate("/dashboard");
@@ -209,8 +209,8 @@ const Index = () => {
       otherLogo.decoding = "async";
       otherLogo.loading = "lazy";
       otherLogo.src = isLight
-        ? "/images/logo-dark-32px.webp"
-        : "/images/logo-light-32px.webp";
+        ? "/lovable-uploads/76f92d5d-608b-47a5-a829-bdb436a60274.png"
+        : "/lovable-uploads/5e06d662-7533-4ca8-a35e-3167dc0f31e6.png";
 
       // Metas
       const setMeta = (name: string, content: string) => {
