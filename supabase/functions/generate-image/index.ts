@@ -46,20 +46,28 @@ serve(async (req) => {
       }
     }
 
-    // Resolver dimensões
+    const model: string = (typeof body.model === 'string' && body.model.trim()) ? body.model : 'runware:100@1';
+    
+    // Resolver dimensões baseado no modelo
     let width = 1024;
     let height = 1024;
-    if (typeof body.size === 'string' && /^(\d+)x(\d+)$/.test(body.size)) {
-      const [w, h] = body.size.split('x').map((v: string) => parseInt(v, 10));
-      if (Number.isFinite(w) && Number.isFinite(h)) {
-        width = w; height = h;
+    
+    // Modelos Google (como google:4@1 - Gemini Flash) não suportam width/height
+    const isGoogleModel = model.startsWith('google:');
+    
+    if (!isGoogleModel) {
+      // Apenas definir dimensões para modelos que suportam
+      if (typeof body.size === 'string' && /^(\d+)x(\d+)$/.test(body.size)) {
+        const [w, h] = body.size.split('x').map((v: string) => parseInt(v, 10));
+        if (Number.isFinite(w) && Number.isFinite(h)) {
+          width = w; height = h;
+        }
+      } else {
+        if (Number.isFinite(body.width)) width = Math.max(64, Math.min(2048, Number(body.width)));
+        if (Number.isFinite(body.height)) height = Math.max(64, Math.min(2048, Number(body.height)));
       }
-    } else {
-      if (Number.isFinite(body.width)) width = Math.max(64, Math.min(2048, Number(body.width)));
-      if (Number.isFinite(body.height)) height = Math.max(64, Math.min(2048, Number(body.height)));
     }
 
-    const model: string = (typeof body.model === 'string' && body.model.trim()) ? body.model : 'runware:100@1';
     const numberResults: number = Math.max(1, Math.min(4, Number(body.numberResults) || 1));
     // A Runware costuma retornar WEBP por padrão; manter WEBP para desempenho
     const outputFormat: string = (typeof body.outputFormat === 'string' && body.outputFormat) || 'WEBP';
@@ -76,19 +84,26 @@ serve(async (req) => {
       }
     }
 
+    // Preparar o objeto de inferência baseado no modelo
+    const inferenceObject: any = {
+      taskType: 'imageInference',
+      taskUUID,
+      positivePrompt: prompt,
+      model,
+      numberResults,
+      outputFormat,
+      ...attach,
+    };
+
+    // Apenas adicionar width/height para modelos que suportam
+    if (!isGoogleModel) {
+      inferenceObject.width = width;
+      inferenceObject.height = height;
+    }
+
     const tasks: any[] = [
       { taskType: 'authentication', apiKey: RUNWARE_API_KEY },
-      {
-        taskType: 'imageInference',
-        taskUUID,
-        positivePrompt: prompt,
-        width,
-        height,
-        model,
-        numberResults,
-        outputFormat,
-        ...attach,
-      },
+      inferenceObject,
     ];
 
     const rwRes = await fetch('https://api.runware.ai/v1', {
