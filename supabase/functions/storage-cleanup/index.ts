@@ -8,8 +8,42 @@ const corsHeaders = {
 interface CleanupStats {
   totalFiles: number
   deletedFiles: number
-  freedSpace: number
+  freedSpaceMB: number
   errors: string[]
+  processedBuckets: string[]
+  skippedFiles: number
+}
+
+interface BucketStats {
+  name: string
+  totalFiles: number
+  oldFiles: number
+  deletedFiles: number
+  freedSpaceMB: number
+  errors: string[]
+}
+
+async function logCleanupToDatabase(supabase: any, stats: CleanupStats, success: boolean, triggeredBy: string) {
+  try {
+    const { error } = await supabase
+      .from('storage_cleanup_logs')
+      .insert({
+        total_files: stats.totalFiles,
+        deleted_files: stats.deletedFiles,
+        freed_space_mb: stats.freedSpaceMB,
+        errors: stats.errors,
+        success: success,
+        triggered_by: triggeredBy
+      })
+    
+    if (error) {
+      console.error('Failed to log cleanup to database:', error)
+    } else {
+      console.log('Cleanup logged to database successfully')
+    }
+  } catch (error) {
+    console.error('Error logging cleanup to database:', error)
+  }
 }
 
 Deno.serve(async (req) => {
@@ -18,11 +52,23 @@ Deno.serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
 
+  const startTime = Date.now()
+  const body = req.method === 'POST' ? await req.json().catch(() => ({})) : {}
+  const triggeredBy = body.triggered_by || 'cron'
+  
+  console.log(`=== Storage Cleanup Started ===`)
+  console.log(`Triggered by: ${triggeredBy}`)
+  console.log(`Start time: ${new Date().toISOString()}`)
+
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (!supabaseUrl || !supabaseKey) {
+      throw new Error('Missing Supabase environment variables')
+    }
+
+    const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
     const buckets = ['images', 'documents', 'user-videos', 'video-refs']
     const cutoffDate = new Date()
@@ -31,134 +77,288 @@ Deno.serve(async (req) => {
     let totalStats: CleanupStats = {
       totalFiles: 0,
       deletedFiles: 0,
-      freedSpace: 0,
-      errors: []
+      freedSpaceMB: 0,
+      errors: [],
+      processedBuckets: [],
+      skippedFiles: 0
     }
 
-    console.log(`Starting storage cleanup for files older than ${cutoffDate.toISOString()}`)
+    console.log(`Target cutoff date: ${cutoffDate.toISOString()}`)
+    console.log(`Processing ${buckets.length} buckets: ${buckets.join(', ')}`)
 
     for (const bucketName of buckets) {
-      console.log(`Processing bucket: ${bucketName}`)
+      const bucketStartTime = Date.now()
+      console.log(`\n--- Processing bucket: ${bucketName} ---`)
+      
+      let bucketStats: BucketStats = {
+        name: bucketName,
+        totalFiles: 0,
+        oldFiles: 0,
+        deletedFiles: 0,
+        freedSpaceMB: 0,
+        errors: []
+      }
       
       try {
-        // List all files in bucket
-        const { data: files, error: listError } = await supabaseClient.storage
-          .from(bucketName)
-          .list('', {
-            limit: 1000,
-            sortBy: { column: 'created_at', order: 'asc' }
-          })
+        // List all files in bucket with pagination
+        let allFiles: any[] = []
+        let offset = 0
+        const batchSize = 1000
+        
+        while (true) {
+          console.log(`Fetching files from ${bucketName}, offset: ${offset}`)
+          
+          const { data: files, error: listError } = await supabaseClient.storage
+            .from(bucketName)
+            .list('', {
+              limit: batchSize,
+              offset: offset,
+              sortBy: { column: 'created_at', order: 'asc' }
+            })
 
-        if (listError) {
-          console.error(`Error listing files in ${bucketName}:`, listError)
-          totalStats.errors.push(`Error listing ${bucketName}: ${listError.message}`)
-          continue
+          if (listError) {
+            const errorMsg = `Error listing files in ${bucketName} at offset ${offset}: ${listError.message}`
+            console.error(errorMsg)
+            bucketStats.errors.push(errorMsg)
+            totalStats.errors.push(errorMsg)
+            break
+          }
+
+          if (!files || files.length === 0) {
+            break
+          }
+
+          allFiles = allFiles.concat(files)
+          offset += batchSize
+
+          if (files.length < batchSize) {
+            break // No more files to fetch
+          }
         }
 
-        if (!files || files.length === 0) {
+        bucketStats.totalFiles = allFiles.length
+        totalStats.totalFiles += allFiles.length
+        
+        if (allFiles.length === 0) {
           console.log(`No files found in bucket ${bucketName}`)
+          totalStats.processedBuckets.push(bucketName)
           continue
         }
 
-        totalStats.totalFiles += files.length
-        console.log(`Found ${files.length} files in ${bucketName}`)
+        console.log(`Total files found in ${bucketName}: ${allFiles.length}`)
 
         // Filter files older than cutoff date
-        const filesToDelete = files.filter(file => {
+        const filesToDelete = allFiles.filter(file => {
+          if (!file.created_at) {
+            console.warn(`File ${file.name} has no created_at timestamp, skipping`)
+            totalStats.skippedFiles++
+            return false
+          }
+          
           const fileDate = new Date(file.created_at)
-          return fileDate < cutoffDate
+          const isOld = fileDate < cutoffDate
+          
+          if (isOld) {
+            console.log(`File to delete: ${file.name} (created: ${fileDate.toISOString()})`)
+          }
+          
+          return isOld
         })
 
-        console.log(`Found ${filesToDelete.length} files to delete in ${bucketName}`)
+        bucketStats.oldFiles = filesToDelete.length
+        console.log(`Files eligible for deletion in ${bucketName}: ${filesToDelete.length}`)
 
         if (filesToDelete.length === 0) {
+          console.log(`No old files to delete in ${bucketName}`)
+          totalStats.processedBuckets.push(bucketName)
           continue
         }
 
-        // Delete files in batches of 50
-        const batchSize = 50
-        for (let i = 0; i < filesToDelete.length; i += batchSize) {
-          const batch = filesToDelete.slice(i, i + batchSize)
+        // Delete files in smaller batches with better error handling
+        const deleteBatchSize = 25 // Reduced batch size for more reliable deletion
+        console.log(`Starting deletion of ${filesToDelete.length} files in batches of ${deleteBatchSize}`)
+        
+        for (let i = 0; i < filesToDelete.length; i += deleteBatchSize) {
+          const batch = filesToDelete.slice(i, i + deleteBatchSize)
           const pathsToDelete = batch.map(file => file.name)
+          const batchNumber = Math.floor(i / deleteBatchSize) + 1
+          const totalBatches = Math.ceil(filesToDelete.length / deleteBatchSize)
 
-          console.log(`Deleting batch of ${pathsToDelete.length} files from ${bucketName}`)
+          console.log(`Deleting batch ${batchNumber}/${totalBatches}: ${pathsToDelete.length} files from ${bucketName}`)
+          console.log(`Files in batch: ${pathsToDelete.slice(0, 3).join(', ')}${pathsToDelete.length > 3 ? '...' : ''}`)
 
-          const { error: deleteError } = await supabaseClient.storage
-            .from(bucketName)
-            .remove(pathsToDelete)
+          try {
+            const { data: deleteResult, error: deleteError } = await supabaseClient.storage
+              .from(bucketName)
+              .remove(pathsToDelete)
 
-          if (deleteError) {
-            console.error(`Error deleting batch from ${bucketName}:`, deleteError)
-            totalStats.errors.push(`Error deleting batch from ${bucketName}: ${deleteError.message}`)
-          } else {
-            totalStats.deletedFiles += pathsToDelete.length
-            // Estimate freed space (rough calculation based on file metadata)
-            const estimatedSize = batch.reduce((sum, file) => sum + (file.metadata?.size || 1000000), 0)
-            totalStats.freedSpace += estimatedSize
-            console.log(`Successfully deleted ${pathsToDelete.length} files from ${bucketName}`)
+            if (deleteError) {
+              const errorMsg = `Error deleting batch ${batchNumber} from ${bucketName}: ${deleteError.message}`
+              console.error(errorMsg)
+              bucketStats.errors.push(errorMsg)
+              totalStats.errors.push(errorMsg)
+              
+              // Try individual file deletion for failed batch
+              console.log(`Attempting individual deletion for failed batch ${batchNumber}`)
+              for (const path of pathsToDelete) {
+                try {
+                  const { error: singleError } = await supabaseClient.storage
+                    .from(bucketName)
+                    .remove([path])
+                  
+                  if (!singleError) {
+                    bucketStats.deletedFiles++
+                    totalStats.deletedFiles++
+                    console.log(`Successfully deleted individual file: ${path}`)
+                  } else {
+                    console.error(`Failed to delete individual file ${path}:`, singleError)
+                  }
+                } catch (singleDeleteError) {
+                  console.error(`Exception deleting individual file ${path}:`, singleDeleteError)
+                }
+                
+                // Small delay between individual deletions
+                await new Promise(resolve => setTimeout(resolve, 50))
+              }
+            } else {
+              bucketStats.deletedFiles += pathsToDelete.length
+              totalStats.deletedFiles += pathsToDelete.length
+              
+              // Calculate freed space more accurately
+              const estimatedSize = batch.reduce((sum, file) => {
+                const size = file.metadata?.size || 500000 // 500KB default estimate
+                return sum + size
+              }, 0)
+              
+              const freedMB = estimatedSize / (1024 * 1024)
+              bucketStats.freedSpaceMB += freedMB
+              totalStats.freedSpaceMB += freedMB
+              
+              console.log(`✓ Successfully deleted batch ${batchNumber}: ${pathsToDelete.length} files, ~${freedMB.toFixed(2)}MB`)
+            }
+          } catch (batchError) {
+            const errorMsg = `Exception deleting batch ${batchNumber} from ${bucketName}: ${batchError.message}`
+            console.error(errorMsg)
+            bucketStats.errors.push(errorMsg)
+            totalStats.errors.push(errorMsg)
           }
 
-          // Small delay between batches to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 100))
+          // Delay between batches to avoid rate limiting
+          await new Promise(resolve => setTimeout(resolve, 200))
         }
 
-        // Clean up database records for deleted images
-        if (bucketName === 'images' && filesToDelete.length > 0) {
-          const imagePaths = filesToDelete.map(file => file.name)
-          const { error: dbError } = await supabaseClient
-            .from('user_images')
-            .delete()
-            .in('image_path', imagePaths)
+        // Clean up database records for successfully deleted files
+        if (bucketStats.deletedFiles > 0) {
+          console.log(`Cleaning up database records for ${bucketName}`)
+          
+          if (bucketName === 'images') {
+            try {
+              const deletedPaths = filesToDelete.slice(0, bucketStats.deletedFiles).map(file => file.name)
+              const { error: dbError } = await supabaseClient
+                .from('user_images')
+                .delete()
+                .in('image_path', deletedPaths)
 
-          if (dbError) {
-            console.error('Error cleaning up user_images records:', dbError)
-            totalStats.errors.push(`Error cleaning user_images: ${dbError.message}`)
-          } else {
-            console.log(`Cleaned up ${imagePaths.length} user_images records`)
+              if (dbError) {
+                const errorMsg = `Error cleaning up user_images records: ${dbError.message}`
+                console.error(errorMsg)
+                bucketStats.errors.push(errorMsg)
+                totalStats.errors.push(errorMsg)
+              } else {
+                console.log(`✓ Cleaned up ${deletedPaths.length} user_images database records`)
+              }
+            } catch (dbCleanupError) {
+              const errorMsg = `Exception cleaning user_images records: ${dbCleanupError.message}`
+              console.error(errorMsg)
+              bucketStats.errors.push(errorMsg)
+              totalStats.errors.push(errorMsg)
+            }
+          }
+
+          if (bucketName === 'user-videos') {
+            try {
+              const deletedPaths = filesToDelete.slice(0, bucketStats.deletedFiles).map(file => file.name)
+              const videoUrls = deletedPaths.map(path => `${bucketName}/${path}`)
+              
+              const { error: dbError } = await supabaseClient
+                .from('user_videos')
+                .delete()
+                .in('video_url', videoUrls)
+
+              if (dbError) {
+                const errorMsg = `Error cleaning up user_videos records: ${dbError.message}`
+                console.error(errorMsg)
+                bucketStats.errors.push(errorMsg)
+                totalStats.errors.push(errorMsg)
+              } else {
+                console.log(`✓ Cleaned up ${videoUrls.length} user_videos database records`)
+              }
+            } catch (dbCleanupError) {
+              const errorMsg = `Exception cleaning user_videos records: ${dbCleanupError.message}`
+              console.error(errorMsg)
+              bucketStats.errors.push(errorMsg)
+              totalStats.errors.push(errorMsg)
+            }
           }
         }
 
-        // Clean up database records for deleted videos
-        if (bucketName === 'user-videos' && filesToDelete.length > 0) {
-          const videoPaths = filesToDelete.map(file => file.name)
-          const { error: dbError } = await supabaseClient
-            .from('user_videos')
-            .delete()
-            .in('video_url', videoPaths.map(path => `${bucketName}/${path}`))
-
-          if (dbError) {
-            console.error('Error cleaning up user_videos records:', dbError)
-            totalStats.errors.push(`Error cleaning user_videos: ${dbError.message}`)
-          } else {
-            console.log(`Cleaned up ${videoPaths.length} user_videos records`)
-          }
-        }
+        const bucketDuration = Date.now() - bucketStartTime
+        console.log(`--- Bucket ${bucketName} completed in ${bucketDuration}ms ---`)
+        console.log(`Bucket stats: ${bucketStats.totalFiles} total, ${bucketStats.oldFiles} old, ${bucketStats.deletedFiles} deleted, ${bucketStats.freedSpaceMB.toFixed(2)}MB freed, ${bucketStats.errors.length} errors`)
+        
+        totalStats.processedBuckets.push(bucketName)
 
       } catch (error) {
-        console.error(`Unexpected error processing bucket ${bucketName}:`, error)
-        totalStats.errors.push(`Unexpected error in ${bucketName}: ${error.message}`)
+        const errorMsg = `Unexpected error processing bucket ${bucketName}: ${error.message}`
+        console.error(errorMsg)
+        bucketStats.errors.push(errorMsg)
+        totalStats.errors.push(errorMsg)
+        totalStats.processedBuckets.push(`${bucketName} (failed)`)
       }
     }
 
-    // Log final stats
-    console.log('Storage cleanup completed:', {
-      totalFiles: totalStats.totalFiles,
-      deletedFiles: totalStats.deletedFiles,
-      freedSpaceMB: Math.round(totalStats.freedSpace / 1024 / 1024),
-      errorCount: totalStats.errors.length
-    })
+    const totalDuration = Date.now() - startTime
+    const success = totalStats.errors.length === 0
+    
+    // Log comprehensive final stats
+    console.log(`\n=== Storage Cleanup Summary ===`)
+    console.log(`Duration: ${totalDuration}ms (${(totalDuration / 1000).toFixed(1)}s)`)
+    console.log(`Processed buckets: ${totalStats.processedBuckets.join(', ')}`)
+    console.log(`Total files scanned: ${totalStats.totalFiles}`)
+    console.log(`Files deleted: ${totalStats.deletedFiles}`)
+    console.log(`Files skipped: ${totalStats.skippedFiles}`)
+    console.log(`Space freed: ${totalStats.freedSpaceMB.toFixed(2)}MB`)
+    console.log(`Errors: ${totalStats.errors.length}`)
+    console.log(`Success: ${success}`)
+    
+    if (totalStats.errors.length > 0) {
+      console.log(`Error details:`)
+      totalStats.errors.forEach((error, index) => {
+        console.log(`  ${index + 1}. ${error}`)
+      })
+    }
+
+    // Log to database
+    await logCleanupToDatabase(supabaseClient, totalStats, success, triggeredBy)
 
     const response = {
-      success: true,
-      message: 'Storage cleanup completed',
+      success: success,
+      message: success 
+        ? `Storage cleanup completed successfully. Deleted ${totalStats.deletedFiles} files, freed ${totalStats.freedSpaceMB.toFixed(2)}MB`
+        : `Storage cleanup completed with ${totalStats.errors.length} errors`,
       stats: {
         totalFiles: totalStats.totalFiles,
         deletedFiles: totalStats.deletedFiles,
-        freedSpaceMB: Math.round(totalStats.freedSpace / 1024 / 1024),
-        errors: totalStats.errors
+        freedSpaceMB: parseFloat(totalStats.freedSpaceMB.toFixed(2)),
+        errors: totalStats.errors,
+        processedBuckets: totalStats.processedBuckets,
+        skippedFiles: totalStats.skippedFiles,
+        durationMs: totalDuration
       },
       timestamp: new Date().toISOString()
     }
+
+    console.log(`=== Storage Cleanup Completed ===\n`)
 
     return new Response(JSON.stringify(response), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -166,12 +366,35 @@ Deno.serve(async (req) => {
     })
 
   } catch (error) {
-    console.error('Storage cleanup failed:', error)
+    const duration = Date.now() - startTime
+    console.error('=== Storage cleanup failed ===')
+    console.error(`Duration: ${duration}ms`)
+    console.error('Error:', error)
+    
+    // Try to log failure to database
+    try {
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      )
+      
+      await logCleanupToDatabase(supabaseClient, {
+        totalFiles: 0,
+        deletedFiles: 0,
+        freedSpaceMB: 0,
+        errors: [error.message],
+        processedBuckets: [],
+        skippedFiles: 0
+      }, false, triggeredBy)
+    } catch (logError) {
+      console.error('Failed to log error to database:', logError)
+    }
     
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      durationMs: duration
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
