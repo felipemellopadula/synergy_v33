@@ -188,10 +188,12 @@ const AdminDashboard = () => {
       filteredData = data.filter((usage) => {
         const isGeminiModel = usage.model_name.toLowerCase().includes('gemini');
         const isClaudeModel = usage.model_name.toLowerCase().includes('claude');
+        const isGrokModel = usage.model_name.toLowerCase().includes('grok');
         
         if (providerFilter === 'gemini') return isGeminiModel;
         if (providerFilter === 'claude') return isClaudeModel;
-        return !isGeminiModel && !isClaudeModel; // OpenAI models
+        if (providerFilter === 'grok') return isGrokModel;
+        return !isGeminiModel && !isClaudeModel && !isGrokModel; // OpenAI models
       });
     }
     
