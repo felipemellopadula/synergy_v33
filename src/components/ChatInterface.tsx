@@ -10,6 +10,7 @@ import { PdfProcessor } from "@/utils/PdfProcessor";
 import { WordProcessor } from "@/utils/WordProcessor";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useTokens } from '@/hooks/useTokens';
 
 interface Message {
   id: string;
@@ -30,6 +31,7 @@ interface ChatInterfaceProps {
 }
 
 export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
+  const { checkTokenBalance, consumeTokens } = useTokens();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [selectedModel, setSelectedModel] = useState<string>();
@@ -142,6 +144,12 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
     
     if ((!inputValue.trim() && !fileContent && !attachedFiles.length) || !selectedModel) {
       console.log('Exiting early - missing input or model');
+      return;
+    }
+
+    // Check token balance first
+    const hasTokens = await checkTokenBalance(selectedModel);
+    if (!hasTokens) {
       return;
     }
 
@@ -338,6 +346,9 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
             : msg
         )
       );
+      
+      // Consume tokens after successful response
+      await consumeTokens(selectedModel, messageContent);
       
       // Limpar dados do arquivo após o envio
       clearFileData();

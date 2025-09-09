@@ -63,6 +63,8 @@ serve(async (req) => {
       'gemini-2.5-flash-002': 12000,
       'gemini-2.5-pro-002': 12000,
       'gemini-pro': 12000,
+      'deepseek-chat': 12000,
+      'deepseek-reasoner': 12000,
     }
 
     // For now, use the old flat rate for billing (will be updated to real cost calculation later)
