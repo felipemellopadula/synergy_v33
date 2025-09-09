@@ -1,14 +1,12 @@
-// Minimal landing page that loads only essential code initially
-import { useEffect, useState, useCallback, lazy, Suspense } from "react";
+// Simple landing page without lazy loading to avoid module issues
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
-
-// Load components lazily with proper exports
-const MinimalLanding = lazy(() => import("@/components/MinimalLanding").then(m => ({ default: m.MinimalLanding })));
-const LandingHeader = lazy(() => import("@/components/LandingHeader").then(m => ({ default: m.LandingHeader })));
-const LandingHero = lazy(() => import("@/components/LandingHero").then(m => ({ default: m.LandingHero })));
-const LandingSections = lazy(() => import("@/components/LandingSections"));
-const AuthModal = lazy(() => import("@/components/AuthModal").then(m => ({ default: m.AuthModal })));
+import { MinimalLanding } from "@/components/MinimalLanding";
+import { LandingHeader } from "@/components/LandingHeader";
+import { LandingHero } from "@/components/LandingHero";
+import LandingSections from "@/components/LandingSections";
+import { AuthModal } from "@/components/AuthModal";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -92,49 +90,37 @@ const Index = () => {
   // Show minimal version first for fastest loading
   if (!enhancedVersion) {
     return (
-      <Suspense fallback={
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      }>
-        <MinimalLanding 
-          user={user} 
-          onShowAuth={() => setShowAuthModal(true)} 
-        />
-      </Suspense>
+      <MinimalLanding 
+        user={user} 
+        onShowAuth={() => setShowAuthModal(true)} 
+      />
     );
   }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Suspense fallback={
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      }>
-        <LandingHeader 
-          user={user} 
-          onShowAuth={() => setShowAuthModal(true)} 
+      <LandingHeader 
+        user={user} 
+        onShowAuth={() => setShowAuthModal(true)} 
+      />
+      
+      <main>
+        <LandingHero
+          user={user}
+          onShowAuth={() => setShowAuthModal(true)}
+          onScrollToSection={scrollToSection}
         />
         
-        <main>
-          <LandingHero
-            user={user}
-            onShowAuth={() => setShowAuthModal(true)}
-            onScrollToSection={scrollToSection}
-          />
-          
-          <LandingSections />
-        </main>
+        <LandingSections />
+      </main>
 
-        {/* Auth modal */}
-        {showAuthModal && (
-          <AuthModal 
-            isOpen={showAuthModal} 
-            onClose={() => setShowAuthModal(false)} 
-          />
-        )}
-      </Suspense>
+      {/* Auth modal */}
+      {showAuthModal && (
+        <AuthModal 
+          isOpen={showAuthModal} 
+          onClose={() => setShowAuthModal(false)} 
+        />
+      )}
     </div>
   );
 };
