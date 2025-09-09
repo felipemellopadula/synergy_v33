@@ -154,6 +154,10 @@ const AdminDashboard = () => {
         if (providerFilter === 'claude') return isClaudeModel;
         return !isGeminiModel && !isClaudeModel; // OpenAI models
       });
+      
+      // For individual providers, show only recent transactions (last 50)
+      // to avoid showing accumulated historical costs
+      filteredData = filteredData.slice(0, 50);
     }
     
     console.log('Filtered records:', filteredData.length);
@@ -163,6 +167,7 @@ const AdminDashboard = () => {
     if (providerFilter === 'claude') {
       const claudeModels = filteredData.map(d => d.model_name);
       console.log('Claude models in data:', [...new Set(claudeModels)]);
+      console.log('Processing only last 50 Claude transactions to show recent costs');
     }
     
     let totalCost = 0;
