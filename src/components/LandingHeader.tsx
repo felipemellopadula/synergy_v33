@@ -1,11 +1,7 @@
-import { useState, useEffect, Suspense, lazy } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-
-// Lazy load theme toggle to reduce initial bundle
-const ThemeToggleLazy = lazy(() =>
-  import("@/components/ThemeToggle").then((m) => ({ default: m.ThemeToggle }))
-);
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 interface LandingHeaderProps {
   user: any;
@@ -80,11 +76,7 @@ export const LandingHeader = ({ user, onShowAuth }: LandingHeaderProps) => {
           </a>
         </nav>
         <div className="flex items-center gap-2 sm:gap-3">
-          <Suspense
-            fallback={<div className="h-6 w-10 rounded bg-muted" />}
-          >
-            <ThemeToggleLazy />
-          </Suspense>
+          <ThemeToggle />
           {user ? (
             <Button
               onClick={() => navigate("/dashboard")}
