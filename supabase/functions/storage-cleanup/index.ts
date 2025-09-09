@@ -5,47 +5,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface CleanupStats {
-  totalFiles: number
-  deletedFiles: number
-  freedSpaceMB: number
-  errors: string[]
-  processedBuckets: string[]
-  skippedFiles: number
-}
-
-interface BucketStats {
-  name: string
-  totalFiles: number
-  oldFiles: number
-  deletedFiles: number
-  freedSpaceMB: number
-  errors: string[]
-}
-
-async function logCleanupToDatabase(supabase: any, stats: CleanupStats, success: boolean, triggeredBy: string) {
-  try {
-    const { error } = await supabase
-      .from('storage_cleanup_logs')
-      .insert({
-        total_files: stats.totalFiles,
-        deleted_files: stats.deletedFiles,
-        freed_space_mb: stats.freedSpaceMB,
-        errors: stats.errors,
-        success: success,
-        triggered_by: triggeredBy
-      })
-    
-    if (error) {
-      console.error('Failed to log cleanup to database:', error)
-    } else {
-      console.log('Cleanup logged to database successfully')
-    }
-  } catch (error) {
-    console.error('Error logging cleanup to database:', error)
-  }
-}
-
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -57,10 +16,9 @@ Deno.serve(async (req) => {
   const triggeredBy = body.triggered_by || 'cron'
   const isManualCleanup = triggeredBy === 'admin_manual'
   
-  console.log(`=== Storage Cleanup Started ===`)
+  console.log(`=== AGGRESSIVE STORAGE CLEANUP STARTED ===`)
   console.log(`Triggered by: ${triggeredBy}`)
-  console.log(`Manual cleanup: ${isManualCleanup}`)
-  console.log(`Start time: ${new Date().toISOString()}`)
+  console.log(`Manual cleanup (DELETE EVERYTHING): ${isManualCleanup}`)
 
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
@@ -72,397 +30,229 @@ Deno.serve(async (req) => {
 
     const supabaseClient = createClient(supabaseUrl, supabaseKey)
 
-    // Get ALL available buckets, not just predefined ones
-    console.log('Fetching all available buckets...')
-    const { data: allBuckets, error: bucketsError } = await supabaseClient.storage.listBuckets()
-    
-    if (bucketsError) {
-      console.error('Error fetching buckets:', bucketsError)
-      throw new Error(`Failed to fetch buckets: ${bucketsError.message}`)
-    }
-    
+    // Get ALL buckets
+    const { data: allBuckets } = await supabaseClient.storage.listBuckets()
     const buckets = allBuckets?.map(bucket => bucket.name) || []
-    console.log(`Found ${buckets.length} buckets:`, buckets)
-    console.log(`Raw bucket data:`, JSON.stringify(allBuckets, null, 2))
+    console.log(`Found buckets: ${buckets.join(', ')}`)
     
-    // Also try some common bucket names that might not be listed
-    const commonBuckets = ['temp', 'uploads', 'cache', 'thumbnails', 'previews', 'generated']
-    for (const testBucket of commonBuckets) {
+    // Test for additional common bucket names
+    const testBuckets = ['temp', 'uploads', 'cache', 'thumbnails', 'previews', 'generated']
+    for (const testBucket of testBuckets) {
       if (!buckets.includes(testBucket)) {
-        console.log(`Testing for hidden bucket: ${testBucket}`)
         try {
-          const { data: testFiles } = await supabaseClient.storage.from(testBucket).list('', { limit: 1 })
-          if (testFiles && testFiles.length > 0) {
-            console.log(`Found hidden bucket with files: ${testBucket}`)
+          const { data } = await supabaseClient.storage.from(testBucket).list('', { limit: 1 })
+          if (data && data.length > 0) {
             buckets.push(testBucket)
+            console.log(`Found additional bucket: ${testBucket}`)
           }
         } catch (err) {
-          // Bucket doesn't exist, ignore
+          // Bucket doesn't exist
         }
       }
     }
-    
-    const cutoffDate = new Date()
-    if (!isManualCleanup) {
-      cutoffDate.setDate(cutoffDate.getDate() - 1) // Remove files older than 1 day for automatic cleanup
-    }
 
-    let totalStats: CleanupStats = {
-      totalFiles: 0,
-      deletedFiles: 0,
-      freedSpaceMB: 0,
-      errors: [],
-      processedBuckets: [],
-      skippedFiles: 0
-    }
+    let totalDeleted = 0
+    let totalScanned = 0
+    let totalFreed = 0
+    let errors = []
 
-    console.log(`Target cutoff date: ${isManualCleanup ? 'ALL FILES (manual cleanup)' : cutoffDate.toISOString()}`)
-    console.log(`Processing ${buckets.length} buckets: ${buckets.join(', ')}`)
-    console.log(`=== CLEANUP MODE: ${isManualCleanup ? 'MANUAL (DELETE ALL FILES)' : 'AUTOMATIC (1 DAY CUTOFF)'} ===`)
-
+    // Process each bucket AGGRESSIVELY
     for (const bucketName of buckets) {
-      const bucketStartTime = Date.now()
-      console.log(`\n--- Processing bucket: ${bucketName} ---`)
-      
-      let bucketStats: BucketStats = {
-        name: bucketName,
-        totalFiles: 0,
-        oldFiles: 0,
-        deletedFiles: 0,
-        freedSpaceMB: 0,
-        errors: []
-      }
+      console.log(`\n🗂️ PROCESSING BUCKET: ${bucketName}`)
       
       try {
-        // List all files in bucket with pagination
-        let allFiles: any[] = []
-        let offset = 0
-        const batchSize = 1000
-        
-        // Try different listing methods to catch all files
-        console.log(`Trying different listing approaches for ${bucketName}...`)
-        
         // Method 1: Standard list
+        let allFiles = []
+        let page = 0
+        const limit = 1000
+        
         while (true) {
-          console.log(`Method 1: Fetching files from ${bucketName}, offset: ${offset}`)
-          
-          const { data: files, error: listError } = await supabaseClient.storage
+          const { data: files, error } = await supabaseClient.storage
             .from(bucketName)
-            .list('', {
-              limit: batchSize,
-              offset: offset,
+            .list('', { 
+              limit, 
+              offset: page * limit,
               sortBy: { column: 'created_at', order: 'asc' }
             })
 
-          if (listError) {
-            const errorMsg = `Error listing files in ${bucketName} at offset ${offset}: ${listError.message}`
-            console.error(errorMsg)
-            bucketStats.errors.push(errorMsg)
-            totalStats.errors.push(errorMsg)
+          if (error) {
+            console.error(`Error listing ${bucketName}:`, error)
             break
           }
 
-          if (!files || files.length === 0) {
-            break
-          }
-
+          if (!files || files.length === 0) break
+          
           allFiles = allFiles.concat(files)
-          offset += batchSize
-
-          if (files.length < batchSize) {
-            break // No more files to fetch
-          }
+          console.log(`Found ${files.length} files in page ${page + 1}`)
+          
+          if (files.length < limit) break
+          page++
         }
-        
-        // Method 2: List with different parameters to catch hidden files
-        console.log(`Method 2: Trying recursive listing for ${bucketName}...`)
+
+        // Method 2: Try without sorting (sometimes catches more files)
         try {
-          const { data: recursiveFiles, error: recursiveError } = await supabaseClient.storage
+          const { data: altFiles } = await supabaseClient.storage
             .from(bucketName)
-            .list('', {
-              limit: 10000,
-              sortBy: { column: 'name', order: 'asc' }
-            })
+            .list('', { limit: 10000 })
             
-          if (!recursiveError && recursiveFiles) {
-            // Add files that weren't found in method 1
+          if (altFiles) {
             const existingNames = new Set(allFiles.map(f => f.name))
-            const newFiles = recursiveFiles.filter(f => !existingNames.has(f.name))
-            allFiles = allFiles.concat(newFiles)
+            const newFiles = altFiles.filter(f => !existingNames.has(f.name))
             if (newFiles.length > 0) {
-              console.log(`Method 2 found ${newFiles.length} additional files`)
+              allFiles = allFiles.concat(newFiles)
+              console.log(`Alternative method found ${newFiles.length} additional files`)
             }
           }
-        } catch (recursiveErr) {
-          console.log(`Method 2 failed for ${bucketName}:`, recursiveErr)
+        } catch (err) {
+          console.log('Alternative listing failed:', err.message)
         }
 
-        bucketStats.totalFiles = allFiles.length
-        totalStats.totalFiles += allFiles.length
+        totalScanned += allFiles.length
+        console.log(`📁 Total files found in ${bucketName}: ${allFiles.length}`)
         
         if (allFiles.length === 0) {
-          console.log(`No files found in bucket ${bucketName}`)
-          totalStats.processedBuckets.push(bucketName)
+          console.log(`No files in ${bucketName}`)
           continue
         }
 
-        console.log(`Total files found in ${bucketName}: ${allFiles.length}`)
-        console.log(`First few files:`, allFiles.slice(0, 5).map(f => ({ name: f.name, created_at: f.created_at, size: f.metadata?.size })))
+        // Show first few files for debugging
+        console.log(`First 5 files:`, allFiles.slice(0, 5).map(f => ({
+          name: f.name,
+          size: f.metadata?.size,
+          created: f.created_at
+        })))
 
-        // Filter files based on cleanup type
-        const filesToDelete = allFiles.filter(file => {
-          const fileSize = file.metadata?.size ? `${(file.metadata.size / (1024*1024)).toFixed(2)}MB` : 'unknown size'
-          
-          if (isManualCleanup) {
-            console.log(`Manual cleanup: will delete ${file.name} (${fileSize})`)
-            return true // Delete ALL files in manual cleanup
-          }
-          
-          if (!file.created_at) {
-            console.log(`File ${file.name} has no created_at timestamp, will delete (assuming old) - Size: ${fileSize}`)
-            return true // Delete files without timestamp
-          }
-          
-          const fileDate = new Date(file.created_at)
-          const isOld = fileDate < cutoffDate
-          
-          if (isOld) {
-            console.log(`File to delete: ${file.name} (created: ${fileDate.toISOString()}) - Size: ${fileSize}`)
-          }
-          
-          return isOld
-        })
-
-        bucketStats.oldFiles = filesToDelete.length
-        console.log(`Files eligible for deletion in ${bucketName}: ${filesToDelete.length}`)
-
-        if (filesToDelete.length === 0) {
-          console.log(`No old files to delete in ${bucketName}`)
-          totalStats.processedBuckets.push(bucketName)
-          continue
+        // DELETE EVERYTHING in manual cleanup
+        let filesToDelete = allFiles
+        if (!isManualCleanup) {
+          // For automatic cleanup, only delete files older than 1 day
+          const cutoff = new Date()
+          cutoff.setDate(cutoff.getDate() - 1)
+          filesToDelete = allFiles.filter(f => {
+            if (!f.created_at) return true // Delete files without timestamp
+            return new Date(f.created_at) < cutoff
+          })
         }
 
-        // Delete files in smaller batches with better error handling
-        const deleteBatchSize = 25 // Reduced batch size for more reliable deletion
-        console.log(`Starting deletion of ${filesToDelete.length} files in batches of ${deleteBatchSize}`)
+        console.log(`🗑️ Files to delete: ${filesToDelete.length}`)
         
-        for (let i = 0; i < filesToDelete.length; i += deleteBatchSize) {
-          const batch = filesToDelete.slice(i, i + deleteBatchSize)
-          const pathsToDelete = batch.map(file => file.name)
-          const batchNumber = Math.floor(i / deleteBatchSize) + 1
-          const totalBatches = Math.ceil(filesToDelete.length / deleteBatchSize)
+        if (filesToDelete.length === 0) continue
 
-          console.log(`Deleting batch ${batchNumber}/${totalBatches}: ${pathsToDelete.length} files from ${bucketName}`)
-          console.log(`Files in batch: ${pathsToDelete.slice(0, 3).join(', ')}${pathsToDelete.length > 3 ? '...' : ''}`)
-
+        // Delete in batches of 10 (smaller batches for reliability)
+        const batchSize = 10
+        let deleted = 0
+        
+        for (let i = 0; i < filesToDelete.length; i += batchSize) {
+          const batch = filesToDelete.slice(i, i + batchSize)
+          const paths = batch.map(f => f.name)
+          
+          console.log(`Deleting batch ${Math.floor(i/batchSize) + 1}: ${paths.join(', ')}`)
+          
           try {
-            const { data: deleteResult, error: deleteError } = await supabaseClient.storage
+            const { error: batchError } = await supabaseClient.storage
               .from(bucketName)
-              .remove(pathsToDelete)
-
-            if (deleteError) {
-              const errorMsg = `Error deleting batch ${batchNumber} from ${bucketName}: ${deleteError.message}`
-              console.error(errorMsg)
-              bucketStats.errors.push(errorMsg)
-              totalStats.errors.push(errorMsg)
+              .remove(paths)
+            
+            if (batchError) {
+              console.error(`Batch delete failed:`, batchError.message)
               
-              // Try individual file deletion for failed batch
-              console.log(`Attempting individual deletion for failed batch ${batchNumber}`)
-              for (const path of pathsToDelete) {
+              // Try one by one
+              for (const path of paths) {
                 try {
                   const { error: singleError } = await supabaseClient.storage
                     .from(bucketName)
                     .remove([path])
                   
                   if (!singleError) {
-                    bucketStats.deletedFiles++
-                    totalStats.deletedFiles++
-                    console.log(`Successfully deleted individual file: ${path}`)
+                    deleted++
+                    console.log(`✅ Deleted: ${path}`)
                   } else {
-                    console.error(`Failed to delete individual file ${path}:`, singleError)
+                    console.error(`❌ Failed to delete ${path}:`, singleError.message)
+                    errors.push(`${bucketName}/${path}: ${singleError.message}`)
                   }
-                } catch (singleDeleteError) {
-                  console.error(`Exception deleting individual file ${path}:`, singleDeleteError)
+                } catch (err) {
+                  console.error(`❌ Exception deleting ${path}:`, err.message)
+                  errors.push(`${bucketName}/${path}: ${err.message}`)
                 }
                 
-                // Small delay between individual deletions
-                await new Promise(resolve => setTimeout(resolve, 50))
+                await new Promise(r => setTimeout(r, 100)) // Small delay
               }
             } else {
-              bucketStats.deletedFiles += pathsToDelete.length
-              totalStats.deletedFiles += pathsToDelete.length
+              deleted += paths.length
+              console.log(`✅ Batch deleted: ${paths.length} files`)
               
-              // Calculate freed space more accurately
-              const estimatedSize = batch.reduce((sum, file) => {
-                const size = file.metadata?.size || 500000 // 500KB default estimate
-                return sum + size
-              }, 0)
-              
-              const freedMB = estimatedSize / (1024 * 1024)
-              bucketStats.freedSpaceMB += freedMB
-              totalStats.freedSpaceMB += freedMB
-              
-              console.log(`✓ Successfully deleted batch ${batchNumber}: ${pathsToDelete.length} files, ~${freedMB.toFixed(2)}MB`)
+              // Calculate freed space
+              const batchSize = batch.reduce((sum, f) => sum + (f.metadata?.size || 500000), 0)
+              totalFreed += batchSize
             }
-          } catch (batchError) {
-            const errorMsg = `Exception deleting batch ${batchNumber} from ${bucketName}: ${batchError.message}`
-            console.error(errorMsg)
-            bucketStats.errors.push(errorMsg)
-            totalStats.errors.push(errorMsg)
+            
+          } catch (err) {
+            console.error(`Batch error:`, err.message)
+            errors.push(`Batch error in ${bucketName}: ${err.message}`)
           }
-
-          // Delay between batches to avoid rate limiting
-          await new Promise(resolve => setTimeout(resolve, 200))
-        }
-
-        // Clean up database records for successfully deleted files
-        if (bucketStats.deletedFiles > 0) {
-          console.log(`Cleaning up database records for ${bucketName}`)
           
-          if (bucketName === 'images') {
-            try {
-              const deletedPaths = filesToDelete.slice(0, bucketStats.deletedFiles).map(file => file.name)
-              const { error: dbError } = await supabaseClient
-                .from('user_images')
-                .delete()
-                .in('image_path', deletedPaths)
-
-              if (dbError) {
-                const errorMsg = `Error cleaning up user_images records: ${dbError.message}`
-                console.error(errorMsg)
-                bucketStats.errors.push(errorMsg)
-                totalStats.errors.push(errorMsg)
-              } else {
-                console.log(`✓ Cleaned up ${deletedPaths.length} user_images database records`)
-              }
-            } catch (dbCleanupError) {
-              const errorMsg = `Exception cleaning user_images records: ${dbCleanupError.message}`
-              console.error(errorMsg)
-              bucketStats.errors.push(errorMsg)
-              totalStats.errors.push(errorMsg)
-            }
-          }
-
-          if (bucketName === 'user-videos') {
-            try {
-              const deletedPaths = filesToDelete.slice(0, bucketStats.deletedFiles).map(file => file.name)
-              const videoUrls = deletedPaths.map(path => `${bucketName}/${path}`)
-              
-              const { error: dbError } = await supabaseClient
-                .from('user_videos')
-                .delete()
-                .in('video_url', videoUrls)
-
-              if (dbError) {
-                const errorMsg = `Error cleaning up user_videos records: ${dbError.message}`
-                console.error(errorMsg)
-                bucketStats.errors.push(errorMsg)
-                totalStats.errors.push(errorMsg)
-              } else {
-                console.log(`✓ Cleaned up ${videoUrls.length} user_videos database records`)
-              }
-            } catch (dbCleanupError) {
-              const errorMsg = `Exception cleaning user_videos records: ${dbCleanupError.message}`
-              console.error(errorMsg)
-              bucketStats.errors.push(errorMsg)
-              totalStats.errors.push(errorMsg)
-            }
-          }
+          await new Promise(r => setTimeout(r, 200)) // Delay between batches
         }
-
-        const bucketDuration = Date.now() - bucketStartTime
-        console.log(`--- Bucket ${bucketName} completed in ${bucketDuration}ms ---`)
-        console.log(`Bucket stats: ${bucketStats.totalFiles} total, ${bucketStats.oldFiles} old, ${bucketStats.deletedFiles} deleted, ${bucketStats.freedSpaceMB.toFixed(2)}MB freed, ${bucketStats.errors.length} errors`)
         
-        totalStats.processedBuckets.push(bucketName)
-
-      } catch (error) {
-        const errorMsg = `Unexpected error processing bucket ${bucketName}: ${error.message}`
-        console.error(errorMsg)
-        bucketStats.errors.push(errorMsg)
-        totalStats.errors.push(errorMsg)
-        totalStats.processedBuckets.push(`${bucketName} (failed)`)
+        totalDeleted += deleted
+        console.log(`✅ Bucket ${bucketName} completed: ${deleted}/${filesToDelete.length} deleted`)
+        
+      } catch (bucketError) {
+        const msg = `Error processing bucket ${bucketName}: ${bucketError.message}`
+        console.error(msg)
+        errors.push(msg)
       }
     }
 
-    const totalDuration = Date.now() - startTime
-    const success = totalStats.errors.length === 0
+    const duration = Date.now() - startTime
+    const freedMB = totalFreed / (1024 * 1024)
     
-    // Log comprehensive final stats
-    console.log(`\n=== Storage Cleanup Summary ===`)
-    console.log(`Duration: ${totalDuration}ms (${(totalDuration / 1000).toFixed(1)}s)`)
-    console.log(`Processed buckets: ${totalStats.processedBuckets.join(', ')}`)
-    console.log(`Total files scanned: ${totalStats.totalFiles}`)
-    console.log(`Files deleted: ${totalStats.deletedFiles}`)
-    console.log(`Files skipped: ${totalStats.skippedFiles}`)
-    console.log(`Space freed: ${totalStats.freedSpaceMB.toFixed(2)}MB`)
-    console.log(`Errors: ${totalStats.errors.length}`)
-    console.log(`Success: ${success}`)
-    
-    if (totalStats.errors.length > 0) {
-      console.log(`Error details:`)
-      totalStats.errors.forEach((error, index) => {
-        console.log(`  ${index + 1}. ${error}`)
-      })
-    }
+    console.log(`\n🎉 CLEANUP COMPLETED`)
+    console.log(`Files scanned: ${totalScanned}`)
+    console.log(`Files deleted: ${totalDeleted}`)
+    console.log(`Space freed: ${freedMB.toFixed(2)}MB`)
+    console.log(`Errors: ${errors.length}`)
+    console.log(`Duration: ${duration}ms`)
 
     // Log to database
-    await logCleanupToDatabase(supabaseClient, totalStats, success, triggeredBy)
-
-    const response = {
-      success: success,
-      message: success 
-        ? `Storage cleanup completed successfully. Deleted ${totalStats.deletedFiles} files, freed ${totalStats.freedSpaceMB.toFixed(2)}MB`
-        : `Storage cleanup completed with ${totalStats.errors.length} errors`,
-      stats: {
-        totalFiles: totalStats.totalFiles,
-        deletedFiles: totalStats.deletedFiles,
-        freedSpaceMB: parseFloat(totalStats.freedSpaceMB.toFixed(2)),
-        errors: totalStats.errors,
-        processedBuckets: totalStats.processedBuckets,
-        skippedFiles: totalStats.skippedFiles,
-        durationMs: totalDuration
-      },
-      timestamp: new Date().toISOString()
+    try {
+      await supabaseClient
+        .from('storage_cleanup_logs')
+        .insert({
+          total_files: totalScanned,
+          deleted_files: totalDeleted,
+          freed_space_mb: parseFloat(freedMB.toFixed(2)),
+          errors: errors,
+          success: errors.length === 0,
+          triggered_by: triggeredBy
+        })
+    } catch (logErr) {
+      console.error('Failed to log to database:', logErr)
     }
 
-    console.log(`=== Storage Cleanup Completed ===\n`)
-
-    return new Response(JSON.stringify(response), {
+    return new Response(JSON.stringify({
+      success: true,
+      message: `Deleted ${totalDeleted} files, freed ${freedMB.toFixed(2)}MB`,
+      stats: {
+        totalFiles: totalScanned,
+        deletedFiles: totalDeleted,
+        freedSpaceMB: parseFloat(freedMB.toFixed(2)),
+        errors: errors,
+        durationMs: duration
+      },
+      timestamp: new Date().toISOString()
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     })
 
   } catch (error) {
-    const duration = Date.now() - startTime
-    console.error('=== Storage cleanup failed ===')
-    console.error(`Duration: ${duration}ms`)
-    console.error('Error:', error)
-    
-    // Try to log failure to database
-    try {
-      const supabaseClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      )
-      
-      await logCleanupToDatabase(supabaseClient, {
-        totalFiles: 0,
-        deletedFiles: 0,
-        freedSpaceMB: 0,
-        errors: [error.message],
-        processedBuckets: [],
-        skippedFiles: 0
-      }, false, triggeredBy)
-    } catch (logError) {
-      console.error('Failed to log error to database:', logError)
-    }
+    console.error('CLEANUP FAILED:', error)
     
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString(),
-      durationMs: duration
+      timestamp: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 500,
