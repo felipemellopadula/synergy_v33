@@ -146,6 +146,64 @@ serve(async (req) => {
 
     console.log('xAI response received successfully');
 
+    // Record token usage in database  
+    const authHeader = req.headers.get('authorization');
+    const token = authHeader?.replace('Bearer ', '');
+    
+    if (token) {
+      try {
+        // Get user info from JWT
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        
+        const { data: { user } } = await supabase.auth.getUser(token);
+        const userId = user?.id;
+        
+        if (userId) {
+          // Calculate token usage - 4 characters = 1 token
+          const inputTokens = Math.ceil((messages[messages.length - 1]?.content?.length || 0) / 4);
+          const outputTokens = Math.ceil(generatedText.length / 4);
+          const totalTokens = inputTokens + outputTokens;
+          
+          console.log('Recording Grok token usage:', {
+            userId,
+            model,
+            inputTokens,
+            outputTokens,
+            totalTokens
+          });
+
+          // Save token usage to database
+          const { error: tokenError } = await supabase
+            .from('token_usage')
+            .insert({
+              user_id: userId,
+              model_name: model,
+              tokens_used: totalTokens,
+              input_tokens: inputTokens,
+              output_tokens: outputTokens,
+              message_content: messages[messages.length - 1]?.content?.length > 1000 
+                ? messages[messages.length - 1]?.content.substring(0, 1000) + '...' 
+                : messages[messages.length - 1]?.content,
+              ai_response_content: generatedText.length > 2000
+                ? generatedText.substring(0, 2000) + '...'
+                : generatedText,
+              created_at: new Date().toISOString()
+            });
+
+          if (tokenError) {
+            console.error('Error saving token usage:', tokenError);
+          } else {
+            console.log('Token usage recorded successfully');
+          }
+        }
+      } catch (tokenRecordError) {
+        console.error('Error recording token usage:', tokenRecordError);
+      }
+    }
+
     return new Response(JSON.stringify({ response: finalResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
