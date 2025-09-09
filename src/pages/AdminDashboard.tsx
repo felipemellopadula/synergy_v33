@@ -103,6 +103,44 @@ const AdminDashboard = () => {
   const [recentUsage, setRecentUsage] = useState<TokenUsage[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedProvider, setSelectedProvider] = useState<'openai' | 'gemini' | 'claude' | 'grok' | 'todos'>('todos');
+  const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('all');
+
+  const getDateFilterRange = (period: 'today' | 'week' | 'month' | 'year' | 'all') => {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    
+    switch (period) {
+      case 'today':
+        return {
+          start: today,
+          end: new Date(today.getTime() + 24 * 60 * 60 * 1000)
+        };
+      case 'week':
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - 7);
+        return {
+          start: weekStart,
+          end: now
+        };
+      case 'month':
+        const monthStart = new Date(today);
+        monthStart.setMonth(today.getMonth() - 1);
+        return {
+          start: monthStart,
+          end: now
+        };
+      case 'year':
+        const yearStart = new Date(today);
+        yearStart.setFullYear(today.getFullYear() - 1);
+        return {
+          start: yearStart,
+          end: now
+        };
+      case 'all':
+      default:
+        return null;
+    }
+  };
 
   const charsToTokens = (chars: number): number => Math.ceil(chars / 4);
 
@@ -181,11 +219,21 @@ const AdminDashboard = () => {
     return cost;
   };
 
-  const calculateAdminStats = (data: TokenUsage[], providerFilter: 'openai' | 'gemini' | 'claude' | 'grok' | 'todos' = 'todos'): AdminStats => {
-    console.log('Calculating stats for provider:', providerFilter);
+  const calculateAdminStats = (data: TokenUsage[], providerFilter: 'openai' | 'gemini' | 'claude' | 'grok' | 'todos' = 'todos', period: 'today' | 'week' | 'month' | 'year' | 'all' = 'all'): AdminStats => {
+    console.log('Calculating stats for provider:', providerFilter, 'period:', period);
     console.log('Total records:', data.length);
     
     let filteredData = data;
+    
+    // Filter data based on selected period
+    const dateRange = getDateFilterRange(period);
+    if (dateRange) {
+      filteredData = filteredData.filter(usage => {
+        const usageDate = new Date(usage.created_at);
+        return usageDate >= dateRange.start && usageDate <= dateRange.end;
+      });
+      console.log('After date filter:', filteredData.length, 'records');
+    }
     
     // Filter data based on selected provider
     if (providerFilter !== 'todos') {
@@ -400,7 +448,7 @@ const AdminDashboard = () => {
         if (allUsage) {
           console.log('Raw usage data sample:', allUsage.slice(0, 3));
           console.log('Selected provider for calculation:', selectedProvider);
-          const calculatedStats = calculateAdminStats(allUsage, selectedProvider);
+          const calculatedStats = calculateAdminStats(allUsage, selectedProvider, selectedPeriod);
           console.log('Calculated stats for', selectedProvider, ':', calculatedStats);
           setAdminStats(calculatedStats);
           setRecentUsage(allUsage.slice(0, 15)); // Show last 15 transactions
@@ -419,7 +467,7 @@ const AdminDashboard = () => {
       const interval = setInterval(fetchAdminData, 30000);
       return () => clearInterval(interval);
     }
-  }, [isAdmin, authLoading, user, selectedProvider]);
+  }, [isAdmin, authLoading, user, selectedProvider, selectedPeriod]);
 
   if (authLoading || loading) {
     return (
@@ -501,6 +549,43 @@ const AdminDashboard = () => {
             </AlertDescription>
         </Alert>
 
+        {/* Period Filter */}
+        <div className="mb-6">
+          <Card>
+            <CardHeader className="pb-4">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-lg">Filtros de Período</CardTitle>
+                <div className="flex items-center gap-4">
+                  <Select value={selectedPeriod} onValueChange={(value: 'today' | 'week' | 'month' | 'year' | 'all') => setSelectedPeriod(value)}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Selecionar período" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todos os períodos</SelectItem>
+                      <SelectItem value="today">Hoje</SelectItem>
+                      <SelectItem value="week">Última semana</SelectItem>
+                      <SelectItem value="month">Último mês</SelectItem>
+                      <SelectItem value="year">Último ano</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Select value={selectedProvider} onValueChange={(value: 'openai' | 'gemini' | 'claude' | 'grok' | 'todos') => setSelectedProvider(value)}>
+                    <SelectTrigger className="w-[180px]">
+                      <SelectValue placeholder="Selecionar provedor" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos</SelectItem>
+                      <SelectItem value="openai">OpenAI</SelectItem>
+                      <SelectItem value="gemini">Google Gemini</SelectItem>
+                      <SelectItem value="claude">Anthropic Claude</SelectItem>
+                      <SelectItem value="grok">xAI Grok</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+          </Card>
+        </div>
+
         {/* Stats Cards */}
         <AdminStatsCards {...adminStats} selectedProvider={selectedProvider} />
 
@@ -513,21 +598,7 @@ const AdminDashboard = () => {
         <div className="mb-8">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle>Preços dos Modelos de IA</CardTitle>
-                <Select value={selectedProvider} onValueChange={(value: 'openai' | 'gemini' | 'claude' | 'grok' | 'todos') => setSelectedProvider(value)}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Selecionar provedor" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos</SelectItem>
-                    <SelectItem value="openai">OpenAI</SelectItem>
-                    <SelectItem value="gemini">Google Gemini</SelectItem>
-                    <SelectItem value="claude">Anthropic Claude</SelectItem>
-                    <SelectItem value="grok">xAI Grok</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              <CardTitle>Preços dos Modelos de IA</CardTitle>
             </CardHeader>
             <CardContent>
               <UnifiedPricingTable 
@@ -546,22 +617,38 @@ const AdminDashboard = () => {
           <CardHeader>
             <CardTitle>
               Transações Recentes 
-              {selectedProvider !== 'todos' && (
+              {(selectedProvider !== 'todos' || selectedPeriod !== 'all') && (
                  <span className="text-sm font-normal text-muted-foreground ml-2">
-                   ({selectedProvider === 'openai' ? 'OpenAI' : 
+                   ({selectedProvider !== 'todos' && `${selectedProvider === 'openai' ? 'OpenAI' : 
                      selectedProvider === 'gemini' ? 'Google Gemini' : 
                      selectedProvider === 'claude' ? 'Anthropic Claude' :
-                     selectedProvider === 'grok' ? 'xAI Grok' : selectedProvider})
+                     selectedProvider === 'grok' ? 'xAI Grok' : selectedProvider}`}
+                   {selectedProvider !== 'todos' && selectedPeriod !== 'all' && ' • '}
+                   {selectedPeriod !== 'all' && `${selectedPeriod === 'today' ? 'Hoje' :
+                     selectedPeriod === 'week' ? 'Última semana' :
+                     selectedPeriod === 'month' ? 'Último mês' :
+                     selectedPeriod === 'year' ? 'Último ano' : selectedPeriod}`})
                  </span>
               )}
             </CardTitle>
           </CardHeader>
           <CardContent>
             {(() => {
-              // Filter recent usage based on selected provider
+              // Filter recent usage based on selected provider and period
               let filteredUsage = recentUsage;
+              
+              // First filter by period
+              const dateRange = getDateFilterRange(selectedPeriod);
+              if (dateRange) {
+                filteredUsage = filteredUsage.filter(usage => {
+                  const usageDate = new Date(usage.created_at);
+                  return usageDate >= dateRange.start && usageDate <= dateRange.end;
+                });
+              }
+              
+              // Then filter by provider
               if (selectedProvider !== 'todos') {
-                filteredUsage = recentUsage.filter((usage) => {
+                filteredUsage = filteredUsage.filter((usage) => {
                   const isGeminiModel = usage.model_name.toLowerCase().includes('gemini');
                   const isClaudeModel = usage.model_name.toLowerCase().includes('claude');
                   const isGrokModel = usage.model_name.toLowerCase().includes('grok');
@@ -630,14 +717,39 @@ const AdminDashboard = () => {
                   );
                  })}
                  </div>
-               ) : (
-                  <p className="text-center text-muted-foreground py-8">
-                    {selectedProvider !== 'todos' 
-                      ? `Nenhuma transação encontrada para ${selectedProvider === 'openai' ? 'OpenAI' : selectedProvider === 'gemini' ? 'Google Gemini' : 'Anthropic Claude'}`
-                      : 'Nenhuma transação encontrada'
-                    }
-                  </p>
-               );
+                ) : (
+                   <p className="text-center text-muted-foreground py-8">
+                     {(() => {
+                       let message = "Nenhuma transação encontrada";
+                       
+                       if (selectedProvider !== 'todos' || selectedPeriod !== 'all') {
+                         message += " para";
+                         
+                         if (selectedProvider !== 'todos') {
+                           const providerName = selectedProvider === 'openai' ? 'OpenAI' : 
+                                               selectedProvider === 'gemini' ? 'Google Gemini' : 
+                                               selectedProvider === 'claude' ? 'Anthropic Claude' :
+                                               selectedProvider === 'grok' ? 'xAI Grok' : selectedProvider;
+                           message += ` ${providerName}`;
+                         }
+                         
+                         if (selectedProvider !== 'todos' && selectedPeriod !== 'all') {
+                           message += " no período";
+                         }
+                         
+                         if (selectedPeriod !== 'all') {
+                           const periodName = selectedPeriod === 'today' ? 'hoje' :
+                                            selectedPeriod === 'week' ? 'da última semana' :
+                                            selectedPeriod === 'month' ? 'do último mês' :
+                                            selectedPeriod === 'year' ? 'do último ano' : selectedPeriod;
+                           message += selectedProvider !== 'todos' ? ` ${periodName}` : ` ${periodName}`;
+                         }
+                       }
+                       
+                       return message;
+                     })()}
+                   </p>
+                );
              })()}
            </CardContent>
         </Card>
