@@ -32,28 +32,65 @@ export const StorageCleanup: React.FC = () => {
       const { data, error } = await supabase.functions.invoke('storage-cleanup', {
         body: { 
           manual: true, 
-          triggered_by: 'admin',
+          triggered_by: 'admin_manual',
           timestamp: new Date().toISOString()
         }
       });
 
       if (error) {
         console.error('Storage cleanup error:', error);
-        throw error;
+        toast.error(`Erro na função de limpeza: ${error.message}`);
+        return;
       }
 
       console.log('Storage cleanup completed:', data);
-      setLastCleanup(data);
-
-      if (data.success) {
-        toast.success(`Limpeza concluída! ${data.stats.deletedFiles} arquivos removidos, ${data.stats.freedSpaceMB}MB liberados.`);
+      
+      if (data && data.success) {
+        const result: CleanupResult = {
+          success: true,
+          stats: {
+            totalFiles: data.stats?.totalFiles || 0,
+            deletedFiles: data.stats?.deletedFiles || 0,
+            freedSpaceMB: parseFloat((data.stats?.freedSpaceMB || 0).toFixed(2)),
+            errors: data.stats?.errors || []
+          },
+          message: data.message || 'Limpeza concluída com sucesso',
+          timestamp: new Date().toISOString()
+        };
+        
+        setLastCleanup(result);
+        
+        if (result.stats.deletedFiles > 0) {
+          toast.success(
+            `🗑️ Limpeza concluída! ${result.stats.deletedFiles} arquivos removidos, ${result.stats.freedSpaceMB}MB liberados.`,
+            { duration: 5000 }
+          );
+        } else {
+          toast.success("✅ Limpeza concluída! Nenhum arquivo antigo encontrado para remover.");
+        }
       } else {
-        toast.error(`Limpeza falhou: ${data.error || 'Erro desconhecido'}`);
+        const errorMsg = data?.error || data?.message || 'Erro desconhecido na limpeza';
+        toast.error(`❌ Limpeza falhou: ${errorMsg}`);
+        
+        setLastCleanup({
+          success: false,
+          stats: { totalFiles: 0, deletedFiles: 0, freedSpaceMB: 0, errors: [errorMsg] },
+          message: errorMsg,
+          timestamp: new Date().toISOString()
+        });
       }
 
-    } catch (error) {
+    } catch (error: any) {
       console.error('Manual cleanup failed:', error);
-      toast.error('Falha na limpeza manual do storage');
+      const errorMsg = error?.message || 'Falha na comunicação com o servidor';
+      toast.error(`❌ Falha na limpeza: ${errorMsg}`);
+      
+      setLastCleanup({
+        success: false,
+        stats: { totalFiles: 0, deletedFiles: 0, freedSpaceMB: 0, errors: [errorMsg] },
+        message: errorMsg,
+        timestamp: new Date().toISOString()
+      });
     } finally {
       setIsLoading(false);
     }
