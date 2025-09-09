@@ -102,7 +102,9 @@ const AdminDashboard = () => {
           modelKey.includes(key.toLowerCase()) || key.toLowerCase().includes(modelKey)
         ) || 'gemini-1.5-flash';
         
-        return GEMINI_PRICING[matchedKey][type]; // Already converted to unit price
+        const cost = GEMINI_PRICING[matchedKey][type]; // Already converted to unit price
+        console.log(`Gemini ${type} cost for ${model}:`, cost);
+        return cost;
       }
     }
     
@@ -118,7 +120,10 @@ const AdminDashboard = () => {
         ) || 'claude-haiku-3.5';
         
         // Convert from per million tokens to per individual token: $X per 1M tokens = $X / 1,000,000 per token
-        return CLAUDE_PRICING[matchedKey][type] / 1_000_000;
+        const pricePerMillion = CLAUDE_PRICING[matchedKey][type];
+        const costPerToken = pricePerMillion / 1_000_000;
+        console.log(`Claude ${type} cost for ${model}: ${pricePerMillion} per million = ${costPerToken} per token`);
+        return costPerToken;
       }
     }
     
@@ -127,7 +132,9 @@ const AdminDashboard = () => {
       modelKey.includes(key.toLowerCase()) || key.toLowerCase().includes(modelKey)
     ) || 'gpt-4o-mini';
     
-    return OPENAI_PRICING[matchedKey][type] / 1_000_000;
+    const cost = OPENAI_PRICING[matchedKey][type] / 1_000_000;
+    console.log(`OpenAI ${type} cost for ${model}:`, cost);
+    return cost;
   };
 
   const calculateAdminStats = (data: TokenUsage[], providerFilter: 'openai' | 'gemini' | 'claude' | 'todos' = 'todos'): AdminStats => {
@@ -184,18 +191,17 @@ const AdminDashboard = () => {
       // Revenue calculation: cost + 200% profit margin = 3x cost
       const revenue = totalCostForTransaction * 3;
       
-      // Debug logging for Claude transactions
-      if (isClaudeModel) {
-        console.log('Claude transaction:', {
-          model: usage.model_name,
-          inputChars: inputCharacters,
-          inputTokens,
-          outputTokens,
-          inputCost: inputCost.toFixed(8),
-          outputCost: outputCost.toFixed(8),
-          totalCost: totalCostForTransaction.toFixed(8)
-        });
-      }
+      // Debug logging for each provider
+      console.log(`Transaction for ${provider} model ${usage.model_name}:`, {
+        inputChars: inputCharacters,
+        inputTokens,
+        outputTokens,
+        inputCostPerToken: getCostPerToken(usage.model_name, 'input', provider),
+        outputCostPerToken: getCostPerToken(usage.model_name, 'output', provider),
+        inputCost: inputCost.toFixed(10),
+        outputCost: outputCost.toFixed(10),
+        totalCost: totalCostForTransaction.toFixed(10)
+      });
       
       totalCost += totalCostForTransaction;
       totalRevenue += revenue;
