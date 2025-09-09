@@ -4,7 +4,7 @@ import './index.css'
 
 // Lazy load heavy providers and app to reduce initial bundle
 const ThemeProvider = lazy(() => import("next-themes").then(m => ({ default: m.ThemeProvider })));
-const AuthProvider = lazy(() => import("@/contexts/AuthContext").then(m => ({ default: m.AuthProvider })));
+const AuthProvider = lazy(() => import("@/contexts/AuthContext"));
 const App = lazy(() => import('./App.tsx'));
 
 // Minimal loading fallback
