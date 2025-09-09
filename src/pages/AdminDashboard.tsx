@@ -55,6 +55,17 @@ const GEMINI_PRICING: Record<string, { input: number; output: number }> = {
   'gemini-flash': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000 }
 };
 
+// Claude pricing per million tokens (USD) - Based on Anthropic pricing
+const CLAUDE_PRICING: Record<string, { input: number; output: number }> = {
+  'claude-opus-4.1': { input: 15.0, output: 75.0 },
+  'claude-opus-4': { input: 15.0, output: 75.0 },
+  'claude-sonnet-4': { input: 3.0, output: 15.0 },
+  'claude-haiku-3.5': { input: 0.80, output: 4.0 },
+  'claude-3-5-sonnet': { input: 3.0, output: 15.0 },
+  'claude-3-opus': { input: 15.0, output: 75.0 },
+  'claude-3-haiku': { input: 0.25, output: 1.25 }
+};
+
 const AdminDashboard = () => {
   const navigate = useNavigate();
   const { user, isAdmin, loading: authLoading } = useAdminAuth();
@@ -67,11 +78,11 @@ const AdminDashboard = () => {
   });
   const [recentUsage, setRecentUsage] = useState<TokenUsage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedProvider, setSelectedProvider] = useState<'openai' | 'gemini' | 'todos'>('todos');
+  const [selectedProvider, setSelectedProvider] = useState<'openai' | 'gemini' | 'claude' | 'todos'>('todos');
 
   const charsToTokens = (chars: number): number => Math.ceil(chars / 4);
 
-  const getCostPerToken = (model: string, type: 'input' | 'output', provider: 'openai' | 'gemini' | 'todos' = selectedProvider): number => {
+  const getCostPerToken = (model: string, type: 'input' | 'output', provider: 'openai' | 'gemini' | 'claude' | 'todos' = selectedProvider): number => {
     let modelKey = model.toLowerCase();
     
     // Handle SynergyAI mapping
@@ -95,6 +106,21 @@ const AdminDashboard = () => {
       }
     }
     
+    if (provider === 'claude') {
+      // Check if it's a Claude model
+      const isClaudeModel = modelKey.includes('claude') || Object.keys(CLAUDE_PRICING).some(key => 
+        modelKey.includes(key.toLowerCase()) || key.toLowerCase().includes(modelKey)
+      );
+      
+      if (isClaudeModel) {
+        const matchedKey = Object.keys(CLAUDE_PRICING).find(key => 
+          modelKey.includes(key.toLowerCase()) || key.toLowerCase().includes(modelKey)
+        ) || 'claude-haiku-3.5';
+        
+        return CLAUDE_PRICING[matchedKey][type] / 1_000_000; // Convert from per million to unit price
+      }
+    }
+    
     // Default to OpenAI pricing (convert from per million to unit price)
     const matchedKey = Object.keys(OPENAI_PRICING).find(key => 
       modelKey.includes(key.toLowerCase()) || key.toLowerCase().includes(modelKey)
@@ -103,14 +129,18 @@ const AdminDashboard = () => {
     return OPENAI_PRICING[matchedKey][type] / 1_000_000;
   };
 
-  const calculateAdminStats = (data: TokenUsage[], providerFilter: 'openai' | 'gemini' | 'todos' = 'todos'): AdminStats => {
+  const calculateAdminStats = (data: TokenUsage[], providerFilter: 'openai' | 'gemini' | 'claude' | 'todos' = 'todos'): AdminStats => {
     let filteredData = data;
     
     // Filter data based on selected provider
     if (providerFilter !== 'todos') {
       filteredData = data.filter((usage) => {
         const isGeminiModel = usage.model_name.toLowerCase().includes('gemini');
-        return providerFilter === 'gemini' ? isGeminiModel : !isGeminiModel;
+        const isClaudeModel = usage.model_name.toLowerCase().includes('claude');
+        
+        if (providerFilter === 'gemini') return isGeminiModel;
+        if (providerFilter === 'claude') return isClaudeModel;
+        return !isGeminiModel && !isClaudeModel; // OpenAI models
       });
     }
     
@@ -130,7 +160,11 @@ const AdminDashboard = () => {
       
       // Detect provider based on model name
       const isGeminiModel = usage.model_name.toLowerCase().includes('gemini');
-      const provider = isGeminiModel ? 'gemini' : 'openai';
+      const isClaudeModel = usage.model_name.toLowerCase().includes('claude');
+      let provider: 'openai' | 'gemini' | 'claude' = 'openai';
+      
+      if (isGeminiModel) provider = 'gemini';
+      else if (isClaudeModel) provider = 'claude';
       
       // Calculate costs using correct pricing per token type
       const inputCost = inputTokens * getCostPerToken(usage.model_name, 'input', provider);
@@ -295,7 +329,7 @@ const AdminDashboard = () => {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Preços dos Modelos de IA</CardTitle>
-                <Select value={selectedProvider} onValueChange={(value: 'openai' | 'gemini' | 'todos') => setSelectedProvider(value)}>
+                <Select value={selectedProvider} onValueChange={(value: 'openai' | 'gemini' | 'claude' | 'todos') => setSelectedProvider(value)}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Selecionar provedor" />
                   </SelectTrigger>
@@ -303,6 +337,7 @@ const AdminDashboard = () => {
                     <SelectItem value="todos">Todos</SelectItem>
                     <SelectItem value="openai">OpenAI</SelectItem>
                     <SelectItem value="gemini">Google Gemini</SelectItem>
+                    <SelectItem value="claude">Anthropic Claude</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -335,6 +370,32 @@ const AdminDashboard = () => {
                   </table>
                 </div>
               )}
+              {(selectedProvider === 'claude' || selectedProvider === 'todos') && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b">
+                        <th className="text-left p-3 font-medium">Modelo</th>
+                        <th className="text-right p-3 font-medium">Entrada (USD/1M tokens)</th>
+                        <th className="text-right p-3 font-medium">Saída (USD/1M tokens)</th>
+                        <th className="text-right p-3 font-medium">Custo por Token (Entrada)</th>
+                        <th className="text-right p-3 font-medium">Custo por Token (Saída)</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(CLAUDE_PRICING).map(([model, pricing]) => (
+                        <tr key={model} className="border-b">
+                          <td className="p-3 font-medium">{model}</td>
+                          <td className="text-right p-3 text-purple-400">${pricing.input.toFixed(2)}</td>
+                          <td className="text-right p-3 text-purple-400">${pricing.output.toFixed(2)}</td>
+                          <td className="text-right p-3 text-purple-400">${(pricing.input / 1_000_000).toFixed(10)}</td>
+                          <td className="text-right p-3 text-purple-400">${(pricing.output / 1_000_000).toFixed(10)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -346,7 +407,7 @@ const AdminDashboard = () => {
               Transações Recentes 
               {selectedProvider !== 'todos' && (
                 <span className="text-sm font-normal text-muted-foreground ml-2">
-                  ({selectedProvider === 'openai' ? 'OpenAI' : 'Google Gemini'})
+                  ({selectedProvider === 'openai' ? 'OpenAI' : selectedProvider === 'gemini' ? 'Google Gemini' : 'Anthropic Claude'})
                 </span>
               )}
             </CardTitle>
@@ -358,7 +419,11 @@ const AdminDashboard = () => {
               if (selectedProvider !== 'todos') {
                 filteredUsage = recentUsage.filter((usage) => {
                   const isGeminiModel = usage.model_name.toLowerCase().includes('gemini');
-                  return selectedProvider === 'gemini' ? isGeminiModel : !isGeminiModel;
+                  const isClaudeModel = usage.model_name.toLowerCase().includes('claude');
+                  
+                  if (selectedProvider === 'gemini') return isGeminiModel;
+                  if (selectedProvider === 'claude') return isClaudeModel;
+                  return !isGeminiModel && !isClaudeModel; // OpenAI models
                 });
               }
               
@@ -374,7 +439,11 @@ const AdminDashboard = () => {
                   
                   // Detect provider based on model name
                   const isGeminiModel = usage.model_name.toLowerCase().includes('gemini');
-                  const provider = isGeminiModel ? 'gemini' : 'openai';
+                  const isClaudeModel = usage.model_name.toLowerCase().includes('claude');
+                  let provider: 'openai' | 'gemini' | 'claude' = 'openai';
+                  
+                  if (isGeminiModel) provider = 'gemini';
+                  else if (isClaudeModel) provider = 'claude';
                   
                   // Calculate costs using correct pricing per token type
                   const inputCost = inputTokens * getCostPerToken(usage.model_name, 'input', provider);
@@ -414,12 +483,12 @@ const AdminDashboard = () => {
                  })}
                  </div>
                ) : (
-                 <p className="text-center text-muted-foreground py-8">
-                   {selectedProvider !== 'todos' 
-                     ? `Nenhuma transação encontrada para ${selectedProvider === 'openai' ? 'OpenAI' : 'Google Gemini'}`
-                     : 'Nenhuma transação encontrada'
-                   }
-                 </p>
+                  <p className="text-center text-muted-foreground py-8">
+                    {selectedProvider !== 'todos' 
+                      ? `Nenhuma transação encontrada para ${selectedProvider === 'openai' ? 'OpenAI' : selectedProvider === 'gemini' ? 'Google Gemini' : 'Anthropic Claude'}`
+                      : 'Nenhuma transação encontrada'
+                    }
+                  </p>
                );
              })()}
            </CardContent>
