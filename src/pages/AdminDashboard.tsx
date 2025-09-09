@@ -6,6 +6,7 @@ import { AdminStatsCards } from "@/components/AdminStatsCards";
 import { StorageCleanup } from "@/components/StorageCleanup";
 import { OpenAIPricingTable } from "@/components/OpenAIPricingTable";
 import { GrokPricingTable } from "@/components/GrokPricingTable";
+import UnifiedPricingTable from "@/components/UnifiedPricingTable";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -529,86 +530,13 @@ const AdminDashboard = () => {
               </div>
             </CardHeader>
             <CardContent>
-              {(selectedProvider === 'openai' || selectedProvider === 'todos') && <OpenAIPricingTable />}
-              {(selectedProvider === 'grok' || selectedProvider === 'todos') && <GrokPricingTable />}
-              {(selectedProvider === 'gemini' || selectedProvider === 'todos') && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-3 font-medium">Modelo</th>
-                        <th className="text-right p-3 font-medium">Entrada (USD/1M tokens)</th>
-                        <th className="text-right p-3 font-medium">Saída (USD/1M tokens)</th>
-                        <th className="text-right p-3 font-medium">Custo por Token (Entrada)</th>
-                        <th className="text-right p-3 font-medium">Custo por Token (Saída)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(GEMINI_PRICING).map(([model, pricing]) => (
-                        <tr key={model} className="border-b">
-                          <td className="p-3 font-medium">{model}</td>
-                          <td className="text-right p-3 text-blue-400">${(pricing.input * 1_000_000).toFixed(2)}</td>
-                          <td className="text-right p-3 text-blue-400">${(pricing.output * 1_000_000).toFixed(2)}</td>
-                          <td className="text-right p-3 text-blue-400">${pricing.input.toFixed(10)}</td>
-                          <td className="text-right p-3 text-blue-400">${pricing.output.toFixed(10)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {(selectedProvider === 'claude' || selectedProvider === 'todos') && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-3 font-medium">Modelo</th>
-                        <th className="text-right p-3 font-medium">Entrada (USD/1M tokens)</th>
-                        <th className="text-right p-3 font-medium">Saída (USD/1M tokens)</th>
-                        <th className="text-right p-3 font-medium">Custo por Token (Entrada)</th>
-                        <th className="text-right p-3 font-medium">Custo por Token (Saída)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(CLAUDE_PRICING).map(([model, pricing]) => (
-                        <tr key={model} className="border-b">
-                          <td className="p-3 font-medium">{model}</td>
-                          <td className="text-right p-3 text-purple-400">${pricing.input.toFixed(2)}</td>
-                          <td className="text-right p-3 text-purple-400">${pricing.output.toFixed(2)}</td>
-                          <td className="text-right p-3 text-purple-400">${(pricing.input / 1_000_000).toFixed(10)}</td>
-                          <td className="text-right p-3 text-purple-400">${(pricing.output / 1_000_000).toFixed(10)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {selectedProvider === 'grok' && (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b-2">
-                        <th className="text-left p-3 font-medium">Modelo</th>
-                        <th className="text-right p-3 font-medium">Entrada (USD/1M tokens)</th>
-                        <th className="text-right p-3 font-medium">Saída (USD/1M tokens)</th>
-                        <th className="text-right p-3 font-medium">Custo por Token (Entrada)</th>
-                        <th className="text-right p-3 font-medium">Custo por Token (Saída)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {Object.entries(GROK_PRICING).map(([model, pricing]) => (
-                        <tr key={model} className="border-b">
-                          <td className="p-3 font-medium">{model}</td>
-                          <td className="text-right p-3 text-orange-400">${pricing.input.toFixed(2)}</td>
-                          <td className="text-right p-3 text-orange-400">${pricing.output.toFixed(2)}</td>
-                          <td className="text-right p-3 text-orange-400">${(pricing.input / 1_000_000).toFixed(10)}</td>
-                          <td className="text-right p-3 text-orange-400">${(pricing.output / 1_000_000).toFixed(10)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
+              <UnifiedPricingTable 
+                selectedProvider={selectedProvider}
+                openaiPricing={OPENAI_PRICING}
+                geminiPricing={GEMINI_PRICING}
+                claudePricing={CLAUDE_PRICING}
+                grokPricing={GROK_PRICING}
+              />
             </CardContent>
           </Card>
         </div>
