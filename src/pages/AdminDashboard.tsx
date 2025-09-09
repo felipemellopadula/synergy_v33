@@ -67,11 +67,11 @@ const AdminDashboard = () => {
   });
   const [recentUsage, setRecentUsage] = useState<TokenUsage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedProvider, setSelectedProvider] = useState<'openai' | 'gemini'>('openai');
+  const [selectedProvider, setSelectedProvider] = useState<'openai' | 'gemini' | 'todos'>('todos');
 
   const charsToTokens = (chars: number): number => Math.ceil(chars / 4);
 
-  const getCostPerToken = (model: string, type: 'input' | 'output', provider: 'openai' | 'gemini' = selectedProvider): number => {
+  const getCostPerToken = (model: string, type: 'input' | 'output', provider: 'openai' | 'gemini' | 'todos' = selectedProvider): number => {
     let modelKey = model.toLowerCase();
     
     // Handle SynergyAI mapping
@@ -103,13 +103,23 @@ const AdminDashboard = () => {
     return OPENAI_PRICING[matchedKey][type] / 1_000_000;
   };
 
-  const calculateAdminStats = (data: TokenUsage[]): AdminStats => {
+  const calculateAdminStats = (data: TokenUsage[], providerFilter: 'openai' | 'gemini' | 'todos' = 'todos'): AdminStats => {
+    let filteredData = data;
+    
+    // Filter data based on selected provider
+    if (providerFilter !== 'todos') {
+      filteredData = data.filter((usage) => {
+        const isGeminiModel = usage.model_name.toLowerCase().includes('gemini');
+        return providerFilter === 'gemini' ? isGeminiModel : !isGeminiModel;
+      });
+    }
+    
     let totalCost = 0;
     let totalRevenue = 0;
     let totalTokens = 0;
     const uniqueUsers = new Set<string>();
 
-    data.forEach((usage) => {
+    filteredData.forEach((usage) => {
       // Input: convert message content characters to tokens (4 chars = 1 token)
       const inputCharacters = usage.message_content?.length || 0;
       const inputTokens = charsToTokens(inputCharacters);
@@ -172,7 +182,7 @@ const AdminDashboard = () => {
         console.log('Token usage data fetched:', allUsage?.length, 'records');
 
         if (allUsage) {
-          setAdminStats(calculateAdminStats(allUsage));
+          setAdminStats(calculateAdminStats(allUsage, selectedProvider));
           setRecentUsage(allUsage.slice(0, 20)); // Show last 20 transactions
         }
       } catch (error) {
@@ -189,7 +199,7 @@ const AdminDashboard = () => {
       const interval = setInterval(fetchAdminData, 30000);
       return () => clearInterval(interval);
     }
-  }, [isAdmin, authLoading, user]);
+  }, [isAdmin, authLoading, user, selectedProvider]);
 
   if (authLoading || loading) {
     return (
@@ -285,11 +295,12 @@ const AdminDashboard = () => {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle>Preços dos Modelos de IA</CardTitle>
-                <Select value={selectedProvider} onValueChange={(value: 'openai' | 'gemini') => setSelectedProvider(value)}>
+                <Select value={selectedProvider} onValueChange={(value: 'openai' | 'gemini' | 'todos') => setSelectedProvider(value)}>
                   <SelectTrigger className="w-[180px]">
                     <SelectValue placeholder="Selecionar provedor" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="todos">Todos</SelectItem>
                     <SelectItem value="openai">OpenAI</SelectItem>
                     <SelectItem value="gemini">Google Gemini</SelectItem>
                   </SelectContent>
@@ -297,8 +308,8 @@ const AdminDashboard = () => {
               </div>
             </CardHeader>
             <CardContent>
-              {selectedProvider === 'openai' && <OpenAIPricingTable />}
-              {selectedProvider === 'gemini' && (
+              {(selectedProvider === 'openai' || selectedProvider === 'todos') && <OpenAIPricingTable />}
+              {(selectedProvider === 'gemini' || selectedProvider === 'todos') && (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
@@ -327,12 +338,29 @@ const AdminDashboard = () => {
         {/* Recent Usage */}
         <Card>
           <CardHeader>
-            <CardTitle>Transações Recentes</CardTitle>
+            <CardTitle>
+              Transações Recentes 
+              {selectedProvider !== 'todos' && (
+                <span className="text-sm font-normal text-muted-foreground ml-2">
+                  ({selectedProvider === 'openai' ? 'OpenAI' : 'Google Gemini'})
+                </span>
+              )}
+            </CardTitle>
           </CardHeader>
           <CardContent>
-            {recentUsage.length > 0 ? (
-              <div className="space-y-4">
-                {recentUsage.map((usage) => {
+            {(() => {
+              // Filter recent usage based on selected provider
+              let filteredUsage = recentUsage;
+              if (selectedProvider !== 'todos') {
+                filteredUsage = recentUsage.filter((usage) => {
+                  const isGeminiModel = usage.model_name.toLowerCase().includes('gemini');
+                  return selectedProvider === 'gemini' ? isGeminiModel : !isGeminiModel;
+                });
+              }
+              
+              return filteredUsage.length > 0 ? (
+                <div className="space-y-4">
+                  {filteredUsage.map((usage) => {
                   // Input: convert message content characters to tokens (4 chars = 1 token)
                   const inputCharacters = usage.message_content?.length || 0;
                   const inputTokens = charsToTokens(inputCharacters);
@@ -379,14 +407,18 @@ const AdminDashboard = () => {
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            ) : (
-              <p className="text-center text-muted-foreground py-8">
-                Nenhuma transação encontrada
-              </p>
-            )}
-          </CardContent>
+                 })}
+                 </div>
+               ) : (
+                 <p className="text-center text-muted-foreground py-8">
+                   {selectedProvider !== 'todos' 
+                     ? `Nenhuma transação encontrada para ${selectedProvider === 'openai' ? 'OpenAI' : 'Google Gemini'}`
+                     : 'Nenhuma transação encontrada'
+                   }
+                 </p>
+               );
+             })()}
+           </CardContent>
         </Card>
       </div>
     </div>
