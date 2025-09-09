@@ -50,8 +50,8 @@ export const MinimalLanding = ({ user, onShowAuth }: MinimalLandingProps) => {
       {/* Minimal Header */}
       <header className="border-b border-border sticky top-0 z-30 bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">
-          <a
-            href="/"
+          <button
+            onClick={() => navigate('/')}
             className="flex items-center gap-2"
             aria-label="Synergy AI"
           >
@@ -64,7 +64,7 @@ export const MinimalLanding = ({ user, onShowAuth }: MinimalLandingProps) => {
               loading="eager"
               decoding="async"
             />
-          </a>
+          </button>
           <nav className="hidden md:flex items-center gap-6 text-sm text-muted-foreground">
             <button
               onClick={() => scrollToSection("modelos")}
