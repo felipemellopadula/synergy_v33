@@ -45,14 +45,14 @@ const OPENAI_PRICING: Record<string, { input: number; output: number }> = {
   'gpt-3.5-turbo': { input: 3.0, output: 6.0 }
 };
 
-// Gemini pricing per million tokens (USD) - Based on Google AI Studio pricing
+// Gemini pricing per token (USD) - Based on Google AI Studio pricing converted to unit price
 const GEMINI_PRICING: Record<string, { input: number; output: number }> = {
-  'gemini-2.0-flash-exp': { input: 0.30, output: 2.50 },
-  'gemini-1.5-pro': { input: 1.25, output: 10.00 },
-  'gemini-1.5-flash': { input: 0.30, output: 2.50 },
-  'gemini-1.5-flash-8b': { input: 0.10, output: 0.40 },
-  'gemini-pro': { input: 0.30, output: 2.50 },
-  'gemini-flash': { input: 0.30, output: 2.50 }
+  'gemini-2.0-flash-exp': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000 },
+  'gemini-1.5-pro': { input: 1.25 / 1_000_000, output: 10.00 / 1_000_000 },
+  'gemini-1.5-flash': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000 },
+  'gemini-1.5-flash-8b': { input: 0.10 / 1_000_000, output: 0.40 / 1_000_000 },
+  'gemini-pro': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000 },
+  'gemini-flash': { input: 0.30 / 1_000_000, output: 2.50 / 1_000_000 }
 };
 
 const AdminDashboard = () => {
@@ -91,11 +91,11 @@ const AdminDashboard = () => {
           modelKey.includes(key.toLowerCase()) || key.toLowerCase().includes(modelKey)
         ) || 'gemini-1.5-flash';
         
-        return GEMINI_PRICING[matchedKey][type] / 1_000_000;
+        return GEMINI_PRICING[matchedKey][type]; // Already converted to unit price
       }
     }
     
-    // Default to OpenAI pricing
+    // Default to OpenAI pricing (convert from per million to unit price)
     const matchedKey = Object.keys(OPENAI_PRICING).find(key => 
       modelKey.includes(key.toLowerCase()) || key.toLowerCase().includes(modelKey)
     ) || 'gpt-4o-mini';
@@ -262,13 +262,13 @@ const AdminDashboard = () => {
 
         <Alert className="mb-6">
           <Shield className="h-4 w-4" />
-          <AlertDescription>
-            Dashboard administrativo com visão completa de todos os custos e receitas do hub.
-            <br />
-            <span className="text-xs text-muted-foreground">
-              • Conversão: 4 caracteres = 1 token • Margem de lucro: 200% (3x custo) • Atualização automática a cada 5s
-            </span>
-          </AlertDescription>
+            <AlertDescription>
+              Dashboard administrativo com visão completa de todos os custos e receitas do hub.
+              <br />
+              <span className="text-xs text-muted-foreground">
+                • Conversão: 4 caracteres = 1 token • Margem de lucro: 200% (3x custo) • Cálculo automático para OpenAI e Gemini
+              </span>
+            </AlertDescription>
         </Alert>
 
         {/* Stats Cards */}
@@ -312,8 +312,8 @@ const AdminDashboard = () => {
                       {Object.entries(GEMINI_PRICING).map(([model, pricing]) => (
                         <tr key={model} className="border-b">
                           <td className="p-3 font-medium">{model}</td>
-                          <td className="text-right p-3">${pricing.input.toFixed(2)}</td>
-                          <td className="text-right p-3">${pricing.output.toFixed(2)}</td>
+                          <td className="text-right p-3">${(pricing.input * 1_000_000).toFixed(2)}</td>
+                          <td className="text-right p-3">${(pricing.output * 1_000_000).toFixed(2)}</td>
                         </tr>
                       ))}
                     </tbody>
