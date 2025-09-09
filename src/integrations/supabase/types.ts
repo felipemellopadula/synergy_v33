@@ -291,7 +291,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      delete_all_storage_files: {
+        Args: { bucket_name: string }
+        Returns: number
+      }
+      delete_storage_file: {
+        Args: { bucket_name: string; file_path: string }
+        Returns: boolean
+      }
     }
     Enums: {
       subscription_type: "free" | "paid" | "admin"
