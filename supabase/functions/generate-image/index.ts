@@ -19,12 +19,19 @@ serve(async (req) => {
   }
 
   try {
-    if (!RUNWARE_API_KEY) throw new Error('RUNWARE_API_KEY não configurada');
+    console.log('=== INICIO GENERATE-IMAGE DEBUG ===');
+    
+    if (!RUNWARE_API_KEY) {
+      console.error('RUNWARE_API_KEY não configurada');
+      throw new Error('RUNWARE_API_KEY não configurada');
+    }
 
     const body = await req.json().catch(() => ({}));
+    console.log('Request body recebido:', JSON.stringify(body, null, 2));
 
     const prompt: string | undefined = body.prompt ?? body.positivePrompt;
     if (!prompt) {
+      console.error('Prompt ausente no body:', body);
       return new Response(
         JSON.stringify({ error: 'Parâmetros inválidos: prompt ausente' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -41,12 +48,14 @@ serve(async (req) => {
         });
         const { data: { user } } = await supabaseAuth.auth.getUser();
         userId = user?.id ?? null;
+        console.log('User ID obtido:', userId);
       } catch (e) {
         console.warn('Não foi possível obter o usuário:', e);
       }
     }
 
     const model: string = (typeof body.model === 'string' && body.model.trim()) ? body.model : 'runware:100@1';
+    console.log('Modelo selecionado:', model);
     
     // Resolver dimensões baseado no modelo
     let width = 1024;
@@ -56,6 +65,8 @@ serve(async (req) => {
     const isGoogleModel = model.startsWith('google:');
     // Modelos que suportam dimensões altas
     const isHighResModel = model === 'bytedance:5@0' || model === 'ideogram:4@1' || model === 'bfl:3@1';
+    
+    console.log('isGoogleModel:', isGoogleModel, 'isHighResModel:', isHighResModel);
     
     if (!isGoogleModel) {
       // Apenas definir dimensões para modelos que suportam
@@ -71,12 +82,17 @@ serve(async (req) => {
         if (Number.isFinite(body.height)) height = Math.max(64, Math.min(maxDimension, Number(body.height)));
       }
     }
+    
+    console.log('Dimensões finais:', { width, height });
 
     const numberResults: number = Math.max(1, Math.min(4, Number(body.numberResults) || 1));
     // A Runware costuma retornar WEBP por padrão; manter WEBP para desempenho
     const outputFormat: string = (typeof body.outputFormat === 'string' && body.outputFormat) || 'WEBP';
+    
+    console.log('Parâmetros:', { numberResults, outputFormat });
 
     const taskUUID = crypto.randomUUID();
+    console.log('Task UUID gerado:', taskUUID);
 
     // Montar payload para Runware, evitando "strength" em GPT-Image-1
     const attach: any = {};
@@ -86,6 +102,7 @@ serve(async (req) => {
       if (model !== 'openai:1@1' && typeof body.strength === 'number') {
         attach.strength = body.strength;
       }
+      console.log('Imagem anexada, attach:', Object.keys(attach));
     }
 
     // Preparar o objeto de inferência baseado no modelo
@@ -104,21 +121,28 @@ serve(async (req) => {
       inferenceObject.width = width;
       inferenceObject.height = height;
     }
+    
+    console.log('Objeto de inferência:', JSON.stringify(inferenceObject, null, 2));
 
     const tasks: any[] = [
       { taskType: 'authentication', apiKey: RUNWARE_API_KEY },
       inferenceObject,
     ];
+    
+    console.log('Tasks completas para envio:', JSON.stringify(tasks, null, 2));
 
+    console.log('Enviando requisição para Runware...');
     const rwRes = await fetch('https://api.runware.ai/v1', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(tasks),
     });
+    
+    console.log('Status da resposta Runware:', rwRes.status, rwRes.statusText);
 
     if (!rwRes.ok) {
       const err = await rwRes.text();
-      console.error('Runware error:', err);
+      console.error('Runware error response:', err);
       return new Response(
         JSON.stringify({ error: 'Falha ao gerar imagem (Runware)', details: err }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -126,15 +150,25 @@ serve(async (req) => {
     }
 
     const rwData = await rwRes.json();
+    console.log('Resposta completa da Runware:', JSON.stringify(rwData, null, 2));
+    
     const dataArray = Array.isArray(rwData?.data) ? rwData.data : (Array.isArray(rwData) ? rwData : []);
+    console.log('Data array processado:', dataArray.length, 'items');
 
     const item = dataArray.find((d: any) => d?.taskType === 'imageInference' && (d.imageURL || d.imageUrl || d.image_url));
+    console.log('Item de imagem encontrado:', item ? 'SIM' : 'NÃO');
+    
+    if (item) {
+      console.log('Detalhes do item:', JSON.stringify(item, null, 2));
+    }
+    
     const imageURL: string | undefined = item?.imageURL || item?.imageUrl || item?.image_url;
+    console.log('URL da imagem extraída:', imageURL);
 
     if (!imageURL) {
-      console.error('Resposta Runware inesperada:', rwData);
+      console.error('Nenhuma URL de imagem encontrada na resposta');
       return new Response(
-        JSON.stringify({ error: 'Resposta inválida da Runware' }),
+        JSON.stringify({ error: 'Resposta inválida da Runware', details: rwData }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
