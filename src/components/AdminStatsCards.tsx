@@ -27,14 +27,14 @@ export const AdminStatsCards = ({
     }
   };
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6 mb-6 sm:mb-8">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Custo Total</CardTitle>
-          <DollarSign className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-xs sm:text-sm font-medium">Custo Total</CardTitle>
+          <DollarSign className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-destructive">
+          <div className="text-lg sm:text-xl lg:text-2xl font-bold text-destructive">
             ${totalCost.toFixed(4)}
           </div>
           <p className="text-xs text-muted-foreground">
@@ -45,11 +45,11 @@ export const AdminStatsCards = ({
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Receita Total</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-xs sm:text-sm font-medium">Receita Total</CardTitle>
+          <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-primary">
+          <div className="text-lg sm:text-xl lg:text-2xl font-bold text-primary">
             ${totalRevenue.toFixed(4)}
           </div>
           <p className="text-xs text-muted-foreground">
@@ -60,11 +60,11 @@ export const AdminStatsCards = ({
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Lucro Total</CardTitle>
-          <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-xs sm:text-sm font-medium">Lucro Total</CardTitle>
+          <TrendingUp className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold text-green-600">
+          <div className="text-lg sm:text-xl lg:text-2xl font-bold text-green-600">
             ${totalProfit.toFixed(4)}
           </div>
           <p className="text-xs text-muted-foreground">
@@ -75,11 +75,11 @@ export const AdminStatsCards = ({
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Usuários Ativos</CardTitle>
-          <Users className="h-4 w-4 text-muted-foreground" />
+          <CardTitle className="text-xs sm:text-sm font-medium">Usuários Ativos</CardTitle>
+          <Users className="h-4 w-4 text-muted-foreground flex-shrink-0" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold">
+          <div className="text-lg sm:text-xl lg:text-2xl font-bold">
             {totalUsers}
           </div>
           <p className="text-xs text-muted-foreground">

@@ -577,26 +577,27 @@ const AdminDashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto p-6">
+      <div className="max-w-7xl mx-auto p-3 sm:p-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
             <Button 
               variant="outline" 
               size="sm"
               onClick={() => navigate('/')}
+              className="self-start"
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Voltar
             </Button>
             <div className="flex items-center gap-2">
-              <Shield className="h-6 w-6 text-primary" />
-              <h1 className="text-3xl font-bold text-foreground">
+              <Shield className="h-4 sm:h-6 w-4 sm:w-6 text-primary" />
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-foreground">
                 Dashboard Administrativo
               </h1>
             </div>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <Button
               variant="outline"
               size="sm"
@@ -609,26 +610,26 @@ const AdminDashboard = () => {
           </div>
         </div>
 
-        <Alert className="mb-6">
-          <Shield className="h-4 w-4" />
-            <AlertDescription>
-              Dashboard administrativo com visão completa de todos os custos e receitas do hub.
-              <br />
-              <span className="text-xs text-muted-foreground">
+        <Alert className="mb-4 sm:mb-6">
+          <Shield className="h-4 w-4 flex-shrink-0" />
+            <AlertDescription className="text-xs sm:text-sm">
+              <strong>Dashboard administrativo</strong> com visão completa de todos os custos e receitas do hub.
+              <br className="hidden sm:block" />
+              <span className="text-xs text-muted-foreground block sm:inline mt-1 sm:mt-0">
                 • Conversão: 4 caracteres = 1 token • Margem de lucro: 200% (3x custo) • Cálculo automático para OpenAI e Gemini
               </span>
             </AlertDescription>
         </Alert>
 
         {/* Period Filter */}
-        <div className="mb-6">
+        <div className="mb-4 sm:mb-6">
           <Card>
             <CardHeader className="pb-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">Filtros de Período</CardTitle>
-                <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <CardTitle className="text-base sm:text-lg">Filtros de Período</CardTitle>
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
                   <Select value={selectedPeriod} onValueChange={(value: 'today' | 'week' | 'month' | 'year' | 'all') => setSelectedPeriod(value)}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px]">
                       <SelectValue placeholder="Selecionar período" />
                     </SelectTrigger>
                     <SelectContent>
@@ -640,7 +641,7 @@ const AdminDashboard = () => {
                     </SelectContent>
                   </Select>
                    <Select value={selectedProvider} onValueChange={(value: 'openai' | 'gemini' | 'claude' | 'grok' | 'deepseek' | 'todos') => setSelectedProvider(value)}>
-                     <SelectTrigger className="w-[180px]">
+                     <SelectTrigger className="w-full sm:w-[180px]">
                        <SelectValue placeholder="Selecionar provedor" />
                      </SelectTrigger>
                      <SelectContent>
