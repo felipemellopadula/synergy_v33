@@ -6,13 +6,18 @@ interface PricingData {
   output: number;
 }
 
+interface ImagePricingData {
+  cost: number;
+}
+
 interface UnifiedPricingTableProps {
-  selectedProvider: 'openai' | 'gemini' | 'claude' | 'grok' | 'deepseek' | 'todos';
+  selectedProvider: 'openai' | 'gemini' | 'claude' | 'grok' | 'deepseek' | 'image' | 'todos';
   openaiPricing: Record<string, PricingData>;
   geminiPricing: Record<string, PricingData>;
   claudePricing: Record<string, PricingData>;
   grokPricing: Record<string, PricingData>;
   deepseekPricing: Record<string, PricingData>;
+  imagePricing: Record<string, ImagePricingData>;
 }
 
 export default function UnifiedPricingTable({ 
@@ -21,7 +26,8 @@ export default function UnifiedPricingTable({
   geminiPricing, 
   claudePricing, 
   grokPricing,
-  deepseekPricing
+  deepseekPricing,
+  imagePricing
 }: UnifiedPricingTableProps) {
   
   const getAllModels = () => {
@@ -87,6 +93,17 @@ export default function UnifiedPricingTable({
       });
     }
 
+    if (selectedProvider === 'todos' || selectedProvider === 'image') {
+      Object.entries(imagePricing).forEach(([model, pricingData]) => {
+        models.push({
+          name: model,
+          provider: 'Modelos de Imagem',
+          pricing: { input: pricingData.cost, output: 0 }, // Image models don't have output tokens
+          color: 'text-pink-400'
+        });
+      });
+    }
+
     return models;
   };
 
@@ -108,26 +125,46 @@ export default function UnifiedPricingTable({
         <TableBody>
           {models.map((model, index) => {
             const isGeminiModel = model.provider === 'Google Gemini';
-            const inputPrice = isGeminiModel ? (model.pricing.input * 1_000_000) : model.pricing.input;
-            const outputPrice = isGeminiModel ? (model.pricing.output * 1_000_000) : model.pricing.output;
-            const inputCostPerToken = isGeminiModel ? model.pricing.input : (model.pricing.input / 1_000_000);
-            const outputCostPerToken = isGeminiModel ? model.pricing.output : (model.pricing.output / 1_000_000);
+            const isImageModel = model.provider === 'Modelos de Imagem';
+            
+            let inputPrice: number;
+            let outputPrice: number;
+            let inputCostPerToken: number;
+            let outputCostPerToken: number;
+            
+            if (isImageModel) {
+              // For image models, show cost per image instead of per token
+              inputPrice = model.pricing.input;
+              outputPrice = 0;
+              inputCostPerToken = model.pricing.input;
+              outputCostPerToken = 0;
+            } else if (isGeminiModel) {
+              inputPrice = model.pricing.input * 1_000_000;
+              outputPrice = model.pricing.output * 1_000_000;
+              inputCostPerToken = model.pricing.input;
+              outputCostPerToken = model.pricing.output;
+            } else {
+              inputPrice = model.pricing.input;
+              outputPrice = model.pricing.output;
+              inputCostPerToken = model.pricing.input / 1_000_000;
+              outputCostPerToken = model.pricing.output / 1_000_000;
+            }
 
             return (
               <TableRow key={`${model.provider}-${model.name}-${index}`}>
                 <TableCell className="font-medium">{model.name}</TableCell>
                 <TableCell className={`text-sm ${model.color}`}>{model.provider}</TableCell>
                 <TableCell className={`text-right ${model.color}`}>
-                  ${inputPrice.toFixed(2)}
+                  {isImageModel ? `$${inputPrice.toFixed(4)} por imagem` : `$${inputPrice.toFixed(2)}`}
                 </TableCell>
                 <TableCell className={`text-right ${model.color}`}>
-                  ${outputPrice.toFixed(2)}
+                  {isImageModel ? '-' : `$${outputPrice.toFixed(2)}`}
                 </TableCell>
                 <TableCell className={`text-right ${model.color}`}>
-                  ${inputCostPerToken.toFixed(10)}
+                  {isImageModel ? `$${inputCostPerToken.toFixed(4)}` : `$${inputCostPerToken.toFixed(10)}`}
                 </TableCell>
                 <TableCell className={`text-right ${model.color}`}>
-                  ${outputCostPerToken.toFixed(10)}
+                  {isImageModel ? '-' : `$${outputCostPerToken.toFixed(10)}`}
                 </TableCell>
               </TableRow>
             );

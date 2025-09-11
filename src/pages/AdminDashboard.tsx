@@ -77,6 +77,15 @@ const DEEPSEEK_PRICING: Record<string, { input: number; output: number }> = {
   'deepseek-v3.1': { input: 0.56, output: 1.68 }, // Generic fallback
   'deepseek': { input: 0.56, output: 1.68 }, // Generic fallback
 };
+
+// Image models pricing per image (USD)
+const IMAGE_PRICING: Record<string, { cost: number }> = {
+  'gpt-image-1': { cost: 0.25 },
+  'gemini-flash': { cost: 0.0273 },
+  'qwen-image': { cost: 0.0058 },
+  'ideogram-3.0': { cost: 0.06 },
+  'flux.1-kontext-max': { cost: 0.08 },
+};
 const CLAUDE_PRICING: Record<string, { input: number; output: number }> = {
   // Latest models
   'claude-opus-4-20250514': { input: 15.0, output: 75.0 },
@@ -111,7 +120,7 @@ const AdminDashboard = () => {
   });
   const [recentUsage, setRecentUsage] = useState<TokenUsage[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedProvider, setSelectedProvider] = useState<'openai' | 'gemini' | 'claude' | 'grok' | 'deepseek' | 'todos'>('todos');
+  const [selectedProvider, setSelectedProvider] = useState<'openai' | 'gemini' | 'claude' | 'grok' | 'deepseek' | 'image' | 'todos'>('todos');
   const [selectedPeriod, setSelectedPeriod] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('all');
 
   const getDateFilterRange = (period: 'today' | 'week' | 'month' | 'year' | 'all') => {
@@ -153,7 +162,7 @@ const AdminDashboard = () => {
 
   const charsToTokens = (chars: number): number => Math.ceil(chars / 4);
 
-  const getCostPerToken = (model: string, type: 'input' | 'output', provider: 'openai' | 'gemini' | 'claude' | 'grok' | 'deepseek' | 'todos' = selectedProvider): number => {
+  const getCostPerToken = (model: string, type: 'input' | 'output', provider: 'openai' | 'gemini' | 'claude' | 'grok' | 'deepseek' | 'image' | 'todos' = selectedProvider): number => {
     let modelKey = model.toLowerCase();
     
     // Handle SynergyAI mapping
@@ -248,7 +257,7 @@ const AdminDashboard = () => {
     return cost;
   };
 
-  const calculateAdminStats = (data: TokenUsage[], providerFilter: 'openai' | 'gemini' | 'claude' | 'grok' | 'deepseek' | 'todos' = 'todos', period: 'today' | 'week' | 'month' | 'year' | 'all' = 'all'): AdminStats => {
+  const calculateAdminStats = (data: TokenUsage[], providerFilter: 'openai' | 'gemini' | 'claude' | 'grok' | 'deepseek' | 'image' | 'todos' = 'todos', period: 'today' | 'week' | 'month' | 'year' | 'all' = 'all'): AdminStats => {
     console.log('Calculating stats for provider:', providerFilter, 'period:', period);
     console.log('Total records:', data.length);
     
@@ -271,12 +280,16 @@ const AdminDashboard = () => {
         const isClaudeModel = usage.model_name.toLowerCase().includes('claude');
         const isGrokModel = usage.model_name.toLowerCase().includes('grok');
         const isDeepSeekModel = usage.model_name.toLowerCase().includes('deepseek');
+        const isImageModel = Object.keys(IMAGE_PRICING).some(key => 
+          usage.model_name.toLowerCase().includes(key.toLowerCase())
+        );
         
         if (providerFilter === 'gemini') return isGeminiModel;
         if (providerFilter === 'claude') return isClaudeModel;
         if (providerFilter === 'grok') return isGrokModel;
         if (providerFilter === 'deepseek') return isDeepSeekModel;
-        return !isGeminiModel && !isClaudeModel && !isGrokModel && !isDeepSeekModel; // OpenAI models
+        if (providerFilter === 'image') return isImageModel;
+        return !isGeminiModel && !isClaudeModel && !isGrokModel && !isDeepSeekModel && !isImageModel; // OpenAI models
       });
     }
     
@@ -310,17 +323,33 @@ const AdminDashboard = () => {
         const isClaudeModel = usage.model_name.toLowerCase().includes('claude');
         const isGrokModel = usage.model_name.toLowerCase().includes('grok');
         const isDeepSeekModel = usage.model_name.toLowerCase().includes('deepseek');
-        let provider: 'openai' | 'gemini' | 'claude' | 'grok' | 'deepseek' = 'openai';
+        const isImageModel = Object.keys(IMAGE_PRICING).some(key => 
+          usage.model_name.toLowerCase().includes(key.toLowerCase())
+        );
+        let provider: 'openai' | 'gemini' | 'claude' | 'grok' | 'deepseek' | 'image' = 'openai';
         
         if (isGeminiModel) provider = 'gemini';
         else if (isClaudeModel) provider = 'claude';
         else if (isGrokModel) provider = 'grok';
         else if (isDeepSeekModel) provider = 'deepseek';
+        else if (isImageModel) provider = 'image';
         
         // Calculate costs using correct pricing per token type
-        const inputCost = inputTokens * getCostPerToken(usage.model_name, 'input', provider);
-        const outputCost = outputTokens * getCostPerToken(usage.model_name, 'output', provider);
-        const totalCostForTransaction = inputCost + outputCost;
+        let totalCostForTransaction: number;
+        let inputCost = 0;
+        let outputCost = 0;
+        
+        if (provider === 'image') {
+          // For image models, use fixed cost per image
+          const imageModelKey = Object.keys(IMAGE_PRICING).find(key => 
+            usage.model_name.toLowerCase().includes(key.toLowerCase())
+          ) || 'gpt-image-1';
+          totalCostForTransaction = IMAGE_PRICING[imageModelKey].cost;
+        } else {
+          inputCost = inputTokens * getCostPerToken(usage.model_name, 'input', provider);
+          outputCost = outputTokens * getCostPerToken(usage.model_name, 'output', provider);
+          totalCostForTransaction = inputCost + outputCost;
+        }
         
         // Total tokens used (input + output)
         const totalTokensForTransaction = inputTokens + outputTokens;
@@ -676,11 +705,12 @@ const AdminDashboard = () => {
             <CardContent>
                <UnifiedPricingTable 
                  selectedProvider={selectedProvider}
-                 openaiPricing={OPENAI_PRICING}
-                 geminiPricing={GEMINI_PRICING}
-                 claudePricing={CLAUDE_PRICING}
-                 grokPricing={GROK_PRICING}
-                 deepseekPricing={DEEPSEEK_PRICING}
+                  openaiPricing={OPENAI_PRICING}
+                  geminiPricing={GEMINI_PRICING}
+                  claudePricing={CLAUDE_PRICING}
+                  grokPricing={GROK_PRICING}
+                  deepseekPricing={DEEPSEEK_PRICING}
+                  imagePricing={IMAGE_PRICING}
                />
             </CardContent>
           </Card>
