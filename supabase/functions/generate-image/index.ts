@@ -86,7 +86,7 @@ serve(async (req) => {
     console.log('Dimensões finais:', { width, height });
 
     const numberResults: number = Math.max(1, Math.min(4, Number(body.numberResults) || 1));
-    // A Runware costuma retornar WEBP por padrão; manter WEBP para desempenho
+    // Usar WEBP por padrão para economizar recursos e melhor desempenho
     const outputFormat: string = (typeof body.outputFormat === 'string' && body.outputFormat) || 'WEBP';
     
     console.log('Parâmetros:', { numberResults, outputFormat });
@@ -174,6 +174,7 @@ serve(async (req) => {
     }
 
     // Baixar imagem e retornar em base64 para compatibilidade com o front
+    console.log('Baixando imagem da URL:', imageURL);
     const imgRes = await fetch(imageURL);
     if (!imgRes.ok) {
       const t = await imgRes.text();
@@ -184,8 +185,21 @@ serve(async (req) => {
       );
     }
 
+    console.log('Imagem baixada, convertendo para base64...');
     const ab = await imgRes.arrayBuffer();
+    console.log('ArrayBuffer size:', ab.byteLength, 'bytes');
+    
+    // Verificar se a imagem não é muito grande (limite de 5MB para otimização)
+    if (ab.byteLength > 5 * 1024 * 1024) {
+      console.error('Imagem muito grande:', ab.byteLength, 'bytes');
+      return new Response(
+        JSON.stringify({ error: 'Imagem gerada é muito grande para processar' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     const b64 = b64encode(new Uint8Array(ab));
+    console.log('Base64 length:', b64.length);
 
     // Inferir formato a partir da URL
     let format: string | undefined = undefined;
@@ -193,28 +207,39 @@ serve(async (req) => {
     else if (imageURL.endsWith('.png')) format = 'png';
     else if (imageURL.endsWith('.jpg')) format = 'jpg';
     else if (imageURL.endsWith('.jpeg')) format = 'jpeg';
+    
+    console.log('Formato inferido:', format);
 
     // Salvar no Storage e registrar no banco se o usuário estiver autenticado
     if (userId && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
       try {
+        console.log('Salvando imagem para usuário:', userId);
         const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
         const ext = (format || 'webp').toLowerCase();
         const path = `user-images/${userId}/${Date.now()}-${crypto.randomUUID()}.${ext}`;
         const contentType = `image/${ext === 'jpg' ? 'jpeg' : ext}`;
-        const upload = await supabaseAdmin.storage.from('images').upload(path, new Uint8Array(ab), { contentType });
+        
+        // Usar ArrayBuffer diretamente em vez de criar novo Uint8Array
+        const upload = await supabaseAdmin.storage.from('images').upload(path, ab, { contentType });
         if (upload.error) {
           console.error('Erro upload Storage:', upload.error);
         } else {
+          console.log('Upload realizado com sucesso:', path);
           const { error: insertErr } = await supabaseAdmin
             .from('user_images')
             .insert({ user_id: userId, image_path: path, prompt, width, height, format: ext });
-          if (insertErr) console.error('Erro ao inserir user_images:', insertErr);
+          if (insertErr) {
+            console.error('Erro ao inserir user_images:', insertErr);
+          } else {
+            console.log('Registro inserido no banco de dados');
+          }
         }
       } catch (e) {
         console.error('Falha ao salvar imagem do usuário:', e);
       }
     }
-
+    
+    console.log('=== SUCESSO - Retornando resposta ===');
     return new Response(
       JSON.stringify({ image: b64, url: imageURL, width, height, format }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
