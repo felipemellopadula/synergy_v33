@@ -85,6 +85,7 @@ const IMAGE_PRICING: Record<string, { cost: number }> = {
   'qwen-image': { cost: 0.0058 },
   'ideogram-3.0': { cost: 0.06 },
   'flux.1-kontext-max': { cost: 0.08 },
+  'seedream-4.0': { cost: 0.03 },
 };
 const CLAUDE_PRICING: Record<string, { input: number; output: number }> = {
   // Latest models
