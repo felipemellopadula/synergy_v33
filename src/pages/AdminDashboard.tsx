@@ -369,10 +369,20 @@ const AdminDashboard = () => {
           console.log(`💰 Image cost: $${totalCostForTransaction}`);
           console.log(`🔢 Raw cost value:`, IMAGE_PRICING[imageModelKey]?.cost);
           console.log(`📊 Available IMAGE_PRICING keys:`, Object.keys(IMAGE_PRICING));
+          console.log(`🎯 typeof totalCostForTransaction:`, typeof totalCostForTransaction);
+          console.log(`🎯 isNaN(totalCostForTransaction):`, isNaN(totalCostForTransaction));
+          console.log(`🎯 totalCostForTransaction === 0:`, totalCostForTransaction === 0);
         } else {
           inputCost = inputTokens * getCostPerToken(usage.model_name, 'input', provider);
           outputCost = outputTokens * getCostPerToken(usage.model_name, 'output', provider);
           totalCostForTransaction = inputCost + outputCost;
+        }
+        
+        // Debug log for final calculation
+        if (usage.model_name.toLowerCase().includes('qwen') || usage.model_name.toLowerCase().includes('image')) {
+          console.log(`🏁 Final totalCostForTransaction: ${totalCostForTransaction}`);
+          console.log(`🏁 Final inputCost: ${inputCost}`);
+          console.log(`🏁 Final outputCost: ${outputCost}`);
         }
         
         // Total tokens used (input + output)
@@ -412,6 +422,13 @@ const AdminDashboard = () => {
         totalCost += totalCostForTransaction;
         totalRevenue += revenue;
         totalTokens += totalTokensForTransaction;
+        
+        // Debug log for aggregation
+        if (usage.model_name.toLowerCase().includes('qwen') || usage.model_name.toLowerCase().includes('image')) {
+          console.log(`📈 Adding to totalCost: ${totalCostForTransaction} (running total: ${totalCost})`);
+          console.log(`📈 Revenue for this transaction: ${revenue}`);
+          console.log(`📈 Current totalCost after this transaction: ${totalCost}`);
+        }
         
         if (usage.user_id) {
           uniqueUsers.add(usage.user_id);
@@ -539,6 +556,28 @@ const AdminDashboard = () => {
       totalUsers: uniqueUsers.size,
       totalTokens
     });
+
+    // Special debug for image costs
+    const imageRecords = filteredData.filter(usage => 
+      Object.keys(IMAGE_PRICING).some(key => 
+        usage.model_name.toLowerCase().includes(key.toLowerCase())
+      )
+    );
+    console.log(`🖼️ Final image records processed: ${imageRecords.length}`);
+    console.log(`🖼️ Image record models:`, imageRecords.map(r => r.model_name));
+    
+    if (imageRecords.length > 0) {
+      let imageOnlyTotalCost = 0;
+      imageRecords.forEach(usage => {
+        const imageModelKey = Object.keys(IMAGE_PRICING).find(key => 
+          usage.model_name.toLowerCase().includes(key.toLowerCase())
+        ) || 'gpt-image-1';
+        const cost = IMAGE_PRICING[imageModelKey].cost;
+        imageOnlyTotalCost += cost;
+        console.log(`🖼️ Image ${usage.model_name} -> key: ${imageModelKey} -> cost: $${cost}`);
+      });
+      console.log(`🖼️ Total image cost should be: $${imageOnlyTotalCost.toFixed(8)}`);
+    }
 
     return {
       totalCost,
