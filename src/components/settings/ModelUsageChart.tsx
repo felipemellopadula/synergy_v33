@@ -89,19 +89,19 @@ export default function ModelUsageChart({ cycleStart, cycleEnd }: ModelUsageChar
             Sem uso registrado neste ciclo.
           </div>
         ) : (
-          <div className="h-64 w-full">
+          <div className="h-80 w-full">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <Pie 
                   data={data} 
                   dataKey="value" 
                   nameKey="name" 
-                  innerRadius={25} 
-                  outerRadius={60} 
+                  innerRadius={20} 
+                  outerRadius={50} 
                   paddingAngle={2}
                   fontSize={12}
                   cx="50%"
-                  cy="45%"
+                  cy="35%"
                 >
                   {data.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -119,11 +119,12 @@ export default function ModelUsageChart({ cycleStart, cycleEnd }: ModelUsageChar
                 />
                 <Legend 
                   verticalAlign="bottom"
-                  height={36}
+                  height={60}
                   wrapperStyle={{
-                    fontSize: '11px',
+                    fontSize: '10px',
                     color: 'hsl(var(--foreground))',
-                    paddingTop: '10px'
+                    paddingTop: '20px',
+                    lineHeight: '1.2'
                   }}
                 />
               </PieChart>
