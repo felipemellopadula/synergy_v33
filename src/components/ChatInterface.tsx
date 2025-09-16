@@ -11,6 +11,7 @@ import { WordProcessor } from "@/utils/WordProcessor";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useTokens } from '@/hooks/useTokens';
+import { PagePreview } from './PagePreview';
 
 interface Message {
   id: string;
@@ -419,32 +420,38 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
                   </Avatar>
                 )}
                 
-                <div
-                  className={`max-w-[70%] p-3 rounded-lg ${
-                    message.sender === 'user'
-                      ? 'bg-primary text-primary-foreground ml-auto'
-                      : 'bg-muted text-foreground'
-                  }`}
-                >
-                  <p className="text-sm">{message.content}</p>
-                  {message.files && message.files.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {message.files.map((file, index) => (
-                        <div key={index} className="flex items-center gap-2 bg-white/10 px-2 py-1 rounded text-xs border border-white/20">
-                          {file.type.startsWith('image/') ? (
-                            <Image className="h-3 w-3 text-white/80" />
-                          ) : (
-                            <Paperclip className="h-3 w-3 text-white/80" />
-                          )}
-                          <span className="truncate max-w-[200px] text-white/90">{file.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                  {message.model && (
-                    <p className="text-xs opacity-70 mt-1">
-                      Modelo: {message.model}
-                    </p>
+                <div className={message.sender === 'user' ? 'ml-auto flex flex-col max-w-[70%]' : 'max-w-[70%]'}>
+                  <div
+                    className={`p-3 rounded-lg ${
+                      message.sender === 'user'
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-foreground'
+                    }`}
+                  >
+                    <p className="text-sm">{message.content}</p>
+                    {message.files && message.files.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {message.files.map((file, index) => (
+                          <div key={index} className="flex items-center gap-2 bg-white/10 px-2 py-1 rounded text-xs border border-white/20">
+                            {file.type.startsWith('image/') ? (
+                              <Image className="h-3 w-3 text-white/80" />
+                            ) : (
+                              <Paperclip className="h-3 w-3 text-white/80" />
+                            )}
+                            <span className="truncate max-w-[200px] text-white/90">{file.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {message.model && (
+                      <p className="text-xs opacity-70 mt-1">
+                        Modelo: {message.model}
+                      </p>
+                    )}
+                  </div>
+                  
+                  {message.sender === 'user' && (
+                    <PagePreview />
                   )}
                 </div>
 
