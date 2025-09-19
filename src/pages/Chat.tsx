@@ -37,6 +37,7 @@ import {
   Image as ImageIcon,
   Share,
   RefreshCw,
+  Camera,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -1164,6 +1165,153 @@ Forneça uma resposta abrangente que integre informações de todos os documento
     },
     []
   );
+
+  const captureScreenshot = useCallback(async () => {
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        toast({
+          title: "Não suportado",
+          description: "Screenshot não é suportado neste navegador.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true
+      });
+
+      const video = document.createElement('video');
+      video.srcObject = stream;
+      video.play();
+
+      video.onloadedmetadata = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0);
+          
+          canvas.toBlob((blob) => {
+            if (blob) {
+              const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+              const fileName = `screenshot-${timestamp}.png`;
+              
+              if (attachedFiles.length >= 5) {
+                toast({
+                  title: "Limite excedido",
+                  description: "Máximo de 5 arquivos permitidos por vez.",
+                  variant: "destructive",
+                });
+                return;
+              }
+              
+              // Criar arquivo usando Object.assign para contornar problema de tipagem
+              const fileData = new Blob([blob], { type: 'image/png' });
+              const file = Object.assign(fileData, { name: fileName });
+              const imageUrl = URL.createObjectURL(blob);
+              
+              setAttachedFiles(prev => [...prev, file as File]);
+              setFilePreviewUrls(prev => {
+                const newMap = new Map(prev);
+                newMap.set(fileName, imageUrl);
+                return newMap;
+              });
+              setFileProcessingStatus(prev => {
+                const newMap = new Map(prev);
+                newMap.set(fileName, "completed");
+                return newMap;
+              });
+              
+              toast({
+                title: "Screenshot capturado",
+                description: "Screenshot anexado com sucesso!",
+              });
+            }
+          }, 'image/png');
+        }
+        
+        stream.getTracks().forEach(track => track.stop());
+      };
+    } catch (error) {
+      console.error('Erro ao capturar screenshot:', error);
+      toast({
+        title: "Erro",
+        description: "Erro ao capturar screenshot.",
+        variant: "destructive",
+      });
+    }
+  }, [attachedFiles.length, toast]);
+
+  const handlePaste = useCallback(async (e: ClipboardEvent) => {
+    const items = Array.from(e.clipboardData?.items || []);
+    const imageItems = items.filter(item => item.type.startsWith('image/'));
+    
+    if (imageItems.length > 0) {
+      e.preventDefault();
+      
+      if (attachedFiles.length + imageItems.length > 5) {
+        toast({
+          title: "Limite excedido",
+          description: "Máximo de 5 arquivos permitidos por vez.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      try {
+        for (const item of imageItems) {
+          const file = item.getAsFile();
+          if (file) {
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const fileName = `pasted-image-${timestamp}.${file.type.split('/')[1]}`;
+            const imageUrl = URL.createObjectURL(file);
+            
+            // Criar arquivo usando Object.assign para contornar problema de tipagem  
+            const fileBlob = new Blob([file], { type: file.type });
+            const renamedFile = Object.assign(fileBlob, { name: fileName });
+            
+            setAttachedFiles(prev => [...prev, renamedFile as File]);
+            setFilePreviewUrls(prev => {
+              const newMap = new Map(prev);
+              newMap.set(fileName, imageUrl);
+              return newMap;
+            });
+            setFileProcessingStatus(prev => {
+              const newMap = new Map(prev);
+              newMap.set(fileName, "completed");
+              return newMap;
+            });
+          }
+        }
+        
+        toast({
+          title: "Imagem anexada",
+          description: `${imageItems.length} imagem(ns) colada(s) com sucesso!`,
+        });
+      } catch (error) {
+        console.error('Erro ao processar imagem colada:', error);
+        toast({
+          title: "Erro",
+          description: "Erro ao processar a imagem colada.",
+          variant: "destructive",
+        });
+      }
+    }
+  }, [attachedFiles.length, toast]);
+
+  // Event listener para paste de imagens
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (textarea) {
+      textarea.addEventListener('paste', handlePaste as EventListener);
+      return () => {
+        textarea.removeEventListener('paste', handlePaste as EventListener);
+      };
+    }
+  }, [handlePaste]);
 
   const handleSendMessage = useCallback(
     async (e: React.FormEvent) => {
@@ -2346,6 +2494,13 @@ Forneça uma resposta abrangente que integre informações de todos os documento
                         >
                           <Paperclip className="h-4 w-4 mr-2" />
                           Anexar (.pdf, .doc/.docx, imagens)
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={captureScreenshot}
+                          className="cursor-pointer"
+                        >
+                          <Camera className="h-4 w-4 mr-2" />
+                          Capturar Screenshot
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => setIsWebSearchMode((p) => !p)}
