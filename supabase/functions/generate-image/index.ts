@@ -81,13 +81,30 @@ serve(async (req) => {
         // Definir limites baseados no modelo
         let maxDimension = 2048; // Padrão
         if (isSeedreamModel) {
-          maxDimension = 6048; // Seedream suporta até 6048x6048
+          maxDimension = 4096; // Seedream suporta até 4096x4096 (4K)
+          console.log('Seedream detectado - limite máximo ajustado para:', maxDimension);
         } else if (isHighResModel) {
           maxDimension = 8192; // Outros modelos de alta resolução
         }
         
-        if (Number.isFinite(body.width)) width = Math.max(64, Math.min(maxDimension, Number(body.width)));
-        if (Number.isFinite(body.height)) height = Math.max(64, Math.min(maxDimension, Number(body.height)));
+        console.log('Dimensões solicitadas - width:', body.width, 'height:', body.height);
+        console.log('MaxDimension para o modelo:', maxDimension);
+        
+        if (Number.isFinite(body.width)) {
+          const requestedWidth = Number(body.width);
+          if (requestedWidth > maxDimension) {
+            console.warn(`Width ${requestedWidth} excede limite ${maxDimension} para modelo ${model}`);
+          }
+          width = Math.max(64, Math.min(maxDimension, requestedWidth));
+        }
+        
+        if (Number.isFinite(body.height)) {
+          const requestedHeight = Number(body.height);
+          if (requestedHeight > maxDimension) {
+            console.warn(`Height ${requestedHeight} excede limite ${maxDimension} para modelo ${model}`);
+          }
+          height = Math.max(64, Math.min(maxDimension, requestedHeight));
+        }
       }
     }
     
@@ -128,9 +145,18 @@ serve(async (req) => {
     if (!isGoogleModel) {
       inferenceObject.width = width;
       inferenceObject.height = height;
+      
+      // Log específico para Seedream
+      if (isSeedreamModel) {
+        console.log('=== SEEDREAM CONFIGURATION ===');
+        console.log('Modelo Seedream detectado:', model);
+        console.log('Dimensões finais:', { width, height });
+        console.log('É resolução 4K?', (width >= 4096 || height >= 4096));
+        console.log('Dimensões solicitadas originais:', { originalWidth: body.width, originalHeight: body.height });
+      }
     }
     
-    console.log('Objeto de inferência:', JSON.stringify(inferenceObject, null, 2));
+    console.log('Objeto de inferência final:', JSON.stringify(inferenceObject, null, 2));
 
     const tasks: any[] = [
       { taskType: 'authentication', apiKey: RUNWARE_API_KEY },
@@ -151,8 +177,15 @@ serve(async (req) => {
     if (!rwRes.ok) {
       const err = await rwRes.text();
       console.error('Runware error response:', err);
+      console.error('Request body que causou erro:', JSON.stringify(tasks, null, 2));
       return new Response(
-        JSON.stringify({ error: 'Falha ao gerar imagem (Runware)', details: err }),
+        JSON.stringify({ 
+          error: 'Falha ao gerar imagem (Runware)', 
+          details: err,
+          model: model,
+          dimensions: { width, height },
+          requestBody: tasks
+        }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -325,9 +358,36 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {
-    console.error('Erro na função generate-image (Runware):', error);
+    console.error('=== ERRO DETALHADO NA FUNÇÃO GENERATE-IMAGE ===');
+    console.error('Erro capturado:', error);
+    console.error('Tipo do erro:', typeof error);
+    console.error('Error message:', error?.message);
+    console.error('Error stack:', error?.stack);
+    console.error('Modelo usado:', body?.model);
+    console.error('Dimensões solicitadas:', { width: body?.width, height: body?.height });
+    console.error('Prompt:', body?.positivePrompt?.substring(0, 100));
+    
+    // Se for erro específico do Seedream em alta resolução
+    if (body?.model === 'bytedance:5@0' && (body?.width > 4096 || body?.height > 4096)) {
+      console.error('ERRO SEEDREAM 4K detectado - dimensões muito altas para o modelo');
+      return new Response(
+        JSON.stringify({ 
+          error: 'Seedream 4.0 não suporta resoluções acima de 4096x4096 pixels',
+          details: 'Por favor, use resoluções menores ou tente outro modelo para imagens 4K',
+          model: body?.model,
+          requestedDimensions: { width: body?.width, height: body?.height }
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
     return new Response(
-      JSON.stringify({ error: error?.message || 'Erro inesperado' }),
+      JSON.stringify({ 
+        error: error?.message || 'Erro inesperado na geração de imagem',
+        details: error?.toString(),
+        model: body?.model,
+        stack: error?.stack
+      }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
