@@ -39,7 +39,7 @@ const SEEDREAM_QUALITY_SETTINGS = [
     { id: "1:1-2k", label: "1:1 (2K / Square)", width: 2048, height: 2048, steps: 15 },
     { id: "1:1-4k", label: "1:1 (4K / Square)", width: 4096, height: 4096, steps: 15 },
     { id: "4:3-2k", label: "4:3 (2K / Landscape)", width: 2304, height: 1728, steps: 15 },
-    { id: "4:3-4k", label: "4:3 (4K / Landscape)", width: 4096, height: 3072, steps: 15 },
+    { id: "4:3-4k", label: "4:3 (4K / Landscape)", width: 4608, height: 3456, steps: 15 },
     { id: "16:9-2k", label: "16:9 (2K / Landscape)", width: 2560, height: 1440, steps: 15 },
     { id: "16:9-4k", label: "16:9 (4K / Landscape)", width: 5120, height: 2880, steps: 15 },
     { id: "3:2-2k", label: "3:2 (2K / Landscape)", width: 2496, height: 1664, steps: 15 },
