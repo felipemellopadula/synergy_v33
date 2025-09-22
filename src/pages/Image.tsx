@@ -151,6 +151,7 @@ const ImagePage = () => {
     // Carrega imagens salvas
     const loadSavedImages = useCallback(async () => {
         if (!user) return;
+        setIsLoadingHistory(true);
         try {
             const { data, error } = await supabase
                 .from('user_images')
@@ -160,7 +161,13 @@ const ImagePage = () => {
                 .limit(MAX_IMAGES_TO_FETCH);
 
             if (error) throw error;
-            setImages(data || []);
+            
+            // Usar Set para garantir que não há duplicatas por ID
+            const uniqueImages = Array.from(
+                new Map((data || []).map(img => [img.id, img])).values()
+            );
+            
+            setImages(uniqueImages);
         } catch (error) {
             console.error("Erro ao carregar imagens:", error);
         } finally {
@@ -246,7 +253,7 @@ const ImagePage = () => {
             
             if (storageError) throw storageError;
             
-            const { error: dbError } = await supabase
+            const { data: insertedData, error: dbError } = await supabase
                 .from('user_images')
                 .insert({
                     user_id: user.id,
@@ -255,15 +262,27 @@ const ImagePage = () => {
                     width: selectedQualityInfo.width,
                     height: selectedQualityInfo.height,
                     format,
-                });
+                })
+                .select()
+                .single();
             
             if (dbError) throw dbError;
             
-            loadSavedImages();
+            // Adicionar a nova imagem diretamente ao estado em vez de recarregar tudo
+            if (insertedData) {
+                setImages(prev => {
+                    // Verificar se a imagem já existe para evitar duplicatas
+                    const exists = prev.some(img => img.id === insertedData.id);
+                    if (exists) return prev;
+                    
+                    // Adicionar no início da lista e limitar a MAX_IMAGES_TO_FETCH
+                    return [insertedData, ...prev].slice(0, MAX_IMAGES_TO_FETCH);
+                });
+            }
         } catch (error) {
             console.error("Erro ao salvar imagem:", error);
         }
-    }, [user, prompt, selectedQualityInfo, loadSavedImages]);
+    }, [user, prompt, selectedQualityInfo]);
 
     // Deletar imagem
     const deleteImage = useCallback(async (imageId: string, imagePath: string) => {
