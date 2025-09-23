@@ -105,6 +105,7 @@ const ImagePage = () => {
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [images, setImages] = useState<DatabaseImage[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(true);
+    const [isReloading, setIsReloading] = useState(false);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     
     // Habilita anexo para GPT, Ideogram, Kontext, Gemini-Flash e Seedream
@@ -150,8 +151,9 @@ const ImagePage = () => {
 
     // Carrega imagens salvas
     const loadSavedImages = useCallback(async () => {
-        if (!user) return;
+        if (!user || isReloading) return; // Evitar múltiplas chamadas simultâneas
         setIsLoadingHistory(true);
+        setIsReloading(true);
         try {
             const { data, error } = await supabase
                 .from('user_images')
@@ -172,8 +174,9 @@ const ImagePage = () => {
             console.error("Erro ao carregar imagens:", error);
         } finally {
             setIsLoadingHistory(false);
+            setIsReloading(false);
         }
-    }, [user]);
+    }, [user, isReloading]);
 
     useEffect(() => {
         loadSavedImages();
@@ -225,8 +228,10 @@ const ImagePage = () => {
             
             if (!apiData?.image) throw new Error("A API não retornou uma imagem.");
             
-            // O Edge Function já salva a imagem no banco, então só carregamos novamente o histórico
-            await loadSavedImages();
+            // O Edge Function já salva a imagem no banco, aguardar um pouco e recarregar histórico
+            setTimeout(() => {
+                loadSavedImages();
+            }, 1000); // Aguardar 1 segundo para garantir que o banco foi atualizado
             
             toast({ title: 'Imagem gerada e salva!', variant: "default" });
 
@@ -324,9 +329,13 @@ const ImagePage = () => {
             console.error("Erro ao deletar imagem:", error);
             toast({ title: 'Erro ao deletar', description: 'Tente novamente.', variant: "destructive" });
             // Reverter otimistic update em caso de erro
-            loadSavedImages();
+            setTimeout(() => {
+                if (!isReloading) {
+                    loadSavedImages();
+                }
+            }, 500);
         }
-    }, [user, toast, loadSavedImages]);
+    }, [user, toast]); // Removendo loadSavedImages da dependência para evitar dependências circulares
 
     // --- ALTERAÇÃO AQUI ---: Lógica de download corrigida para funcionar com cross-origin.
     const downloadImage = useCallback(async (image: DatabaseImage) => {
