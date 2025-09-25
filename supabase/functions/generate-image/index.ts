@@ -74,39 +74,104 @@ serve(async (req) => {
     console.log('isGoogleModel:', isGoogleModel, 'isHighResModel:', isHighResModel, 'isSeedream:', isSeedreamModel);
     
     if (!isGoogleModel) {
-      // Apenas definir dimensões para modelos que suportam
-      if (typeof body.size === 'string' && /^(\d+)x(\d+)$/.test(body.size)) {
-        const [w, h] = body.size.split('x').map((v: string) => parseInt(v, 10));
-        if (Number.isFinite(w) && Number.isFinite(h)) {
-          width = w; height = h;
+      // Para Ideogram, usar dimensões específicas suportadas pela API
+      if (model === 'ideogram:4@1') {
+        console.log('Ideogram detectado - aplicando mapeamento de dimensões suportadas');
+        
+        // Calcular a proporção das dimensões solicitadas
+        const requestedWidth = Number(body.width) || 1024;
+        const requestedHeight = Number(body.height) || 1024;
+        const requestedRatio = requestedWidth / requestedHeight;
+        
+        console.log('Dimensões solicitadas:', { requestedWidth, requestedHeight, ratio: requestedRatio });
+        
+        // Mapeamento direto para dimensões suportadas pelo Ideogram v3
+        // Baseado no erro da API que lista todas as dimensões válidas
+        if (requestedRatio >= 2.09 && requestedRatio <= 2.11) {
+          // Formato 21:10 (2.1 ratio)
+          width = 1344;
+          height = 640;
+          console.log('Formato 21:10 detectado - usando 1344x640');
+        } else if (requestedRatio >= 1.9 && requestedRatio <= 2.1) {
+          // Formato 2:1
+          width = 1408;
+          height = 704;
+          console.log('Formato ~2:1 detectado - usando 1408x704');
+        } else if (requestedRatio >= 1.7 && requestedRatio <= 1.9) {
+          // Formato 7:4 (1.75)
+          width = 1344;
+          height = 768;
+          console.log('Formato ~7:4 detectado - usando 1344x768');
+        } else if (requestedRatio >= 1.4 && requestedRatio <= 1.7) {
+          // Formato 3:2 (1.5)
+          width = 1248;
+          height = 832;
+          console.log('Formato ~3:2 detectado - usando 1248x832');
+        } else if (requestedRatio >= 1.2 && requestedRatio <= 1.4) {
+          // Formato 4:3 (1.33)
+          width = 1152;
+          height = 864;
+          console.log('Formato ~4:3 detectado - usando 1152x864');
+        } else if (requestedRatio >= 0.9 && requestedRatio <= 1.1) {
+          // Formato 1:1 (square)
+          width = 1024;
+          height = 1024;
+          console.log('Formato quadrado detectado - usando 1024x1024');
+        } else if (requestedRatio >= 0.7 && requestedRatio <= 0.9) {
+          // Formato 4:5 (0.8)
+          width = 896;
+          height = 1120;
+          console.log('Formato ~4:5 detectado - usando 896x1120');
+        } else if (requestedRatio >= 0.5 && requestedRatio <= 0.7) {
+          // Formato 2:3 (0.67)
+          width = 832;
+          height = 1248;
+          console.log('Formato ~2:3 detectado - usando 832x1248');
+        } else {
+          // Default para proporções não reconhecidas
+          width = 1024;
+          height = 1024;
+          console.log('Proporção não reconhecida - usando default 1024x1024');
         }
+        
       } else {
-        // Definir limites baseados no modelo
-        let maxDimension = 2048; // Padrão
-        if (isSeedreamModel) {
-          maxDimension = 6144; // Seedream suporta até 5120x2880 (4K real) - aumentando limite para 6144
-          console.log('Seedream detectado - limite máximo ajustado para:', maxDimension);
-        } else if (isHighResModel) {
-          maxDimension = 8192; // Outros modelos de alta resolução
-        }
-        
-        console.log('Dimensões solicitadas - width:', body.width, 'height:', body.height);
-        console.log('MaxDimension para o modelo:', maxDimension);
-        
-        if (Number.isFinite(body.width)) {
-          const requestedWidth = Number(body.width);
-          if (requestedWidth > maxDimension) {
-            console.warn(`Width ${requestedWidth} excede limite ${maxDimension} para modelo ${model}`);
+        // Lógica original para outros modelos
+        if (typeof body.size === 'string' && /^(\d+)x(\d+)$/.test(body.size)) {
+          const sizeParts = body.size.split('x');
+          const w = parseInt(sizeParts[0], 10);
+          const h = parseInt(sizeParts[1], 10);
+          if (Number.isFinite(w) && Number.isFinite(h)) {
+            width = w; 
+            height = h;
           }
-          width = Math.max(64, Math.min(maxDimension, requestedWidth));
-        }
-        
-        if (Number.isFinite(body.height)) {
-          const requestedHeight = Number(body.height);
-          if (requestedHeight > maxDimension) {
-            console.warn(`Height ${requestedHeight} excede limite ${maxDimension} para modelo ${model}`);
+        } else {
+          // Definir limites baseados no modelo
+          let maxDimension = 2048;
+          if (isSeedreamModel) {
+            maxDimension = 6144;
+            console.log('Seedream detectado - limite máximo ajustado para:', maxDimension);
+          } else if (isHighResModel) {
+            maxDimension = 8192;
           }
-          height = Math.max(64, Math.min(maxDimension, requestedHeight));
+          
+          console.log('Dimensões solicitadas - width:', body.width, 'height:', body.height);
+          console.log('MaxDimension para o modelo:', maxDimension);
+          
+          if (Number.isFinite(body.width)) {
+            const requestedWidth = Number(body.width);
+            if (requestedWidth > maxDimension) {
+              console.warn(`Width ${requestedWidth} excede limite ${maxDimension} para modelo ${model}`);
+            }
+            width = Math.max(64, Math.min(maxDimension, requestedWidth));
+          }
+          
+          if (Number.isFinite(body.height)) {
+            const requestedHeight = Number(body.height);
+            if (requestedHeight > maxDimension) {
+              console.warn(`Height ${requestedHeight} excede limite ${maxDimension} para modelo ${model}`);
+            }
+            height = Math.max(64, Math.min(maxDimension, requestedHeight));
+          }
         }
       }
     }
@@ -252,7 +317,7 @@ serve(async (req) => {
       );
     }
     
-    const b64 = b64encode(new Uint8Array(ab));
+    const b64 = b64encode(ab);
     console.log('Base64 length:', b64.length);
 
     // Inferir formato a partir da URL
@@ -374,21 +439,16 @@ serve(async (req) => {
     console.error('=== ERRO DETALHADO NA FUNÇÃO GENERATE-IMAGE ===');
     console.error('Erro capturado:', error);
     console.error('Tipo do erro:', typeof error);
-    console.error('Error message:', error?.message);
-    console.error('Error stack:', error?.stack);
-    console.error('Modelo usado:', body?.model);
-    console.error('Dimensões solicitadas:', { width: body?.width, height: body?.height });
-    console.error('Prompt:', body?.positivePrompt?.substring(0, 100));
+    console.error('Error message:', error instanceof Error ? error.message : String(error));
+    console.error('Error stack:', error instanceof Error ? error.stack : 'N/A');
     
     // Se for erro específico do Seedream em alta resolução
-    if (body?.model === 'bytedance:5@0' && (body?.width > 4096 || body?.height > 4096)) {
-      console.error('ERRO SEEDREAM 4K detectado - dimensões muito altas para o modelo');
+    if (error instanceof Error && error.message.includes('Seedream')) {
+      console.error('ERRO SEEDREAM 4K detectado');
       return new Response(
         JSON.stringify({ 
           error: 'Seedream 4.0 não suporta resoluções acima de 4096x4096 pixels',
-          details: 'Por favor, use resoluções menores ou tente outro modelo para imagens 4K',
-          model: body?.model,
-          requestedDimensions: { width: body?.width, height: body?.height }
+          details: 'Por favor, use resoluções menores ou tente outro modelo para imagens 4K'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
@@ -396,10 +456,8 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
-        error: error?.message || 'Erro inesperado na geração de imagem',
-        details: error?.toString(),
-        model: body?.model,
-        stack: error?.stack
+        error: error instanceof Error ? error.message : 'Erro inesperado na geração de imagem',
+        details: String(error)
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
