@@ -716,9 +716,28 @@ const ImagePage = () => {
                                     images.slice(1, MAX_IMAGES_TO_FETCH).map((img) => (
                                         <Card key={img.id} className="overflow-hidden group hover:shadow-md transition-shadow">
                                             <div className="flex gap-4 p-4">
-                                                <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0">
-                                                    <img src={getImageUrl(img)} alt={`Miniatura: ${img.prompt}`} className="w-full h-full object-cover" loading="lazy" />
-                                                </div>
+                                                <Dialog>
+                                                    <DialogTrigger asChild>
+                                                        <div className="w-16 h-16 rounded-md overflow-hidden flex-shrink-0 cursor-pointer hover:opacity-80 transition-opacity">
+                                                            <img src={getImageUrl(img)} alt={`Miniatura: ${img.prompt}`} className="w-full h-full object-cover" loading="lazy" />
+                                                        </div>
+                                                    </DialogTrigger>
+                                                    <DialogContent className="max-w-7xl max-h-[90vh] p-2">
+                                                        <div className="relative">
+                                                            <img src={getImageUrl(img)} alt={`Imagem gerada: ${img.prompt}`} className="w-full h-auto max-h-[85vh] object-contain rounded-lg" />
+                                                            <div className="absolute bottom-4 right-4">
+                                                                <Button 
+                                                                    size="lg" 
+                                                                    onClick={() => downloadImage(img)}
+                                                                    className="bg-primary/90 hover:bg-primary shadow-lg"
+                                                                >
+                                                                    <Download className="h-5 w-5 mr-2" />
+                                                                    Baixar Imagem
+                                                                </Button>
+                                                            </div>
+                                                        </div>
+                                                    </DialogContent>
+                                                </Dialog>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="text-sm font-medium text-foreground line-clamp-2 mb-1">{img.prompt}</p>
                                                     <p className="text-xs text-muted-foreground mb-2">
@@ -734,16 +753,6 @@ const ImagePage = () => {
                                                         <Button size="sm" variant="ghost" onClick={() => deleteImage(img.id, img.image_path)} className="h-7 px-2 text-red-500 hover:text-red-600">
                                                             <Trash2 className="h-3 w-3" />
                                                         </Button>
-                                                        <Dialog>
-                                                            <DialogTrigger asChild>
-                                                                <Button size="sm" variant="ghost" className="h-7 px-2">
-                                                                    <ZoomIn className="h-3 w-3" />
-                                                                </Button>
-                                                            </DialogTrigger>
-                                                            <DialogContent className="max-w-4xl">
-                                                                <img src={getImageUrl(img)} alt={`Imagem gerada: ${img.prompt}`} className="w-full h-auto" />
-                                                            </DialogContent>
-                                                        </Dialog>
                                                     </div>
                                                 </div>
                                             </div>
