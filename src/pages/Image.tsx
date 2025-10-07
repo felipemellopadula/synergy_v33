@@ -108,6 +108,7 @@ const ImagePage = () => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [isGenerating, setIsGenerating] = useState(false);
     const [isEnhancingPrompt, setIsEnhancingPrompt] = useState(false);
+    const [isDragging, setIsDragging] = useState(false);
     const [isImageModalOpen, setIsImageModalOpen] = useState(false);
     const [images, setImages] = useState<DatabaseImage[]>([]);
     const [isLoadingHistory, setIsLoadingHistory] = useState(true);
@@ -452,6 +453,60 @@ const ImagePage = () => {
         }
     };
 
+    // Drag and drop handlers
+    const handleDragEnter = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (canAttachImage) {
+            setIsDragging(true);
+        }
+    }, [canAttachImage]);
+
+    const handleDragLeave = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+    }, []);
+
+    const handleDragOver = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+    }, []);
+
+    const handleDrop = useCallback((e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        if (!canAttachImage) {
+            toast({
+                title: 'Anexo de imagem não disponível',
+                description: 'Este modelo não suporta anexar imagens.',
+                variant: "destructive"
+            });
+            return;
+        }
+
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
+            const file = files[0];
+            if (file.type.startsWith('image/')) {
+                setSelectedFile(file);
+                toast({
+                    title: 'Imagem anexada',
+                    description: 'A imagem foi anexada com sucesso.',
+                    variant: "default"
+                });
+            } else {
+                toast({
+                    title: 'Arquivo inválido',
+                    description: 'Por favor, arraste apenas arquivos de imagem.',
+                    variant: "destructive"
+                });
+            }
+        }
+    }, [canAttachImage, toast]);
+
     return (
         <div className="min-h-screen bg-background" role="main">
             <header className="border-b border-border sticky top-0 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 z-10">
@@ -553,9 +608,17 @@ const ImagePage = () => {
                                       <Label
                                         htmlFor="file-upload"
                                         aria-disabled={!canAttachImage}
-                                        className={`mt-2 flex h-10 w-full items-center justify-center rounded-md border border-input bg-background px-3 py-2 text-sm text-muted-foreground ring-offset-background cursor-pointer hover:bg-accent hover:text-accent-foreground`}
+                                        onDragEnter={handleDragEnter}
+                                        onDragOver={handleDragOver}
+                                        onDragLeave={handleDragLeave}
+                                        onDrop={handleDrop}
+                                        className={`mt-2 flex h-10 w-full items-center justify-center rounded-md border px-3 py-2 text-sm ring-offset-background cursor-pointer transition-all ${
+                                          isDragging 
+                                            ? 'border-primary bg-primary/10 text-primary scale-105' 
+                                            : 'border-input bg-background text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                                        }`}
                                       >
-                                        Imagem
+                                        {isDragging ? 'Solte aqui' : 'Imagem'}
                                       </Label>
                                     )}
                                     {previewUrl && (
