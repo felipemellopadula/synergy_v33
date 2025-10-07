@@ -145,6 +145,17 @@ const getEdgeFunctionName = (model: string) => {
 const isPdfFile = (file: File) =>
   file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 
+const isPythonFile = (file: File) =>
+  file.type === "text/x-python" ||
+  file.type === "application/x-python-code" ||
+  file.name.toLowerCase().endsWith(".py");
+
+const isExcelFile = (file: File) =>
+  file.type.includes("spreadsheet") ||
+  file.type.includes("excel") ||
+  file.name.toLowerCase().endsWith(".xlsx") ||
+  file.name.toLowerCase().endsWith(".xls");
+
 const isWordFile = (file: File) =>
   file.type.includes("word") ||
   file.name.toLowerCase().endsWith(".docx") ||
@@ -624,13 +635,19 @@ const Chat: React.FC = () => {
   const [processedWords, setProcessedWords] = useState<Map<string, string>>(
     new Map()
   );
+  const [processedPython, setProcessedPython] = useState<Map<string, string>>(
+    new Map()
+  );
+  const [processedExcel, setProcessedExcel] = useState<Map<string, string>>(
+    new Map()
+  );
   const [fileProcessingStatus, setFileProcessingStatus] = useState<
     Map<string, FileStatus>
   >(new Map());
   const [processedDocuments, setProcessedDocuments] = useState<
     Map<
       string,
-      { content: string; type: string; pages?: number; fileSize?: number }
+      { content: string; type: string; pages?: number; fileSize?: number; sheets?: any[] }
     >
   >(new Map());
   const [comparativeAnalysisEnabled, setComparativeAnalysisEnabled] =
@@ -1333,6 +1350,8 @@ Forneça uma resposta abrangente que integre informações de todos os documento
         setAttachedFiles([]);
         setProcessedPdfs(new Map());
         setProcessedWords(new Map());
+        setProcessedPython(new Map());
+        setProcessedExcel(new Map());
         setProcessedDocuments(new Map());
         setFileProcessingStatus(new Map());
         setComparativeAnalysisEnabled(false);
@@ -1370,6 +1389,16 @@ Forneça uma resposta abrangente que integre informações de todos os documento
           // Para Word docs
           if (isWordFile(file)) {
             baseData.wordContent = processedWords.get(file.name) || "";
+          }
+          
+          // Para arquivos Python
+          if (isPythonFile(file)) {
+            baseData.pythonContent = processedPython.get(file.name) || "";
+          }
+          
+          // Para arquivos Excel
+          if (isExcelFile(file)) {
+            baseData.excelContent = processedExcel.get(file.name) || "";
           }
           
           return baseData;
@@ -1448,6 +1477,28 @@ Forneça uma resposta abrangente que integre informações de todos os documento
                 }`
             );
             contents.push(...wordContents);
+          }
+
+          const pythonFiles = currentFiles.filter(isPythonFile);
+          if (pythonFiles.length > 0) {
+            const pythonContents = pythonFiles.map(
+              (py) =>
+                `[Arquivo Python: ${py.name}]\n\n${
+                  processedPython.get(py.name) || "Conteúdo não disponível"
+                }`
+            );
+            contents.push(...pythonContents);
+          }
+
+          const excelFiles = currentFiles.filter(isExcelFile);
+          if (excelFiles.length > 0) {
+            const excelContents = excelFiles.map(
+              (excel) =>
+                `[Arquivo Excel: ${excel.name}]\n\n${
+                  processedExcel.get(excel.name) || "Conteúdo não disponível"
+                }`
+            );
+            contents.push(...excelContents);
           }
 
           // Suporte à visão para alguns modelos
@@ -1724,6 +1775,8 @@ Forneça uma resposta abrangente que integre informações de todos os documento
       selectedModel,
       processedPdfs,
       processedWords,
+      processedPython,
+      processedExcel,
       processedDocuments,
       comparativeAnalysisEnabled,
       messages,
@@ -1825,6 +1878,85 @@ Forneça uma resposta abrangente que integre informações de todos os documento
             } else {
               throw new Error(result.error || "Erro ao processar Word");
             }
+          } else if (isPythonFile(file)) {
+            // Processar arquivo Python
+            const base64Data = await fileToBase64(file);
+            const { data, error } = await supabase.functions.invoke(
+              "process-files",
+              {
+                body: {
+                  file: base64Data,
+                  fileName: file.name,
+                  fileType: file.type,
+                },
+              }
+            );
+
+            if (error) {
+              throw new Error(error.message || "Erro ao processar arquivo Python");
+            }
+
+            if (data?.success && data?.content) {
+              setProcessedDocuments(
+                (prev) =>
+                  new Map(
+                    prev.set(fileName, {
+                      content: data.content,
+                      type: "python",
+                      fileSize: file.size,
+                    })
+                  )
+              );
+              setProcessedPython((prev) =>
+                new Map(prev).set(fileName, data.content || "")
+              );
+              setFileProcessingStatus(
+                (prev) => new Map(prev.set(fileName, "completed"))
+              );
+              return { fileName, success: true };
+            } else {
+              throw new Error("Erro ao processar arquivo Python");
+            }
+          } else if (isExcelFile(file)) {
+            // Processar arquivo Excel
+            const base64Data = await fileToBase64(file);
+            const { data, error } = await supabase.functions.invoke(
+              "process-files",
+              {
+                body: {
+                  file: base64Data,
+                  fileName: file.name,
+                  fileType: file.type,
+                },
+              }
+            );
+
+            if (error) {
+              throw new Error(error.message || "Erro ao processar arquivo Excel");
+            }
+
+            if (data?.success && data?.content) {
+              setProcessedDocuments(
+                (prev) =>
+                  new Map(
+                    prev.set(fileName, {
+                      content: data.content,
+                      type: "excel",
+                      fileSize: file.size,
+                      sheets: data.sheets,
+                    })
+                  )
+              );
+              setProcessedExcel((prev) =>
+                new Map(prev).set(fileName, data.content || "")
+              );
+              setFileProcessingStatus(
+                (prev) => new Map(prev.set(fileName, "completed"))
+              );
+              return { fileName, success: true };
+            } else {
+              throw new Error("Erro ao processar arquivo Excel");
+            }
           }
           return {
             fileName,
@@ -1872,7 +2004,11 @@ Forneça uma resposta abrangente que integre informações de todos os documento
 
       const validFiles = files.filter((file) => {
         const isValidType =
-          file.type.startsWith("image/") || isPdfFile(file) || isWordFile(file);
+          file.type.startsWith("image/") || 
+          isPdfFile(file) || 
+          isWordFile(file) || 
+          isPythonFile(file) || 
+          isExcelFile(file);
         return isValidType && file.size <= 50 * 1024 * 1024;
       });
 
@@ -1880,7 +2016,7 @@ Forneça uma resposta abrangente que integre informações de todos os documento
         toast({
           title: "Nenhum arquivo válido",
           description:
-            "Arraste apenas imagens, PDFs ou documentos Word (.doc/.docx, máx. 50MB cada).",
+            "Arraste apenas imagens, PDFs, documentos Word, arquivos Python (.py) ou Excel (.xlsx/.xls, máx. 50MB cada).",
           variant: "destructive",
         });
         return;
@@ -2081,8 +2217,12 @@ Forneça uma resposta abrangente que integre informações de todos os documento
               type: file.type,
               hasPdfContent: false,
               hasWordContent: false,
+              hasPythonContent: false,
+              hasExcelContent: false,
               pdfContent: "",
               wordContent: "",
+              pythonContent: "",
+              excelContent: "",
             };
             if (file.type === "application/pdf") {
               const pdfContent = processedPdfs.get(file.name);
@@ -2100,6 +2240,29 @@ Forneça uma resposta abrangente que integre informações de todos os documento
               if (wordContent) {
                 fileData.hasWordContent = true;
                 fileData.wordContent = wordContent;
+              }
+            }
+            if (
+              file.type === "text/x-python" ||
+              file.type === "application/x-python-code" ||
+              file.name.toLowerCase().endsWith(".py")
+            ) {
+              const pythonContent = processedPython.get(file.name);
+              if (pythonContent) {
+                fileData.hasPythonContent = true;
+                fileData.pythonContent = pythonContent;
+              }
+            }
+            if (
+              file.type.includes("spreadsheet") ||
+              file.type.includes("excel") ||
+              file.name.toLowerCase().endsWith(".xlsx") ||
+              file.name.toLowerCase().endsWith(".xls")
+            ) {
+              const excelContent = processedExcel.get(file.name);
+              if (excelContent) {
+                fileData.hasExcelContent = true;
+                fileData.excelContent = excelContent;
               }
             }
             return fileData;
@@ -2157,7 +2320,7 @@ Forneça uma resposta abrangente que integre informações de todos os documento
         });
       }
     },
-    [messages, processedPdfs, processedWords, toast]
+    [messages, processedPdfs, processedWords, processedPython, processedExcel, toast]
   );
 
   const toggleReasoning = useCallback((id: string) => {
