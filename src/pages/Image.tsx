@@ -453,8 +453,8 @@ const ImagePage = () => {
         }
     };
 
-    // Drag and drop handlers
-    const handleDragEnter = useCallback((e: React.DragEvent) => {
+    // Drag and drop handlers for image attachment
+    const handleDragEnter = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
         e.preventDefault();
         e.stopPropagation();
         if (canAttachImage) {
@@ -462,18 +462,18 @@ const ImagePage = () => {
         }
     }, [canAttachImage]);
 
-    const handleDragLeave = useCallback((e: React.DragEvent) => {
+    const handleDragLeave = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
         e.preventDefault();
         e.stopPropagation();
         setIsDragging(false);
     }, []);
 
-    const handleDragOver = useCallback((e: React.DragEvent) => {
+    const handleDragOver = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
         e.preventDefault();
         e.stopPropagation();
     }, []);
 
-    const handleDrop = useCallback((e: React.DragEvent) => {
+    const handleDrop = useCallback((e: React.DragEvent<HTMLLabelElement>) => {
         e.preventDefault();
         e.stopPropagation();
         setIsDragging(false);
