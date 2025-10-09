@@ -175,11 +175,10 @@ serve(async (req) => {
 
       console.log('Resposta completa recebida');
       
-      // Normalize line breaks for better Word compatibility
+      // Normalize line breaks to standard \n
       fullResponse = fullResponse
-        .replace(/\r\n/g, '\n')  // Normalize to \n first
-        .replace(/\r/g, '\n')    // Convert any remaining \r to \n
-        .replace(/\n/g, '\r\n'); // Convert all \n to \r\n for Word compatibility
+        .replace(/\r\n/g, '\n')  // Normalize CRLF to LF
+        .replace(/\r/g, '\n');   // Convert any remaining CR to LF
       
       return new Response(JSON.stringify({ response: fullResponse }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -190,11 +189,10 @@ serve(async (req) => {
     const data = await response.json();
     let responseText = data.choices[0].message.content;
     
-    // Normalize line breaks for better Word compatibility
+    // Normalize line breaks to standard \n
     responseText = responseText
-      .replace(/\r\n/g, '\n')  // Normalize to \n first
-      .replace(/\r/g, '\n')    // Convert any remaining \r to \n
-      .replace(/\n/g, '\r\n'); // Convert all \n to \r\n for Word compatibility
+      .replace(/\r\n/g, '\n')  // Normalize CRLF to LF
+      .replace(/\r/g, '\n');   // Convert any remaining CR to LF
 
     // Record token usage in database  
     const authHeader = req.headers.get('authorization');

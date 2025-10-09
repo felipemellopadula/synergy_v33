@@ -121,11 +121,10 @@ serve(async (req) => {
     const data = await response.json();
     let generatedText = data.choices?.[0]?.message?.content || 'Não foi possível gerar resposta';
     
-    // Normalize line breaks for better Word compatibility
+    // Normalize line breaks to standard \n
     generatedText = generatedText
-      .replace(/\r\n/g, '\n')  // Normalize to \n first
-      .replace(/\r/g, '\n')    // Convert any remaining \r to \n
-      .replace(/\n/g, '\r\n'); // Convert all \n to \r\n for Word compatibility
+      .replace(/\r\n/g, '\n')  // Normalize CRLF to LF
+      .replace(/\r/g, '\n');   // Convert any remaining CR to LF
     
     // Add prefix if message was processed in chunks
     const finalResponse = responsePrefix + generatedText;
