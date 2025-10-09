@@ -148,26 +148,26 @@
     font-style: italic;
   }
 
-  /* Força espaçamentos compactos no markdown (override de qualquer estilo global) */
+  /* ULTRA-COMPACTO - Igual GPT */
   .markdown-content > * + * {
-    margin-top: 0.375rem !important; /* 6px entre qualquer elemento */
+    margin-top: 0.25rem !important; /* 4px entre elementos */
   }
 
   .markdown-content h1,
   .markdown-content h2,
   .markdown-content h3 {
     margin-top: 0.5rem !important; /* 8px para títulos */
-    margin-bottom: 0.375rem !important; /* 6px abaixo */
+    margin-bottom: 0.25rem !important; /* 4px abaixo */
   }
 
   .markdown-content p {
-    margin-bottom: 0.375rem !important; /* 6px entre parágrafos */
+    margin-bottom: 0.25rem !important; /* 4px entre parágrafos */
   }
 
   .markdown-content ul,
   .markdown-content ol {
     margin-top: 0.25rem !important; /* 4px antes de listas */
-    margin-bottom: 0.375rem !important; /* 6px depois */
+    margin-bottom: 0.25rem !important; /* 4px depois */
   }
 
   .markdown-content li {
