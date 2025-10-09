@@ -66,7 +66,7 @@ const UserProfileLazy = lazy(() =>
   import("@/components/UserProfile")
 );
 // Temporarily use static import to debug
-import MarkdownRendererLazy from "@/components/MarkdownRenderer";
+import MarkdownRendererLazy from "@/components/CleanMarkdownRenderer";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTokens } from "@/hooks/useTokens";
