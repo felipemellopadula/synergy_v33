@@ -148,30 +148,30 @@
     font-style: italic;
   }
 
-  /* ULTRA-COMPACTO - Igual GPT */
+  /* Formatação equilibrada - Funciona bem para GPT e Claude */
   .markdown-content > * + * {
-    margin-top: 0.25rem !important; /* 4px entre elementos */
+    margin-top: 0.5rem !important; /* 8px entre elementos */
   }
 
   .markdown-content h1,
   .markdown-content h2,
   .markdown-content h3 {
-    margin-top: 0.5rem !important; /* 8px para títulos */
-    margin-bottom: 0.25rem !important; /* 4px abaixo */
+    margin-top: 1rem !important; /* 16px para títulos */
+    margin-bottom: 0.5rem !important; /* 8px abaixo */
   }
 
   .markdown-content p {
-    margin-bottom: 0.25rem !important; /* 4px entre parágrafos */
+    margin-bottom: 0.5rem !important; /* 8px entre parágrafos */
   }
 
   .markdown-content ul,
   .markdown-content ol {
-    margin-top: 0.25rem !important; /* 4px antes de listas */
-    margin-bottom: 0.25rem !important; /* 4px depois */
+    margin-top: 0.5rem !important; /* 8px antes de listas */
+    margin-bottom: 0.5rem !important; /* 8px depois */
   }
 
   .markdown-content li {
-    margin-top: 0.125rem !important; /* 2px entre bullets */
-    line-height: 1.4 !important; /* compacto */
+    margin-top: 0.25rem !important; /* 4px entre bullets */
+    line-height: 1.5 !important; /* mais legível */
   }
 }
