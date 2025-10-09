@@ -139,7 +139,13 @@ serve(async (req) => {
     }
 
     const data = await response.json();
-    const generatedText = data.choices?.[0]?.message?.content || 'Não foi possível gerar resposta';
+    let generatedText = data.choices?.[0]?.message?.content || 'Não foi possível gerar resposta';
+    
+    // Normalize line breaks for better Word compatibility
+    generatedText = generatedText
+      .replace(/\r\n/g, '\n')  // Normalize to \n first
+      .replace(/\r/g, '\n')    // Convert any remaining \r to \n
+      .replace(/\n/g, '\r\n'); // Convert all \n to \r\n for Word compatibility
     
     // Add prefix if message was processed in chunks
     const finalResponse = responsePrefix + generatedText;

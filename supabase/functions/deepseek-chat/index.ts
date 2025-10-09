@@ -174,6 +174,13 @@ serve(async (req) => {
       }
 
       console.log('Resposta completa recebida');
+      
+      // Normalize line breaks for better Word compatibility
+      fullResponse = fullResponse
+        .replace(/\r\n/g, '\n')  // Normalize to \n first
+        .replace(/\r/g, '\n')    // Convert any remaining \r to \n
+        .replace(/\n/g, '\r\n'); // Convert all \n to \r\n for Word compatibility
+      
       return new Response(JSON.stringify({ response: fullResponse }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -181,7 +188,13 @@ serve(async (req) => {
 
     // Fallback para resposta não-stream
     const data = await response.json();
-    const responseText = data.choices[0].message.content;
+    let responseText = data.choices[0].message.content;
+    
+    // Normalize line breaks for better Word compatibility
+    responseText = responseText
+      .replace(/\r\n/g, '\n')  // Normalize to \n first
+      .replace(/\r/g, '\n')    // Convert any remaining \r to \n
+      .replace(/\n/g, '\r\n'); // Convert all \n to \r\n for Word compatibility
 
     // Record token usage in database  
     const authHeader = req.headers.get('authorization');
