@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ModelSelector } from "./ModelSelector";
-import { Send, Bot, User, Paperclip, Image, Camera } from "lucide-react";
+import { Send, Bot, User, Paperclip, Image, Camera, ArrowDown } from "lucide-react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { PdfProcessor } from "@/utils/PdfProcessor";
 import { WordProcessor } from "@/utils/WordProcessor";
@@ -42,10 +42,12 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
   const [fileContent, setFileContent] = useState<string>('');
   const [fileName, setFileName] = useState<string>('');
   const [filePages, setFilePages] = useState<number>(0);
+  const [showScrollButton, setShowScrollButton] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const pasteAreaRef = useRef<HTMLDivElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   // Handle clipboard paste for images - enhanced version
   const handlePaste = async (event: ClipboardEvent) => {
@@ -148,6 +150,35 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
       setIsProcessingFile(false);
     }
   };
+
+  // Check if user is at bottom of scroll
+  const checkScrollPosition = () => {
+    const scrollElement = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (scrollElement) {
+      const { scrollTop, scrollHeight, clientHeight } = scrollElement;
+      const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+      setShowScrollButton(!isAtBottom);
+    }
+  };
+
+  // Scroll to bottom function
+  const scrollToBottom = () => {
+    const scrollElement = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (scrollElement) {
+      scrollElement.scrollTo({ top: scrollElement.scrollHeight, behavior: 'smooth' });
+    }
+  };
+
+  // Add scroll listener
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const scrollElement = scrollAreaRef.current?.querySelector('[data-radix-scroll-area-viewport]');
+    if (scrollElement) {
+      scrollElement.addEventListener('scroll', checkScrollPosition);
+      return () => scrollElement.removeEventListener('scroll', checkScrollPosition);
+    }
+  }, [isOpen, messages]);
 
   // Add global paste listener with immediate setup
   useEffect(() => {
@@ -536,7 +567,7 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
           </div>
         </div>
 
-        <ScrollArea className="flex-1 p-4">
+        <ScrollArea ref={scrollAreaRef} className="flex-1 p-4 relative">
           <div className="space-y-4">
             {messages.length === 0 && (
               <div className="text-center text-muted-foreground py-8">
@@ -620,6 +651,20 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
               </div>
             )}
           </div>
+          
+          {/* Scroll to bottom button */}
+          {showScrollButton && (
+            <div className="fixed bottom-24 right-8 z-50">
+              <Button
+                onClick={scrollToBottom}
+                size="icon"
+                className="rounded-full h-12 w-12 shadow-lg hover:scale-110 transition-transform"
+                aria-label="Rolar para o final"
+              >
+                <ArrowDown className="h-5 w-5" />
+              </Button>
+            </div>
+          )}
         </ScrollArea>
 
         <div className="p-4 border-t border-border">
