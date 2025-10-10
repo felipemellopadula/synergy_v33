@@ -118,6 +118,12 @@ const ImagePage = () => {
     const [upscaleFactor, setUpscaleFactor] = useState<number>(4);
     const [upscaleFormat, setUpscaleFormat] = useState<string>('WEBP');
     
+    // Estados para upscale standalone
+    const [uploadedImageForUpscale, setUploadedImageForUpscale] = useState<File | null>(null);
+    const [uploadedImagePreview, setUploadedImagePreview] = useState<string | null>(null);
+    const [upscaledResult, setUpscaledResult] = useState<string | null>(null);
+    const [isUpscalingStandalone, setIsUpscalingStandalone] = useState(false);
+    
     // Habilita anexo para GPT, Ideogram, Kontext, Gemini-Flash e Seedream
     const canAttachImage = useMemo(() => 
         model === "openai:1@1" || model === "ideogram:4@1" || model === "bfl:3@1" || model === "google:4@1" || model === "bytedance:5@0", 
@@ -146,6 +152,13 @@ const ImagePage = () => {
             setPreviewUrl(null);
         }
     }, [selectedFile]);
+    
+    // Cleanup para preview de upscale
+    useEffect(() => {
+        return () => {
+            if (uploadedImagePreview) URL.revokeObjectURL(uploadedImagePreview);
+        };
+    }, [uploadedImagePreview]);
 
     useEffect(() => {
         if (!canAttachImage && selectedFile) {
@@ -192,6 +205,82 @@ const ImagePage = () => {
       } else {
         setSelectedFile(null);
       }
+    };
+    
+    // Handler para upload de imagem para upscale
+    const handleUpscaleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            setUploadedImageForUpscale(file);
+            setUploadedImagePreview(URL.createObjectURL(file));
+            setUpscaledResult(null);
+        }
+    };
+
+    // Handler para drag and drop de upscale
+    const handleUpscaleDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setIsDragging(false);
+
+        const files = e.dataTransfer.files;
+        if (files && files.length > 0) {
+            const file = files[0];
+            if (file.type.startsWith('image/')) {
+                setUploadedImageForUpscale(file);
+                setUploadedImagePreview(URL.createObjectURL(file));
+                setUpscaledResult(null);
+                toast({ title: 'Imagem carregada!', description: 'Agora você pode fazer o upscale.', variant: "default" });
+            } else {
+                toast({ title: 'Arquivo inválido', description: 'Por favor, envie apenas imagens.', variant: "destructive" });
+            }
+        }
+    };
+
+    // Handler para aplicar upscale 2x
+    const handleStandaloneUpscale = async () => {
+        if (!uploadedImageForUpscale) {
+            toast({ title: "Nenhuma imagem carregada", description: "Por favor, faça upload de uma imagem primeiro.", variant: "destructive" });
+            return;
+        }
+
+        setIsUpscalingStandalone(true);
+
+        try {
+            const reader = new FileReader();
+            reader.readAsDataURL(uploadedImageForUpscale);
+            await new Promise<void>((resolve, reject) => {
+                reader.onload = () => resolve();
+                reader.onerror = (error) => reject(error);
+            });
+            const imageBase64 = (reader.result as string);
+
+            const { data, error } = await supabase.functions.invoke('upscale-image', {
+                body: {
+                    inputImage: imageBase64,
+                    upscaleFactor: 2,
+                    outputFormat: 'WEBP'
+                }
+            });
+
+            if (error) throw error;
+
+            setUpscaledResult(data.imageUrl);
+            toast({
+                title: "Upscale concluído!",
+                description: `Imagem ampliada 2x com sucesso. Custo: $${data.cost.toFixed(4)}`,
+            });
+
+        } catch (error: any) {
+            console.error('Erro ao fazer upscale:', error);
+            toast({
+                title: "Erro ao fazer upscale",
+                description: error.message || "Não foi possível ampliar a imagem",
+                variant: "destructive",
+            });
+        } finally {
+            setIsUpscalingStandalone(false);
+        }
     };
 
     const generate = async () => {
@@ -690,6 +779,126 @@ const ImagePage = () => {
                                     {isGenerating ? 'Gerando...' : 'Gerar Imagem'}
                                 </Button>
                             </div>
+                        </CardContent>
+                    </Card>
+                </section>
+
+                {/* NOVA SEÇÃO: Upscale de Imagens 2x */}
+                <section className="max-w-7xl mx-auto mb-6">
+                    <Card>
+                        <CardContent className="pt-6 space-y-4">
+                            <div className="flex items-center gap-2 mb-4">
+                                <Maximize2 className="h-5 w-5 text-primary" />
+                                <h2 className="text-xl font-semibold">Upscale de Imagem 2x</h2>
+                            </div>
+                            
+                            <p className="text-sm text-muted-foreground mb-4">
+                                Faça upload de qualquer imagem e amplie ela 2x mantendo a qualidade usando IA.
+                            </p>
+
+                            {/* Área de Upload */}
+                            <div
+                                onDragEnter={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(true); }}
+                                onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+                                onDragLeave={(e) => { e.preventDefault(); e.stopPropagation(); setIsDragging(false); }}
+                                onDrop={handleUpscaleDrop}
+                                className={`border-2 border-dashed rounded-lg p-8 text-center transition-all cursor-pointer ${
+                                    isDragging 
+                                        ? 'border-primary bg-primary/10 scale-105' 
+                                        : 'border-border hover:border-primary/50 hover:bg-accent/50'
+                                }`}
+                                onClick={() => document.getElementById('upscale-file-input')?.click()}
+                            >
+                                <Input
+                                    id="upscale-file-input"
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleUpscaleFileChange}
+                                    className="sr-only"
+                                />
+                                
+                                {uploadedImagePreview ? (
+                                    <div className="space-y-4">
+                                        <img 
+                                            src={uploadedImagePreview} 
+                                            alt="Preview da imagem para upscale" 
+                                            className="max-h-64 mx-auto rounded-lg shadow-md"
+                                        />
+                                        <div className="flex gap-2 justify-center">
+                                            <Button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setUploadedImageForUpscale(null);
+                                                    setUploadedImagePreview(null);
+                                                    setUpscaledResult(null);
+                                                }}
+                                                variant="outline"
+                                                size="sm"
+                                            >
+                                                <X className="h-4 w-4 mr-2" />
+                                                Remover
+                                            </Button>
+                                            <Button
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleStandaloneUpscale();
+                                                }}
+                                                disabled={isUpscalingStandalone}
+                                                size="sm"
+                                            >
+                                                {isUpscalingStandalone ? (
+                                                    <>
+                                                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                                        Processando...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <Maximize2 className="h-4 w-4 mr-2" />
+                                                        Aplicar Upscale 2x
+                                                    </>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-4">
+                                        <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground" />
+                                        <div>
+                                            <p className="text-lg font-medium">Arraste uma imagem aqui</p>
+                                            <p className="text-sm text-muted-foreground mt-1">ou clique para selecionar</p>
+                                        </div>
+                                        <p className="text-xs text-muted-foreground">
+                                            Formatos aceitos: JPG, PNG, WEBP
+                                        </p>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Resultado do Upscale */}
+                            {upscaledResult && (
+                                <div className="mt-6 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <h3 className="text-lg font-semibold">Resultado (2x maior)</h3>
+                                        <Button
+                                            onClick={() => {
+                                                const link = document.createElement('a');
+                                                link.href = upscaledResult;
+                                                link.download = `upscale-2x-${Date.now()}.webp`;
+                                                link.click();
+                                            }}
+                                            variant="default"
+                                        >
+                                            <Download className="h-4 w-4 mr-2" />
+                                            Baixar Imagem Ampliada
+                                        </Button>
+                                    </div>
+                                    <img 
+                                        src={upscaledResult} 
+                                        alt="Imagem com upscale aplicado" 
+                                        className="w-full rounded-lg shadow-lg border"
+                                    />
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </section>
