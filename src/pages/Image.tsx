@@ -369,86 +369,46 @@ const ImagePage = () => {
         inputImageBase64 = (reader.result as string).split(",")[1];
       }
 
-      // Se há uma imagem anexada, usa a edge function de edição otimizada
+      // Se há uma imagem anexada, usa a edge function de edição Runware para todos os modelos
       if (inputImageBase64 && canAttachImage) {
-        // Para Gemini, usa o Lovable AI Gateway
-        if (model === "google:4@1") {
-          const editBody = {
-            prompt: finalPrompt,
-            imageUrl: inputImageBase64, // Gemini aceita base64 diretamente
-          };
+        const editBody = {
+          model,
+          positivePrompt: finalPrompt,
+          inputImage: inputImageBase64,
+          width: selectedQualityInfo.width,
+          height: selectedQualityInfo.height,
+        };
 
-          const { data: editData, error: editError } = await supabase.functions.invoke("edit-image-gemini", { body: editBody });
-          if (editError) throw editError;
+        const { data: editData, error: editError } = await supabase.functions.invoke("edit-image", { body: editBody });
+        if (editError) throw editError;
 
-          if (!editData?.image) throw new Error("A API não retornou uma imagem.");
+        if (!editData?.image) throw new Error("A API não retornou uma imagem.");
 
-          // Salvar a imagem editada no banco
-          const imageDataURI = editData.image.startsWith("data:")
-            ? editData.image
-            : `data:image/png;base64,${editData.image}`;
-          const imageResponse = await fetch(imageDataURI);
-          const imageBlob = await imageResponse.blob();
-          const fileName = `${user.id}/${Date.now()}.png`;
+        // Salvar a imagem editada no banco
+        const imageDataURI = editData.image.startsWith("data:")
+          ? editData.image
+          : `data:image/png;base64,${editData.image}`;
+        const imageResponse = await fetch(imageDataURI);
+        const imageBlob = await imageResponse.blob();
+        const fileName = `${user.id}/${Date.now()}.png`;
 
-          const { data: storageData, error: storageError } = await supabase.storage
-            .from("images")
-            .upload(fileName, imageBlob, { cacheControl: "3600" });
+        const { data: storageData, error: storageError } = await supabase.storage
+          .from("images")
+          .upload(fileName, imageBlob, { cacheControl: "3600" });
 
-          if (storageError) throw storageError;
+        if (storageError) throw storageError;
 
-          await supabase.from("user_images").insert({
-            user_id: user.id,
-            prompt: finalPrompt,
-            image_path: storageData.path,
-            width: selectedQualityInfo.width,
-            height: selectedQualityInfo.height,
-            format: "png",
-          });
+        await supabase.from("user_images").insert({
+          user_id: user.id,
+          prompt: finalPrompt,
+          image_path: storageData.path,
+          width: selectedQualityInfo.width,
+          height: selectedQualityInfo.height,
+          format: "png",
+        });
 
-          setTimeout(() => loadSavedImages(), 1000);
-          toast({ title: "Imagem editada com Gemini e salva!", variant: "default" });
-        } else {
-          // Para outros modelos, usa Runware
-          const editBody = {
-            model,
-            positivePrompt: finalPrompt,
-            inputImage: inputImageBase64,
-            width: selectedQualityInfo.width,
-            height: selectedQualityInfo.height,
-          };
-
-          const { data: editData, error: editError } = await supabase.functions.invoke("edit-image", { body: editBody });
-          if (editError) throw editError;
-
-          if (!editData?.image) throw new Error("A API não retornou uma imagem.");
-
-          // Salvar a imagem editada no banco
-          const imageDataURI = editData.image.startsWith("data:")
-            ? editData.image
-            : `data:image/png;base64,${editData.image}`;
-          const imageResponse = await fetch(imageDataURI);
-          const imageBlob = await imageResponse.blob();
-          const fileName = `${user.id}/${Date.now()}.png`;
-
-          const { data: storageData, error: storageError } = await supabase.storage
-            .from("images")
-            .upload(fileName, imageBlob, { cacheControl: "3600" });
-
-          if (storageError) throw storageError;
-
-          await supabase.from("user_images").insert({
-            user_id: user.id,
-            prompt: finalPrompt,
-            image_path: storageData.path,
-            width: selectedQualityInfo.width,
-            height: selectedQualityInfo.height,
-            format: "png",
-          });
-
-          setTimeout(() => loadSavedImages(), 1000);
-          toast({ title: "Imagem editada e salva!", variant: "default" });
-        }
+        setTimeout(() => loadSavedImages(), 1000);
+        toast({ title: "Imagem editada e salva!", variant: "default" });
       } else {
         // Geração normal sem edição - todos os modelos usam Runware
         const body: any = {
