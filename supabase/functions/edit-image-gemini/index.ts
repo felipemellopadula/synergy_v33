@@ -1,3 +1,4 @@
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const corsHeaders = {
@@ -11,9 +12,9 @@ serve(async (req) => {
   }
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
-    if (!LOVABLE_API_KEY) {
-      throw new Error('LOVABLE_API_KEY não configurada');
+    const geminiApiKey = Deno.env.get('GEMINI_API_KEY');
+    if (!geminiApiKey) {
+      throw new Error('GEMINI_API_KEY não configurada');
     }
 
     const { prompt, imageUrl } = await req.json();
@@ -22,51 +23,64 @@ serve(async (req) => {
       throw new Error('Prompt e URL da imagem são obrigatórios');
     }
 
-    console.log('Editando imagem com Gemini via Lovable AI Gateway');
+    console.log('Editando imagem com Gemini API direta');
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-image-preview",
-        messages: [
-          {
-            role: "user",
-            content: [
-              {
-                type: "text",
-                text: prompt
-              },
-              {
-                type: "image_url",
-                image_url: {
-                  url: imageUrl
-                }
-              }
-            ]
+    // Prepara o formato de imagem para o Gemini
+    let inlineData;
+    if (imageUrl.startsWith('data:image')) {
+      // É base64, extrai o mime type e os dados
+      const matches = imageUrl.match(/^data:([^;]+);base64,(.+)$/);
+      if (!matches) {
+        throw new Error('Formato de base64 inválido');
+      }
+      inlineData = {
+        mimeType: matches[1],
+        data: matches[2]
+      };
+    } else {
+      throw new Error('Apenas imagens em base64 são suportadas');
+    }
+
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${geminiApiKey}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                { text: prompt },
+                { inlineData }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
           }
-        ],
-        modalities: ["image", "text"]
-      })
-    });
+        })
+      }
+    );
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Erro da Lovable AI Gateway:', errorText);
-      throw new Error(`Erro da Lovable AI Gateway: ${response.status} - ${errorText}`);
+      console.error('Erro da API Gemini:', errorText);
+      throw new Error(`Erro da API Gemini: ${response.status} - ${errorText}`);
     }
 
     const result = await response.json();
-    console.log('Resposta da Lovable AI Gateway recebida');
+    console.log('Resposta da API Gemini recebida');
 
-    // Extrai a imagem gerada
-    const editedImageUrl = result.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    // Extrai a resposta de texto
+    const generatedText = result.candidates?.[0]?.content?.parts?.[0]?.text;
     
-    if (!editedImageUrl) {
-      throw new Error('Nenhuma imagem foi gerada pela API');
+    if (!generatedText) {
+      throw new Error('Nenhuma resposta foi gerada pela API');
     }
 
     return new Response(
