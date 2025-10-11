@@ -878,7 +878,7 @@ const ImagePage = () => {
                   setIsDragging(false);
                 }}
                 onDrop={handleUpscaleDrop}
-                className={`border-2 border-dashed rounded-lg p-8 text-center transition-all cursor-pointer ${
+                className={`border-2 border-dashed rounded-lg p-4 text-center transition-all cursor-pointer ${
                   isDragging
                     ? "border-primary bg-primary/10 scale-105"
                     : "border-border hover:border-primary/50 hover:bg-accent/50"
@@ -894,11 +894,11 @@ const ImagePage = () => {
                 />
 
                 {uploadedImagePreview ? (
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <img
                       src={uploadedImagePreview}
                       alt="Preview da imagem para upscale"
-                      className="max-h-64 mx-auto rounded-lg shadow-md"
+                      className="max-h-40 mx-auto rounded-lg shadow-md"
                     />
                     <div className="flex gap-2 justify-center">
                       <Button
@@ -937,10 +937,10 @@ const ImagePage = () => {
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    <ImageIcon className="h-12 w-12 mx-auto text-muted-foreground" />
+                  <div className="space-y-3">
+                    <ImageIcon className="h-10 w-10 mx-auto text-muted-foreground" />
                     <div>
-                      <p className="text-lg font-medium">Arraste uma imagem aqui</p>
+                      <p className="text-base font-medium">Arraste uma imagem aqui</p>
                       <p className="text-sm text-muted-foreground mt-1">ou clique para selecionar</p>
                     </div>
                     <p className="text-xs text-muted-foreground">Formatos aceitos: JPG, PNG, WEBP</p>
