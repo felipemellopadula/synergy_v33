@@ -117,7 +117,7 @@ serve(async (req) => {
         throw new Error('Nenhuma imagem foi gerada pela API');
       }
 
-      const imageBase64 = imageResult.imageBase64 || imageResult.imageURL;
+      const imageBase64 = imageResult.imageBase64Data || imageResult.imageBase64 || imageResult.imageURL;
       
       if (!imageBase64) {
         throw new Error('API não retornou imagem em formato esperado');
@@ -177,7 +177,7 @@ serve(async (req) => {
         throw new Error('Nenhuma imagem foi gerada pela API');
       }
 
-      const imageBase64 = imageResult.imageBase64 || imageResult.imageURL;
+      const imageBase64 = imageResult.imageBase64Data || imageResult.imageBase64 || imageResult.imageURL;
       
       if (!imageBase64) {
         throw new Error('API não retornou imagem em formato esperado');
