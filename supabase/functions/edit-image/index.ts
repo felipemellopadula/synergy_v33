@@ -42,7 +42,7 @@ serve(async (req) => {
         numberResults: 1,
         outputFormat: "PNG",
         inputImage,
-        outputType: "base64",
+        outputType: "base64Data",
         includeCost: true,
         // Parâmetros otimizados para edição de imagens
         CFGScale: 7.5, // Maior fidelidade ao prompt
