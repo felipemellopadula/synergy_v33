@@ -112,20 +112,23 @@ const TranslatorPage = () => {
     try {
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: {
-          message: `Você é um especialista em humanização de textos gerados por IA. Sua tarefa é reescrever o texto fornecido para que soe mais natural e humano. Faça as seguintes melhorias:
+          message: `You are an expert in humanizing AI-generated texts. Your task is to rewrite the provided text to sound more natural and human.
 
-1. Adicione variações no tom e ritmo das frases
-2. Use contrações e linguagem mais coloquial quando apropriado
-3. Inclua conectivos naturais e transições suaves
-4. Varie o comprimento das frases para criar fluidez
-5. Adicione toques pessoais e expressões mais humanas
-6. Melhore a pontuação para criar pausas naturais
-7. Remova repetições robóticas e padrões de IA
-8. Mantenha o significado e informações importantes
+CRITICAL: Detect the language of the input text and respond in THE EXACT SAME LANGUAGE. Do not translate or change the language.
 
-O texto deve soar como se fosse escrito por uma pessoa real, não por uma máquina.
+Make the following improvements:
+1. Add variations in tone and sentence rhythm
+2. Use contractions and colloquial language when appropriate
+3. Include natural connectors and smooth transitions
+4. Vary sentence length to create flow
+5. Add personal touches and more human expressions
+6. Improve punctuation to create natural pauses
+7. Remove robotic repetitions and AI patterns
+8. Maintain the meaning and important information
 
-Texto a humanizar:
+The text should sound as if it were written by a real person, not a machine.
+
+Text to humanize:
 ${humanizeInput}`,
           model: "gpt-4o-mini"
         }
