@@ -1262,8 +1262,7 @@ const ImagePage = () => {
                         onClick={() => downloadImage(images[0])}
                         className="bg-primary/90 hover:bg-primary shadow-lg"
                       >
-                        <Download className="h-5 w-5 mr-2" />
-                        Baixar Imagem
+                        <Download className="h-5 w-5" />
                       </Button>
                     </div>
                   )}
@@ -1322,8 +1321,7 @@ const ImagePage = () => {
                                   onClick={() => downloadImage(img)}
                                   className="bg-primary/90 hover:bg-primary shadow-lg"
                                 >
-                                  <Download className="h-5 w-5 mr-2" />
-                                  Baixar Imagem
+                                  <Download className="h-5 w-5" />
                                 </Button>
                               </div>
                             </div>
