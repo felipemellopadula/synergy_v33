@@ -88,7 +88,7 @@ serve(async (req) => {
           referenceImages: [uploadedImage.imageUUID],
           numberResults: 1,
           outputFormat: "PNG",
-          outputType: "base64Data",
+          outputType: "URL",
           includeCost: true,
         }
       ];
@@ -117,7 +117,21 @@ serve(async (req) => {
         throw new Error('Nenhuma imagem foi gerada pela API');
       }
 
-      const imageBase64 = imageResult.imageBase64Data || imageResult.imageBase64 || imageResult.imageURL;
+      const imageUrl = imageResult.imageURL;
+      
+      if (!imageUrl) {
+        throw new Error('API não retornou URL da imagem');
+      }
+
+      // Download da imagem da URL
+      console.log('Baixando imagem da URL:', imageUrl);
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Erro ao baixar imagem: ${imageResponse.status}`);
+      }
+      
+      const imageBuffer = await imageResponse.arrayBuffer();
+      const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
       
       if (!imageBase64) {
         throw new Error('API não retornou imagem em formato esperado');
@@ -149,7 +163,7 @@ serve(async (req) => {
         numberResults: 1,
         outputFormat: "PNG",
         seedImage: inputImage,
-        outputType: "base64Data",
+        outputType: "URL",
         includeCost: true,
       });
 
@@ -177,7 +191,21 @@ serve(async (req) => {
         throw new Error('Nenhuma imagem foi gerada pela API');
       }
 
-      const imageBase64 = imageResult.imageBase64Data || imageResult.imageBase64 || imageResult.imageURL;
+      const imageUrl = imageResult.imageURL;
+      
+      if (!imageUrl) {
+        throw new Error('API não retornou URL da imagem');
+      }
+
+      // Download da imagem da URL
+      console.log('Baixando imagem da URL:', imageUrl);
+      const imageResponse = await fetch(imageUrl);
+      if (!imageResponse.ok) {
+        throw new Error(`Erro ao baixar imagem: ${imageResponse.status}`);
+      }
+      
+      const imageBuffer = await imageResponse.arrayBuffer();
+      const imageBase64 = btoa(String.fromCharCode(...new Uint8Array(imageBuffer)));
       
       if (!imageBase64) {
         throw new Error('API não retornou imagem em formato esperado');
