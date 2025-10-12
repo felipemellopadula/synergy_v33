@@ -418,40 +418,49 @@ serve(async (req) => {
             try {
               // Mapear modelos para custos de acordo com AdminDashboard.tsx
               const IMAGE_COSTS: Record<string, number> = {
-                'gpt-image-1': 0.25,
-                'gemini-flash': 0.0273,
+                'gpt-image-1': 0.167,
+                'gemini-flash': 0.039,
                 'qwen-image': 0.0058,
                 'ideogram-3.0': 0.06,
                 'flux.1-kontext-max': 0.08,
                 'seedream-4.0': 0.03,
                 // Fallback para modelos runware genéricos
-                'runware:100@1': 0.02, // Flux Pro
-                'runware:101@1': 0.02, // Flux Pro 1.1
-                'runware:108@1': 0.03, // Seedream 4.0
-                'runware:109@1': 0.06, // Ideogram 3.0
-                'runware:110@1': 0.08, // Flux Kontext MAX
+                'runware:100@1': 0.04, // Flux Context
+                'runware:101@1': 0.04, // Flux Context
+                'openai:1@1': 0.167, // GPT-Image-1
+                'google:4@1': 0.039, // Gemini Flash Image
+                'ideogram:4@1': 0.06, // Ideogram 3.0
+                'bfl:3@1': 0.08, // Flux Kontext MAX
+                'bytedance:5@0': 0.03, // Seedream 4.0
+                'runware:108@1': 0.0058, // Qwen-Image
               };
               
               // Encontrar o custo baseado no modelo
               let modelCost = 0.02; // Custo padrão
               let modelForTracking = model || 'unknown';
               
-              // Mapear modelos Runware para nomes mais friendly
-              if (model === 'runware:108@1') {
+              // Mapear modelos para nomes mais friendly
+              if (model === 'openai:1@1') {
+                modelForTracking = 'gpt-image-1';
+                modelCost = IMAGE_COSTS['gpt-image-1'] || 0.167;
+              } else if (model === 'google:4@1') {
+                modelForTracking = 'gemini-flash-image';
+                modelCost = IMAGE_COSTS['gemini-flash'] || 0.039;
+              } else if (model === 'runware:108@1') {
                 modelForTracking = 'qwen-image';
                 modelCost = IMAGE_COSTS['qwen-image'] || 0.0058;
-              } else if (model === 'runware:109@1') {
+              } else if (model === 'ideogram:4@1') {
                 modelForTracking = 'ideogram-3.0';
                 modelCost = IMAGE_COSTS['ideogram-3.0'] || 0.06;
-              } else if (model === 'runware:110@1') {
+              } else if (model === 'bfl:3@1') {
                 modelForTracking = 'flux.1-kontext-max';
                 modelCost = IMAGE_COSTS['flux.1-kontext-max'] || 0.08;
               } else if (model === 'bytedance:5@0') {
                 modelForTracking = 'seedream-4.0';
                 modelCost = IMAGE_COSTS['seedream-4.0'] || 0.03;
               } else if (model === 'runware:100@1' || model === 'runware:101@1') {
-                modelForTracking = 'flux-pro';
-                modelCost = 0.02;
+                modelForTracking = 'flux-context';
+                modelCost = IMAGE_COSTS['runware:100@1'] || 0.04;
               } else {
                 // Procurar por correspondência nos custos definidos
                 for (const [modelName, cost] of Object.entries(IMAGE_COSTS)) {

@@ -81,7 +81,7 @@ const DEEPSEEK_PRICING: Record<string, { input: number; output: number }> = {
 // Image models pricing per image (USD)
 const IMAGE_PRICING: Record<string, { cost: number }> = {
   'gpt-image-1': { cost: 0.167 },
-  'gemini-flash': { cost: 0.039 },
+  'gemini-flash-image': { cost: 0.039 },
   'qwen-image': { cost: 0.0058 },
   'ideogram-3.0': { cost: 0.06 },
   'flux.1-kontext-max': { cost: 0.08 },
@@ -330,7 +330,7 @@ const AdminDashboard = () => {
         let provider: 'openai' | 'gemini' | 'claude' | 'grok' | 'deepseek' | 'image' = 'openai';
         
         // Debug log for image model detection
-        if (usage.model_name.toLowerCase().includes('qwen') || usage.model_name.toLowerCase().includes('image')) {
+        if (usage.model_name.toLowerCase().includes('gemini') || usage.model_name.toLowerCase().includes('qwen') || usage.model_name.toLowerCase().includes('image')) {
           console.log(`🔍 Debugging model: ${usage.model_name}`);
           console.log(`🖼️ Is image model: ${isImageModel}`);
           console.log(`📋 IMAGE_PRICING keys:`, Object.keys(IMAGE_PRICING));
@@ -339,14 +339,16 @@ const AdminDashboard = () => {
           ));
         }
         
-        if (isGeminiModel) provider = 'gemini';
+        // CRITICAL: Check image models FIRST before text models
+        // This ensures gemini-flash used for images is detected as image provider
+        if (isImageModel) provider = 'image';
+        else if (isGeminiModel) provider = 'gemini';
         else if (isClaudeModel) provider = 'claude';
         else if (isGrokModel) provider = 'grok';
         else if (isDeepSeekModel) provider = 'deepseek';
-        else if (isImageModel) provider = 'image';
         
         // Debug log for provider assignment
-        if (usage.model_name.toLowerCase().includes('qwen') || usage.model_name.toLowerCase().includes('image')) {
+        if (usage.model_name.toLowerCase().includes('gemini') || usage.model_name.toLowerCase().includes('qwen') || usage.model_name.toLowerCase().includes('image')) {
           console.log(`🏷️ Assigned provider: ${provider}`);
         }
         
