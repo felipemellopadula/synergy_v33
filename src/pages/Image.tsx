@@ -264,7 +264,6 @@ const ImagePage = () => {
         setUpscaledResult(null);
       }
     }
-    }
   };
 
   // Handler para aplicar upscale 2x
