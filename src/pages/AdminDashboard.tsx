@@ -876,35 +876,63 @@ const AdminDashboard = () => {
                  });
                }
               
-              return filteredUsage.length > 0 ? (
+                return filteredUsage.length > 0 ? (
                 <div className="space-y-4">
                   {filteredUsage.map((usage) => {
-                  // Input: convert message content characters to tokens (4 chars = 1 token)
+                  // Detect if this is an image model
+                  const isImageModel = Object.keys(IMAGE_PRICING).some(key => 
+                    usage.model_name.toLowerCase().includes(key.toLowerCase())
+                  ) || usage.model_name === 'google:4@1';
+                  
+                  let totalCost = 0;
+                  let inputTokens = 0;
+                  let outputTokens = 0;
+                  let totalTokens = 0;
+                  
+                  if (isImageModel) {
+                    // For image models, use fixed cost per image
+                    const imageModelKey = Object.keys(IMAGE_PRICING).find(key => 
+                      usage.model_name.toLowerCase().includes(key.toLowerCase())
+                    );
+                    
+                    if (imageModelKey) {
+                      totalCost = IMAGE_PRICING[imageModelKey].cost;
+                    } else if (usage.model_name === 'google:4@1') {
+                      totalCost = 0.039; // Old Gemini Flash Image records
+                    } else {
+                      totalCost = IMAGE_PRICING['gpt-image-1']?.cost || 0.02;
+                    }
+                    
+                    // For display purposes
+                    inputTokens = 1;
+                    outputTokens = 1;
+                    totalTokens = 1;
+                  } else {
+                    // For text models, calculate based on tokens
+                    const inputCharacters = usage.message_content?.length || 0;
+                    inputTokens = charsToTokens(inputCharacters);
+                    outputTokens = Math.floor(inputTokens * 2.5);
+                    
+                    // Detect provider based on model name
+                    const isGeminiModel = usage.model_name.toLowerCase().includes('gemini');
+                    const isClaudeModel = usage.model_name.toLowerCase().includes('claude');
+                    const isGrokModel = usage.model_name.toLowerCase().includes('grok');
+                    const isDeepSeekModel = usage.model_name.toLowerCase().includes('deepseek');
+                    let provider: 'openai' | 'gemini' | 'claude' | 'grok' | 'deepseek' = 'openai';
+                    
+                    if (isGeminiModel) provider = 'gemini';
+                    else if (isClaudeModel) provider = 'claude';
+                    else if (isGrokModel) provider = 'grok';
+                    else if (isDeepSeekModel) provider = 'deepseek';
+                    
+                    // Calculate costs using correct pricing per token type
+                    const inputCost = inputTokens * getCostPerToken(usage.model_name, 'input', provider);
+                    const outputCost = outputTokens * getCostPerToken(usage.model_name, 'output', provider);
+                    totalCost = inputCost + outputCost;
+                    totalTokens = inputTokens + outputTokens;
+                  }
+                  
                   const inputCharacters = usage.message_content?.length || 0;
-                  const inputTokens = charsToTokens(inputCharacters);
-                  
-                  // Output: estimate IA response tokens (typically 2-3x input size)
-                  const outputTokens = Math.floor(inputTokens * 2.5);
-                  
-                   // Detect provider based on model name
-                   const isGeminiModel = usage.model_name.toLowerCase().includes('gemini');
-                   const isClaudeModel = usage.model_name.toLowerCase().includes('claude');
-                   const isGrokModel = usage.model_name.toLowerCase().includes('grok');
-                   const isDeepSeekModel = usage.model_name.toLowerCase().includes('deepseek');
-                   let provider: 'openai' | 'gemini' | 'claude' | 'grok' | 'deepseek' = 'openai';
-                   
-                   if (isGeminiModel) provider = 'gemini';
-                   else if (isClaudeModel) provider = 'claude';
-                   else if (isGrokModel) provider = 'grok';
-                   else if (isDeepSeekModel) provider = 'deepseek';
-                  
-                  // Calculate costs using correct pricing per token type
-                  const inputCost = inputTokens * getCostPerToken(usage.model_name, 'input', provider);
-                  const outputCost = outputTokens * getCostPerToken(usage.model_name, 'output', provider);
-                  const totalCost = inputCost + outputCost;
-                  
-                  // Total tokens used (input + estimated output)
-                  const totalTokens = inputTokens + outputTokens;
                   
                   // Revenue calculation: cost + 200% profit margin = 3x cost
                   const revenue = totalCost * 3;
