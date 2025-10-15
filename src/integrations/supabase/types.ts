@@ -93,10 +93,12 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string | null
+          current_subscription_id: string | null
           email: string
           id: string
           name: string
           phone: string | null
+          stripe_customer_id: string | null
           subscription_type:
             | Database["public"]["Enums"]["subscription_type"]
             | null
@@ -106,10 +108,12 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
+          current_subscription_id?: string | null
           email: string
           id: string
           name: string
           phone?: string | null
+          stripe_customer_id?: string | null
           subscription_type?:
             | Database["public"]["Enums"]["subscription_type"]
             | null
@@ -119,17 +123,27 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string | null
+          current_subscription_id?: string | null
           email?: string
           id?: string
           name?: string
           phone?: string | null
+          stripe_customer_id?: string | null
           subscription_type?:
             | Database["public"]["Enums"]["subscription_type"]
             | null
           tokens_remaining?: number | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "profiles_current_subscription_id_fkey"
+            columns: ["current_subscription_id"]
+            isOneToOne: false
+            referencedRelation: "stripe_subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       storage_cleanup_logs: {
         Row: {
@@ -161,6 +175,120 @@ export type Database = {
           success?: boolean | null
           total_files?: number | null
           triggered_by?: string | null
+        }
+        Relationships: []
+      }
+      stripe_customers: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          stripe_customer_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          stripe_customer_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          stripe_customer_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      stripe_products: {
+        Row: {
+          active: boolean
+          amount_cents: number
+          billing_period: string
+          created_at: string
+          currency: string
+          id: string
+          plan_id: string
+          plan_name: string
+          stripe_price_id: string
+          stripe_product_id: string
+          tokens_included: number
+        }
+        Insert: {
+          active?: boolean
+          amount_cents: number
+          billing_period: string
+          created_at?: string
+          currency?: string
+          id?: string
+          plan_id: string
+          plan_name: string
+          stripe_price_id: string
+          stripe_product_id: string
+          tokens_included: number
+        }
+        Update: {
+          active?: boolean
+          amount_cents?: number
+          billing_period?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          plan_id?: string
+          plan_name?: string
+          stripe_price_id?: string
+          stripe_product_id?: string
+          tokens_included?: number
+        }
+        Relationships: []
+      }
+      stripe_subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean
+          created_at: string
+          current_period_end: string | null
+          current_period_start: string | null
+          id: string
+          plan_id: string
+          price_id: string
+          status: string
+          stripe_customer_id: string
+          stripe_subscription_id: string
+          tokens_per_period: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_id: string
+          price_id: string
+          status: string
+          stripe_customer_id: string
+          stripe_subscription_id: string
+          tokens_per_period: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          current_period_start?: string | null
+          id?: string
+          plan_id?: string
+          price_id?: string
+          status?: string
+          stripe_customer_id?: string
+          stripe_subscription_id?: string
+          tokens_per_period?: number
+          updated_at?: string
+          user_id?: string
         }
         Relationships: []
       }

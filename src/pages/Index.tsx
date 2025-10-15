@@ -6,6 +6,8 @@ import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/ca
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { AuthModal } from "@/components/AuthModal";
 import { ContactForm } from "@/components/ContactForm";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 import {
   Sparkles,
   ThumbsUp,
@@ -34,8 +36,41 @@ import {
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { toast } = useToast();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [annual, setAnnual] = useState(true);
+  const [isSubscribing, setIsSubscribing] = useState(false);
+
+  const handleSubscribe = async (planId: string) => {
+    if (!user) {
+      setShowAuthModal(true);
+      return;
+    }
+
+    setIsSubscribing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: { planId }
+      });
+
+      if (error) throw error;
+      
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        throw new Error("URL de checkout não recebida");
+      }
+    } catch (error) {
+      console.error('Erro ao criar checkout:', error);
+      toast({
+        title: "Erro",
+        description: "Não foi possível iniciar o checkout. Tente novamente.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
 
   const handlePrimaryCta = () => {
     if (user) {
@@ -352,7 +387,7 @@ const Index = () => {
                 <CardHeader className="text-center">
                   <CardTitle className="text-xl">Básico</CardTitle>
                   <div className="text-3xl font-bold text-primary">
-                    R$ {annual ? '29' : '39'}<span className="text-sm text-muted-foreground">/mês</span>
+                    R$ 1,00<span className="text-sm text-muted-foreground">/{annual ? 'ano' : 'mês'}</span>
                   </div>
                   <CardDescription>
                     Perfeito para uso pessoal e projetos pequenos.
@@ -373,8 +408,12 @@ const Index = () => {
                       Suporte por email
                     </li>
                   </ul>
-                  <Button onClick={handlePrimaryCta} className="w-full mt-6">
-                    Começar Agora
+                  <Button 
+                    onClick={() => handleSubscribe(annual ? 'basic_annual' : 'basic_monthly')} 
+                    className="w-full mt-6"
+                    disabled={isSubscribing}
+                  >
+                    {isSubscribing ? "Processando..." : "Começar Agora"}
                   </Button>
                 </div>
               </Card>
@@ -388,7 +427,7 @@ const Index = () => {
                 <CardHeader className="text-center">
                   <CardTitle className="text-xl">Pro</CardTitle>
                   <div className="text-3xl font-bold text-primary">
-                    R$ {annual ? '79' : '89'}<span className="text-sm text-muted-foreground">/mês</span>
+                    R$ 1,00<span className="text-sm text-muted-foreground">/{annual ? 'ano' : 'mês'}</span>
                   </div>
                   <CardDescription>
                     Ideal para profissionais e equipes pequenas.
@@ -413,8 +452,12 @@ const Index = () => {
                       API personalizada
                     </li>
                   </ul>
-                  <Button onClick={handlePrimaryCta} className="w-full mt-6">
-                    Começar Agora
+                  <Button 
+                    onClick={() => handleSubscribe(annual ? 'pro_annual' : 'pro_monthly')} 
+                    className="w-full mt-6"
+                    disabled={isSubscribing}
+                  >
+                    {isSubscribing ? "Processando..." : "Começar Agora"}
                   </Button>
                 </div>
               </Card>
