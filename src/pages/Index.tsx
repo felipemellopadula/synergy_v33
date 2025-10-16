@@ -49,26 +49,48 @@ const Index = () => {
 
     setIsSubscribing(true);
     try {
+      console.log('[Frontend] Iniciando checkout para:', planId);
+      
       const { data, error } = await supabase.functions.invoke('create-checkout-session', {
         body: { planId }
       });
 
-      if (error) throw error;
+      console.log('[Frontend] Resposta recebida:', { data, error });
+
+      if (error) {
+        console.error('[Frontend] Erro da função:', error);
+        throw error;
+      }
       
       if (data?.url) {
-        window.location.href = data.url;
+        console.log('[Frontend] Redirecionando para:', data.url);
+        // Usar window.open para abrir em nova aba (mais confiável)
+        const newWindow = window.open(data.url, '_blank');
+        
+        if (!newWindow) {
+          // Se popup blocker impediu, tentar redirect na mesma aba
+          console.log('[Frontend] Popup bloqueado, redirecionando na mesma aba');
+          window.location.href = data.url;
+        } else {
+          // Resetar estado se abriu com sucesso em nova aba
+          setIsSubscribing(false);
+          toast({
+            title: "Checkout aberto",
+            description: "Complete o pagamento na nova aba que foi aberta.",
+          });
+        }
       } else {
+        console.error('[Frontend] URL não recebida:', data);
         throw new Error("URL de checkout não recebida");
       }
     } catch (error) {
-      console.error('Erro ao criar checkout:', error);
+      console.error('[Frontend] Erro ao criar checkout:', error);
+      setIsSubscribing(false);
       toast({
         title: "Erro",
-        description: "Não foi possível iniciar o checkout. Tente novamente.",
+        description: error instanceof Error ? error.message : "Não foi possível iniciar o checkout. Tente novamente.",
         variant: "destructive"
       });
-    } finally {
-      setIsSubscribing(false);
     }
   };
 
