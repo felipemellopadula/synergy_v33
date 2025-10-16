@@ -1,5 +1,5 @@
 import { useNavigate, Link } from "react-router-dom";
-import { useEffect, Suspense, lazy } from "react";
+import { useEffect, Suspense, lazy, useState } from "react";
 import {
   MessageCircle,
   Video,
@@ -13,17 +13,27 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { useAuth } from "@/contexts/AuthContext";
+import { WelcomeModal } from "@/components/WelcomeModal";
+import { supabase } from "@/integrations/supabase/client";
 
 // Lazy load UserProfile to improve initial render
 const UserProfile = lazy(() => import("@/components/UserProfile"));
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const { signOut, user } = useAuth();
+  const { signOut, user, profile } = useAuth();
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
 
   useEffect(() => {
     document.title = "Synergy Ai Hub";
   }, []);
+
+  // Check if user should see welcome modal
+  useEffect(() => {
+    if (profile && !(profile as any).has_seen_welcome_modal) {
+      setShowWelcomeModal(true);
+    }
+  }, [profile]);
 
   // Render immediately, auth check is handled by ProtectedRoute
   // No need to wait for user data to render the UI
@@ -99,6 +109,13 @@ const Dashboard = () => {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Welcome Modal */}
+      <WelcomeModal
+        isOpen={showWelcomeModal}
+        onClose={() => setShowWelcomeModal(false)}
+        userName={profile?.name || "Usuário"}
+      />
+
       {/* Header */}
       <header className="border-b border-border">
         <div className="container mx-auto px-4 py-4 flex justify-between items-center">

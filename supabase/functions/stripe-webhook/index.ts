@@ -96,6 +96,48 @@ serve(async (req) => {
         }
 
         console.log(`[Webhook] Tokens creditados: ${product.tokens_included}`);
+
+        // Enviar email de boas-vindas em background
+        const sendWelcomeEmail = async () => {
+          try {
+            const { data: userProfile } = await supabase
+              .from("profiles")
+              .select("name, email")
+              .eq("id", userId)
+              .single();
+
+            if (userProfile) {
+              const emailResponse = await fetch(
+                `${Deno.env.get("SUPABASE_URL")}/functions/v1/send-welcome-email`,
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}`,
+                  },
+                  body: JSON.stringify({
+                    user_name: userProfile.name,
+                    user_email: userProfile.email,
+                    plan_name: product.plan_name,
+                    tokens_included: product.tokens_included,
+                  }),
+                }
+              );
+
+              if (emailResponse.ok) {
+                console.log("[Webhook] Email de boas-vindas enviado com sucesso");
+              } else {
+                console.error("[Webhook] Erro ao enviar email:", await emailResponse.text());
+              }
+            }
+          } catch (emailError) {
+            console.error("[Webhook] Erro ao processar email de boas-vindas:", emailError);
+          }
+        };
+
+        // Executar em background sem bloquear o webhook
+        EdgeRuntime.waitUntil(sendWelcomeEmail());
+
         break;
       }
 

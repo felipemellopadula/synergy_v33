@@ -95,6 +95,7 @@ export type Database = {
           created_at: string | null
           current_subscription_id: string | null
           email: string
+          has_seen_welcome_modal: boolean
           id: string
           is_legacy_user: boolean
           name: string
@@ -111,6 +112,7 @@ export type Database = {
           created_at?: string | null
           current_subscription_id?: string | null
           email: string
+          has_seen_welcome_modal?: boolean
           id: string
           is_legacy_user?: boolean
           name: string
@@ -127,6 +129,7 @@ export type Database = {
           created_at?: string | null
           current_subscription_id?: string | null
           email?: string
+          has_seen_welcome_modal?: boolean
           id?: string
           is_legacy_user?: boolean
           name?: string
