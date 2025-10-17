@@ -62,9 +62,16 @@ export const WelcomeModal = ({ isOpen, onClose, userName }: WelcomeModalProps) =
     }
   };
 
-  const handleViewPlans = () => {
-    handleClose();
-    navigate("/#plans");
+  const handleViewPlans = async () => {
+    await handleClose();
+    navigate("/");
+    // Scroll to plans section after navigation
+    setTimeout(() => {
+      const plansSection = document.getElementById("plans");
+      if (plansSection) {
+        plansSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }, 100);
   };
 
   return (
