@@ -500,16 +500,7 @@ const Image2Page = () => {
                   </div>
                 </Card>
               ))}
-
-            {/* Cards vazios (placeholders) */}
-            {images.length < MAX_IMAGES_TO_FETCH &&
-              Array.from({ length: MAX_IMAGES_TO_FETCH - images.length }).map((_, i) => (
-                <Card
-                  key={`empty-${i}`}
-                  className="aspect-square border-dashed border-2 border-muted-foreground/20 bg-muted/10"
-                />
-              ))}
-            </div>
+          </div>
           )}
         </div>
       </main>
