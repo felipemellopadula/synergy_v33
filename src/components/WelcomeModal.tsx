@@ -60,7 +60,6 @@ export const WelcomeModal = ({ isOpen, onClose, userName }: WelcomeModalProps) =
       name: "Básico Anual",
       price: "R$ 1,00",
       period: "/ano",
-      badge: "Economize 17%",
       features: ["50.000 tokens/mês", "Todos os modelos de IA", "Suporte prioritário"],
     },
     {
@@ -69,7 +68,6 @@ export const WelcomeModal = ({ isOpen, onClose, userName }: WelcomeModalProps) =
       name: "Pro Mensal",
       price: "R$ 1,00",
       period: "/mês",
-      popular: true,
       features: ["150.000 tokens/mês", "Todos os modelos de IA", "Suporte VIP", "Funcionalidades exclusivas"],
     },
     {
