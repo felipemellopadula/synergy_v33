@@ -18,6 +18,7 @@ import {
   Paperclip,
   Sparkles,
   Maximize2,
+  Image as ImageIcon,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import UserProfile from "@/components/UserProfile";
@@ -151,7 +152,7 @@ const Image2Page = () => {
   }, [model]);
 
   useEffect(() => {
-    document.title = "Image Generator v2";
+    document.title = "Imagem";
   }, []);
 
   useEffect(() => {
@@ -438,12 +439,17 @@ const Image2Page = () => {
       {/* Header Minimalista */}
       <header className="border-b p-4 sticky top-0 bg-background/95 backdrop-blur z-20">
         <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" onClick={() => navigate("/dashboard")}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               Voltar
             </Button>
-            <h1 className="text-xl font-bold">Image Generator v2</h1>
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                <ImageIcon className="h-5 w-5 text-purple-500" />
+              </div>
+              <h1 className="text-xl font-bold">Imagem</h1>
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <UserProfile />
