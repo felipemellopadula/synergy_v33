@@ -28,9 +28,9 @@ const Dashboard = () => {
     document.title = "Synergy Ai Hub";
   }, []);
 
-  // Check if user should see welcome modal
+  // Check if user should see welcome modal - sempre mostrar para usuários free
   useEffect(() => {
-    if (profile && !(profile as any).has_seen_welcome_modal) {
+    if (profile && profile.subscription_type === 'free') {
       setShowWelcomeModal(true);
     }
   }, [profile]);
