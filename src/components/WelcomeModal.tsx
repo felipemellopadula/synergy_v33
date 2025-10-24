@@ -56,7 +56,7 @@ export const WelcomeModal = ({ isOpen, onClose, userName }: WelcomeModalProps) =
     },
     {
       id: "basic-yearly",
-      planId: "basic_yearly",
+      planId: "basic_annual",
       name: "Básico Anual",
       price: "R$ 1,00",
       period: "/ano",
@@ -74,7 +74,7 @@ export const WelcomeModal = ({ isOpen, onClose, userName }: WelcomeModalProps) =
     },
     {
       id: "pro-yearly",
-      planId: "pro_yearly",
+      planId: "pro_annual",
       name: "Pro Anual",
       price: "R$ 1,00",
       period: "/ano",
