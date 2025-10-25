@@ -46,7 +46,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, model = 'deepseek-chat' } = await req.json();
+    const { message, model = 'deepseek-chat', files } = await req.json();
 
     console.log(`DeepSeek Chat - Modelo: ${model}`);
     console.log(`Tamanho da mensagem: ${message.length} caracteres`);
@@ -56,7 +56,35 @@ serve(async (req) => {
       throw new Error('DEEPSEEK_API_KEY não configurada');
     }
 
+    // Log files information
+    if (files && files.length > 0) {
+      console.log('📄 Files received:', files.map((f: any) => ({ 
+        name: f.name, 
+        type: f.type, 
+        hasPdfContent: !!f.pdfContent,
+        hasWordContent: !!f.wordContent
+      })));
+    }
+    
+    // Process PDF and DOC files if present
     let processedMessage = message;
+    if (files && files.length > 0) {
+      const fileContents = [];
+      
+      files.forEach((file: any) => {
+        if (file.pdfContent) {
+          fileContents.push(`[PDF: ${file.name}]\n\n${file.pdfContent}`);
+        }
+        if (file.wordContent) {
+          fileContents.push(`[Word: ${file.name}]\n\n${file.wordContent}`);
+        }
+      });
+      
+      if (fileContents.length > 0) {
+        processedMessage = `${message}\n\n${fileContents.join('\n\n---\n\n')}`;
+        console.log('📊 Message with files:', processedMessage.length, 'characters');
+      }
+    }
     let chunks: string[] = [];
 
     // Configurar chunk size baseado no modelo
@@ -210,9 +238,9 @@ serve(async (req) => {
         const userId = user?.id;
         
         if (userId) {
-          // Calculate token usage - 4 characters = 1 token
-          const inputTokens = Math.ceil((message?.length || 0) / 4);
-          const outputTokens = Math.ceil(responseText.length / 4);
+          // Calculate token usage - 3.2 characters = 1 token (optimized for Portuguese)
+          const inputTokens = Math.ceil((processedMessage?.length || 0) / 3.2);
+          const outputTokens = Math.ceil(responseText.length / 3.2);
           const totalTokens = inputTokens + outputTokens;
           
           console.log('Recording DeepSeek token usage:', {
@@ -252,7 +280,31 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ response: responseText }), {
+    // Create document context if chunks were processed
+    let documentContext = null;
+    if (chunks.length > 1) {
+      const compactSummary = responseText.length > 2000 
+        ? responseText.substring(0, 2000) + '...\n\n[Resposta completa disponível no histórico]'
+        : responseText;
+      
+      documentContext = {
+        summary: compactSummary,
+        totalChunks: chunks.length,
+        fileNames: files?.map((f: any) => f.name),
+        estimatedTokens: Math.ceil(processedMessage.length / 3.2),
+        processedAt: new Date().toISOString()
+      };
+      
+      console.log('📄 Document context created:', {
+        fileNames: documentContext.fileNames,
+        totalChunks: documentContext.totalChunks
+      });
+    }
+
+    return new Response(JSON.stringify({ 
+      response: responseText,
+      documentContext 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {

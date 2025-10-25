@@ -9,15 +9,14 @@ const corsHeaders = {
 const BASE_URL = "https://api.apillm.com";
 const CHAT_ENDPOINT = `${BASE_URL}/chat/completions`;
 
-// Function to estimate token count (rough approximation)
+// Function to estimate token count (optimized for Portuguese)
 function estimateTokenCount(text: string): number {
-  // Rough approximation: 1 token ≈ 4 characters for Portuguese text
-  return Math.ceil(text.length / 3);
+  return Math.ceil(text.length / 3.2); // More accurate for Portuguese
 }
 
 // Function to split text into chunks
 function splitIntoChunks(text: string, maxTokens: number): string[] {
-  const maxChars = maxTokens * 3; // Convert tokens to approximate characters
+  const maxChars = maxTokens * 3.2;
   const chunks = [];
   
   for (let i = 0; i < text.length; i += maxChars) {
@@ -34,7 +33,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, model = 'llama-3.2-8b-instruct' } = await req.json();
+    const { message, model = 'llama-3.2-8b-instruct', files } = await req.json();
     
     console.log('APILLM Chat - Request received:', {
       model,
@@ -59,30 +58,98 @@ serve(async (req) => {
     };
 
     const limits = getModelLimits(model);
-    const estimatedTokens = estimateTokenCount(message);
     
-    console.log('Token estimation:', { 
+    // Log files information
+    if (files && files.length > 0) {
+      console.log('📄 Files received:', files.map((f: any) => ({ 
+        name: f.name, 
+        type: f.type, 
+        hasPdfContent: !!f.pdfContent,
+        hasWordContent: !!f.wordContent
+      })));
+    }
+    
+    // Process PDF and DOC files if present
+    let finalMessage = message;
+    if (files && files.length > 0) {
+      const fileContents = [];
+      
+      files.forEach((file: any) => {
+        if (file.pdfContent) {
+          fileContents.push(`[PDF: ${file.name}]\n\n${file.pdfContent}`);
+        }
+        if (file.wordContent) {
+          fileContents.push(`[Word: ${file.name}]\n\n${file.wordContent}`);
+        }
+      });
+      
+      if (fileContents.length > 0) {
+        finalMessage = `${message}\n\n${fileContents.join('\n\n---\n\n')}`;
+        console.log('📊 Message with files:', finalMessage.length, 'characters');
+      }
+    }
+    
+    const estimatedTokens = estimateTokenCount(finalMessage);
+    
+    console.log('📊 Token estimation:', { 
       estimatedTokens, 
       inputLimit: limits.input, 
       model,
-      messageLength: message.length 
+      messageLength: finalMessage.length,
+      hasFiles: files && files.length > 0
     });
 
-    let processedMessage = message;
-    let responsePrefix = '';
+    let processedMessage = finalMessage;
+    let chunkResponses: string[] = [];
 
-    // If message is too large, split into chunks
+    // If message is too large, process ALL chunks with Map-Reduce
     if (estimatedTokens > limits.input * 0.6) {
-      console.log('Message too large, processing in chunks...');
+      console.log('📄 Large document detected, processing ALL chunks...');
       
       const maxChunkTokens = Math.floor(limits.input * 0.5);
-      const chunks = splitIntoChunks(message, maxChunkTokens);
+      const chunks = splitIntoChunks(finalMessage, maxChunkTokens);
       
       if (chunks.length > 1) {
-        responsePrefix = `🦙 Documento grande processado em ${chunks.length} partes:\n\n`;
+        console.log(`🔄 Processing ${chunks.length} chunks...`);
         
-        // Process first chunk with instructions to summarize
-        processedMessage = `Analise e resuma este documento (parte 1 de ${chunks.length}). Foque nos pontos principais:\n\n${chunks[0]}`;
+        for (let i = 0; i < chunks.length; i++) {
+          console.log(`🔄 Processing chunk ${i+1}/${chunks.length}...`);
+          
+          const chunkResponse = await fetch(CHAT_ENDPOINT, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${apillmApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              model: model,
+              messages: [
+                { role: 'system', content: 'Você é um assistente de IA prestativo.' },
+                { role: 'user', content: `Analise esta parte (${i+1}/${chunks.length}) do documento:\n\n${chunks[i]}` }
+              ],
+              max_tokens: limits.output,
+              temperature: 0.7,
+              stream: false
+            }),
+          });
+          
+          if (!chunkResponse.ok) {
+            const errorData = await chunkResponse.text();
+            console.error(`❌ Chunk ${i+1} error:`, errorData);
+            throw new Error(`Erro no chunk ${i+1}: ${chunkResponse.status}`);
+          }
+          
+          const chunkData = await chunkResponse.json();
+          const chunkText = chunkData.choices?.[0]?.message?.content || '';
+          chunkResponses.push(chunkText);
+          console.log(`✅ Chunk ${i+1} processed:`, chunkText.length, 'characters');
+        }
+        
+        // Consolidate all responses
+        console.log('🔄 Consolidating', chunkResponses.length, 'chunk responses...');
+        processedMessage = `Consolidar as análises das ${chunks.length} partes:\n\n${
+          chunkResponses.map((r, i) => `PARTE ${i+1}:\n${r}`).join('\n\n---\n\n')
+        }\n\nPergunta original: ${message}`;
       }
     }
 
@@ -125,9 +192,6 @@ serve(async (req) => {
     generatedText = generatedText
       .replace(/\r\n/g, '\n')  // Normalize CRLF to LF
       .replace(/\r/g, '\n');   // Convert any remaining CR to LF
-    
-    // Add prefix if message was processed in chunks
-    const finalResponse = responsePrefix + generatedText;
 
     console.log('APILLM response received successfully');
 
@@ -147,9 +211,9 @@ serve(async (req) => {
         const userId = user?.id;
         
         if (userId) {
-          // Calculate token usage - 4 characters = 1 token
-          const inputTokens = Math.ceil((message?.length || 0) / 4);
-          const outputTokens = Math.ceil(generatedText.length / 4);
+          // Calculate token usage - 3.2 characters = 1 token (optimized for Portuguese)
+          const inputTokens = Math.ceil((finalMessage?.length || 0) / 3.2);
+          const outputTokens = Math.ceil(generatedText.length / 3.2);
           const totalTokens = inputTokens + outputTokens;
           
           console.log('Recording APILLM token usage:', {
@@ -189,7 +253,32 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ response: finalResponse }), {
+    // Create document context for follow-ups
+    let documentContext = null;
+    if (chunkResponses.length > 0) {
+      const compactSummary = generatedText.length > 2000 
+        ? generatedText.substring(0, 2000) + '...\n\n[Resposta completa disponível no histórico]'
+        : generatedText;
+      
+      documentContext = {
+        summary: compactSummary,
+        totalChunks: chunkResponses.length,
+        fileNames: files?.map((f: any) => f.name),
+        estimatedTokens: estimateTokenCount(finalMessage),
+        processedAt: new Date().toISOString()
+      };
+      
+      console.log('📄 Document context created:', {
+        fileNames: documentContext.fileNames,
+        totalChunks: documentContext.totalChunks,
+        tokens: documentContext.estimatedTokens
+      });
+    }
+
+    return new Response(JSON.stringify({ 
+      response: generatedText,
+      documentContext 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {

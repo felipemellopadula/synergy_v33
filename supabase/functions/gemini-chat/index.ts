@@ -6,6 +6,23 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Function to estimate token count (optimized for Portuguese)
+function estimateTokenCount(text: string): number {
+  return Math.ceil(text.length / 3.2); // More accurate for Portuguese
+}
+
+// Function to split text into chunks
+function splitIntoChunks(text: string, maxTokens: number): string[] {
+  const maxChars = maxTokens * 3.2;
+  const chunks = [];
+  
+  for (let i = 0; i < text.length; i += maxChars) {
+    chunks.push(text.slice(i, i + maxChars));
+  }
+  
+  return chunks;
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -13,7 +30,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, model = 'gemini-2.0-flash-exp', conversationHistory = [], contextEnabled = false } = await req.json();
+    const { message, model = 'gemini-2.0-flash-exp', files, conversationHistory = [], contextEnabled = false } = await req.json();
     
     // Map frontend model names to correct Gemini API model names
     const modelMapping: Record<string, string> = {
@@ -38,28 +55,147 @@ serve(async (req) => {
       throw new Error('GEMINI_API_KEY não configurada');
     }
 
-    // Build contents array with conversation history if context is enabled
-    let contents = [];
-    
-    if (contextEnabled && conversationHistory.length > 0) {
-      // Add conversation history for context
-      console.log('Building conversation context with', conversationHistory.length, 'previous messages');
-      
-      conversationHistory.forEach((historyMsg: any) => {
-        // Gemini uses different role names
-        const role = historyMsg.role === 'assistant' ? 'model' : 'user';
-        contents.push({
-          role: role,
-          parts: [{ text: historyMsg.content }]
-        });
-      });
+    // Log files information
+    if (files && files.length > 0) {
+      console.log('📄 Files received:', files.map((f: any) => ({ 
+        name: f.name, 
+        type: f.type, 
+        hasPdfContent: !!f.pdfContent,
+        hasWordContent: !!f.wordContent
+      })));
     }
     
-    // Add current user message
-    contents.push({
-      role: 'user',
-      parts: [{ text: message }]
+    // Process PDF and DOC files if present
+    let finalMessage = message;
+    if (files && files.length > 0) {
+      const fileContents = [];
+      
+      files.forEach((file: any) => {
+        if (file.pdfContent) {
+          fileContents.push(`[PDF: ${file.name}]\n\n${file.pdfContent}`);
+        }
+        if (file.wordContent) {
+          fileContents.push(`[Word: ${file.name}]\n\n${file.wordContent}`);
+        }
+      });
+      
+      if (fileContents.length > 0) {
+        finalMessage = `${message}\n\n${fileContents.join('\n\n---\n\n')}`;
+        console.log('📊 Final message with files:', finalMessage.length, 'characters');
+      }
+    }
+
+    const limits = { input: 1000000, output: 8192 }; // Gemini 2.0 Flash
+    const estimatedTokens = estimateTokenCount(finalMessage);
+    
+    console.log('📊 Token estimation:', { 
+      estimatedTokens, 
+      inputLimit: limits.input, 
+      model,
+      messageLength: finalMessage.length,
+      hasFiles: files && files.length > 0
     });
+
+    // Build contents array with conversation history if context is enabled
+    let contents = [];
+    let chunkResponses: string[] = [];
+    
+    // If document is large, process in chunks with Map-Reduce
+    if (estimatedTokens > limits.input * 0.6) {
+      console.log('📄 Large document detected, processing in chunks...');
+      const chunks = splitIntoChunks(finalMessage, Math.floor(limits.input * 0.5));
+      
+      for (let i = 0; i < chunks.length; i++) {
+        console.log(`🔄 Processing chunk ${i+1}/${chunks.length}...`);
+        
+        const chunkContents = [
+          {
+            role: 'user',
+            parts: [{
+              text: `Analise esta parte (${i+1}/${chunks.length}) do documento:\n\n${chunks[i]}`
+            }]
+          }
+        ];
+        
+        const chunkResponse = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/${actualModel}:generateContent?key=${geminiApiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: chunkContents,
+              generationConfig: {
+                temperature: 0.7,
+                topK: 40,
+                topP: 0.95,
+                maxOutputTokens: 8192,
+              }
+            }),
+          }
+        );
+        
+        if (!chunkResponse.ok) {
+          const errorData = await chunkResponse.text();
+          console.error(`❌ Chunk ${i+1} error:`, errorData);
+          throw new Error(`Erro no chunk ${i+1}: ${chunkResponse.status}`);
+        }
+        
+        const chunkData = await chunkResponse.json();
+        const chunkText = chunkData.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        chunkResponses.push(chunkText);
+        console.log(`✅ Chunk ${i+1} processed:`, chunkText.length, 'characters');
+      }
+      
+      // Consolidate all chunk responses
+      console.log('🔄 Consolidating', chunkResponses.length, 'chunk responses...');
+      const consolidationPrompt = `Consolidar as análises das ${chunks.length} partes do documento:\n\n${
+        chunkResponses.map((r, i) => `PARTE ${i+1}:\n${r}`).join('\n\n---\n\n')
+      }\n\nPergunta original: ${message}`;
+      
+      contents.push({
+        role: 'user',
+        parts: [{ text: consolidationPrompt }]
+      });
+    } else {
+      // Normal processing - use context if enabled
+      if (contextEnabled && conversationHistory.length > 0) {
+        const mainMessageTokens = estimateTokenCount(finalMessage);
+        
+        if (mainMessageTokens > limits.input * 0.6) {
+          // Large document: preserve only document context
+          const documentContextMessages = conversationHistory.filter((msg: any) => 
+            msg.content?.includes('[CONTEXTO DO DOCUMENTO]')
+          );
+          
+          if (documentContextMessages.length > 0) {
+            const lastDocContext = documentContextMessages[documentContextMessages.length - 1];
+            contents.push({
+              role: 'user',
+              parts: [{ text: lastDocContext.content }]
+            });
+            console.log('📚 Previous document context preserved');
+          }
+        } else {
+          // Small document: normal history
+          console.log('Building conversation context with', conversationHistory.length, 'previous messages');
+          
+          const recentHistory = conversationHistory.slice(-3);
+          recentHistory.forEach((historyMsg: any) => {
+            const role = historyMsg.role === 'assistant' ? 'model' : 'user';
+            contents.push({
+              role: role,
+              parts: [{ text: historyMsg.content }]
+            });
+          });
+        }
+      }
+      
+      // Add current user message
+      contents.push({
+        role: 'user',
+        parts: [{ text: finalMessage }]
+      });
+    }
 
     console.log('Sending request to Gemini with model:', actualModel, 'and', contents.length, 'messages');
     console.log('Original model requested:', model, '-> Mapped to:', actualModel);
@@ -112,9 +248,9 @@ serve(async (req) => {
         const userId = user?.id;
         
         if (userId) {
-          // Calculate token usage - 4 characters = 1 token (user's specification)
-          const inputTokens = Math.ceil((message?.length || 0) / 4);
-          const outputTokens = Math.ceil(generatedText.length / 4);
+          // Calculate token usage - 3.2 characters = 1 token (optimized for Portuguese)
+          const inputTokens = Math.ceil((finalMessage?.length || 0) / 3.2);
+          const outputTokens = Math.ceil(generatedText.length / 3.2);
           const totalTokens = inputTokens + outputTokens;
           
           console.log('Recording Gemini token usage:', {
@@ -156,7 +292,32 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ response: generatedText }), {
+    // Create document context for follow-ups (if processed in chunks)
+    let documentContext = null;
+    if (chunkResponses.length > 0) {
+      const compactSummary = generatedText.length > 2000 
+        ? generatedText.substring(0, 2000) + '...\n\n[Resposta completa disponível no histórico]'
+        : generatedText;
+      
+      documentContext = {
+        summary: compactSummary,
+        totalChunks: chunkResponses.length,
+        fileNames: files?.map((f: any) => f.name),
+        estimatedTokens: estimateTokenCount(finalMessage),
+        processedAt: new Date().toISOString()
+      };
+      
+      console.log('📄 Document context created for follow-ups:', {
+        fileNames: documentContext.fileNames,
+        totalChunks: documentContext.totalChunks,
+        tokens: documentContext.estimatedTokens
+      });
+    }
+
+    return new Response(JSON.stringify({ 
+      response: generatedText,
+      documentContext 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {

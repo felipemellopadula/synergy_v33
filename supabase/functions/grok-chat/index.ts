@@ -6,15 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Function to estimate token count (rough approximation)
+// Function to estimate token count (optimized for Portuguese)
 function estimateTokenCount(text: string): number {
-  // Rough approximation: 1 token ≈ 4 characters for Portuguese text
-  return Math.ceil(text.length / 3);
+  return Math.ceil(text.length / 3.2); // More accurate for Portuguese
 }
 
 // Function to split text into chunks
 function splitIntoChunks(text: string, maxTokens: number): string[] {
-  const maxChars = maxTokens * 3; // Convert tokens to approximate characters
+  const maxChars = maxTokens * 3.2;
   const chunks = [];
   
   for (let i = 0; i < text.length; i += maxChars) {
@@ -31,7 +30,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, model = 'grok-3', conversationHistory = [], contextEnabled = false } = await req.json();
+    const { message, model = 'grok-3', files, conversationHistory = [], contextEnabled = false } = await req.json();
     
     const xaiApiKey = Deno.env.get('XAI_API_KEY');
     if (!xaiApiKey) {
@@ -48,66 +47,117 @@ serve(async (req) => {
 
     const limits = getModelLimits(model);
     
-    // Build messages array with conversation history if context is enabled
-    let messages = [];
-    
-    if (contextEnabled && conversationHistory.length > 0) {
-      // Add conversation history for context
-      console.log('Building conversation context with', conversationHistory.length, 'previous messages');
-      
-      messages = conversationHistory.map((historyMsg: any) => ({
-        role: historyMsg.role,
-        content: historyMsg.content
-      }));
+    // Log files information
+    if (files && files.length > 0) {
+      console.log('📄 Files received:', files.map((f: any) => ({ 
+        name: f.name, 
+        type: f.type, 
+        hasPdfContent: !!f.pdfContent,
+        hasWordContent: !!f.wordContent
+      })));
     }
     
-    // Add current user message
-    messages.push({
-      role: 'user',
-      content: message
-    });
+    // Process PDF and DOC files if present
+    let finalMessage = message;
+    if (files && files.length > 0) {
+      const fileContents = [];
+      
+      files.forEach((file: any) => {
+        if (file.pdfContent) {
+          fileContents.push(`[PDF: ${file.name}]\n\n${file.pdfContent}`);
+        }
+        if (file.wordContent) {
+          fileContents.push(`[Word: ${file.name}]\n\n${file.wordContent}`);
+        }
+      });
+      
+      if (fileContents.length > 0) {
+        finalMessage = `${message}\n\n${fileContents.join('\n\n---\n\n')}`;
+        console.log('📊 Message with files:', finalMessage.length, 'characters');
+      }
+    }
     
-    // Calculate total token count for the entire conversation
-    const totalText = messages.map((msg: any) => msg.content).join('\n');
-    const estimatedTokens = estimateTokenCount(totalText);
+    const estimatedTokens = estimateTokenCount(finalMessage);
     
-    console.log('Token estimation:', { 
+    console.log('📊 Token estimation:', { 
       estimatedTokens, 
       inputLimit: limits.input, 
       model,
-      messageLength: totalText.length,
-      contextMessages: messages.length - 1
+      messageLength: finalMessage.length,
+      hasFiles: files && files.length > 0
     });
+    
+    // Build messages array with conversation history if context is enabled
+    let messages = [];
+    let chunkResponses: string[] = [];
+    
+    // If document is large, process in chunks with Map-Reduce
+    if (estimatedTokens > limits.input * 0.6) {
+      console.log('📄 Large document detected, processing in chunks...');
+      const chunks = splitIntoChunks(finalMessage, Math.floor(limits.input * 0.5));
+      
+      for (let i = 0; i < chunks.length; i++) {
+        console.log(`🔄 Processing chunk ${i+1}/${chunks.length}...`);
+        
+        const chunkMessages = [{
+          role: 'user',
+          content: `Analise esta parte (${i+1}/${chunks.length}) do documento:\n\n${chunks[i]}`
+        }];
+        
+        const chunkResponse = await fetch('https://api.x.ai/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${xaiApiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: model,
+            messages: chunkMessages,
+            max_tokens: limits.output,
+            temperature: 0.7,
+          }),
+        });
+        
+        if (!chunkResponse.ok) {
+          const errorData = await chunkResponse.text();
+          console.error(`❌ Chunk ${i+1} error:`, errorData);
+          throw new Error(`Erro no chunk ${i+1}: ${chunkResponse.status}`);
+        }
+        
+        const chunkData = await chunkResponse.json();
+        const chunkText = chunkData.choices?.[0]?.message?.content || '';
+        chunkResponses.push(chunkText);
+        console.log(`✅ Chunk ${i+1} processed:`, chunkText.length, 'characters');
+      }
+      
+      // Consolidate all responses
+      console.log('🔄 Consolidating', chunkResponses.length, 'chunk responses...');
+      const consolidationPrompt = `Consolidar as análises das ${chunks.length} partes:\n\n${
+        chunkResponses.map((r, i) => `PARTE ${i+1}:\n${r}`).join('\n\n---\n\n')
+      }\n\nPergunta original: ${message}`;
+      
+      messages.push({
+        role: 'user',
+        content: consolidationPrompt
+      });
+    } else {
+      // Normal processing with context if enabled
+      if (contextEnabled && conversationHistory.length > 0) {
+        console.log('Building conversation context with', conversationHistory.length, 'previous messages');
+        const recentHistory = conversationHistory.slice(-3);
+        messages = recentHistory.map((historyMsg: any) => ({
+          role: historyMsg.role,
+          content: historyMsg.content
+        }));
+      }
+      
+      messages.push({
+        role: 'user',
+        content: finalMessage
+      });
+    }
 
     let processedMessages = messages;
-    let responsePrefix = '';
-
-    // If conversation is too large, truncate older messages but keep recent context
-    if (estimatedTokens > limits.input * 0.4) {
-      console.log('Conversation too large, truncating older messages...');
-      
-      // Keep the current message and try to fit as many recent messages as possible
-      const currentMessage = messages[messages.length - 1];
-      let keptMessages = [currentMessage];
-      let currentTokens = estimateTokenCount(currentMessage.content);
-      
-      // Add messages from most recent backwards until we hit the limit
-      for (let i = messages.length - 2; i >= 0; i--) {
-        const msgTokens = estimateTokenCount(messages[i].content);
-        if (currentTokens + msgTokens < limits.input * 0.4) {
-          keptMessages.unshift(messages[i]);
-          currentTokens += msgTokens;
-        } else {
-          break;
-        }
-      }
-      
-      processedMessages = keptMessages;
-      
-      if (keptMessages.length < messages.length) {
-        responsePrefix = `ℹ️ Mantendo contexto das últimas ${keptMessages.length - 1} mensagens da conversa.\n\n`;
-      }
-    }
     
     const requestBody = {
       model: model,
@@ -145,9 +195,6 @@ serve(async (req) => {
     generatedText = generatedText
       .replace(/\r\n/g, '\n')  // Normalize CRLF to LF
       .replace(/\r/g, '\n');   // Convert any remaining CR to LF
-    
-    // Add prefix if message was processed in chunks
-    const finalResponse = responsePrefix + generatedText;
 
     console.log('xAI response received successfully');
 
@@ -167,9 +214,9 @@ serve(async (req) => {
         const userId = user?.id;
         
         if (userId) {
-          // Calculate token usage - 4 characters = 1 token
-          const inputTokens = Math.ceil((messages[messages.length - 1]?.content?.length || 0) / 4);
-          const outputTokens = Math.ceil(generatedText.length / 4);
+          // Calculate token usage - 3.2 characters = 1 token (optimized for Portuguese)
+          const inputTokens = Math.ceil((finalMessage?.length || 0) / 3.2);
+          const outputTokens = Math.ceil(generatedText.length / 3.2);
           const totalTokens = inputTokens + outputTokens;
           
           console.log('Recording Grok token usage:', {
@@ -209,7 +256,32 @@ serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ response: finalResponse }), {
+    // Create document context for follow-ups
+    let documentContext = null;
+    if (chunkResponses.length > 0) {
+      const compactSummary = generatedText.length > 2000 
+        ? generatedText.substring(0, 2000) + '...\n\n[Resposta completa disponível no histórico]'
+        : generatedText;
+      
+      documentContext = {
+        summary: compactSummary,
+        totalChunks: chunkResponses.length,
+        fileNames: files?.map((f: any) => f.name),
+        estimatedTokens: estimateTokenCount(finalMessage),
+        processedAt: new Date().toISOString()
+      };
+      
+      console.log('📄 Document context created:', {
+        fileNames: documentContext.fileNames,
+        totalChunks: documentContext.totalChunks,
+        tokens: documentContext.estimatedTokens
+      });
+    }
+
+    return new Response(JSON.stringify({ 
+      response: generatedText,
+      documentContext 
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {

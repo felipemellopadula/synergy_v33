@@ -6,15 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Function to estimate token count (rough approximation)
+// Function to estimate token count (optimized for Portuguese)
 function estimateTokenCount(text: string): number {
-  // Rough approximation: 1 token ≈ 4 characters for Portuguese text
-  return Math.ceil(text.length / 3);
+  return Math.ceil(text.length / 3.2); // More accurate for Portuguese
 }
 
 // Function to split text into chunks
 function splitIntoChunks(text: string, maxTokens: number): string[] {
-  const maxChars = maxTokens * 3; // Convert tokens to approximate characters
+  const maxChars = maxTokens * 3.2;
   const chunks = [];
   
   for (let i = 0; i < text.length; i += maxChars) {
@@ -107,31 +106,67 @@ serve(async (req) => {
     });
 
     let processedMessages = messages;
-    let responsePrefix = '';
+    let chunkResponses: string[] = [];
 
-    // If message is too large, process in chunks
+    // If message is too large, process ALL chunks with Map-Reduce
     if (estimatedTokens > limits.input * 0.4) {
-      console.log('Message too large, processing in chunks...');
+      console.log('📄 Message too large, processing ALL chunks with Map-Reduce...');
       
-      // Claude models have high context window, use larger chunks
       let maxChunkTokens;
       if (model.includes('haiku')) {
-        maxChunkTokens = Math.min(25000, Math.floor(limits.input * 0.4)); // Smaller chunks for Haiku
+        maxChunkTokens = Math.min(25000, Math.floor(limits.input * 0.4));
       } else {
-        maxChunkTokens = Math.min(40000, Math.floor(limits.input * 0.5)); // Larger chunks for Opus/Sonnet
+        maxChunkTokens = Math.min(40000, Math.floor(limits.input * 0.5));
       }
       
       const chunks = splitIntoChunks(finalMessage, maxChunkTokens);
       
       if (chunks.length > 1) {
-        responsePrefix = `⚠️ Documento muito grande para ${model}. Processando em ${chunks.length} partes:\n\n`;
+        console.log(`🔄 Processing ${chunks.length} chunks...`);
         
-        // Process first chunk with instructions to summarize
-        const processedMessage = `Analise e resuma este trecho de um documento extenso (parte 1 de ${chunks.length}). Foque nos pontos principais:\n\n${chunks[0]}`;
+        for (let i = 0; i < chunks.length; i++) {
+          console.log(`🔄 Processing chunk ${i+1}/${chunks.length}...`);
+          
+          const chunkMessages = [{
+            role: 'user',
+            content: `Analise esta parte (${i+1}/${chunks.length}) do documento:\n\n${chunks[i]}`
+          }];
+          
+          const chunkResponse = await fetch('https://api.anthropic.com/v1/messages', {
+            method: 'POST',
+            headers: {
+              'x-api-key': anthropicApiKey,
+              'Content-Type': 'application/json',
+              'anthropic-version': '2023-06-01'
+            },
+            body: JSON.stringify({
+              model: model,
+              max_tokens: 4096,
+              messages: chunkMessages
+            }),
+          });
+          
+          if (!chunkResponse.ok) {
+            const errorData = await chunkResponse.text();
+            console.error(`❌ Chunk ${i+1} error:`, errorData);
+            throw new Error(`Erro no chunk ${i+1}: ${chunkResponse.status}`);
+          }
+          
+          const chunkData = await chunkResponse.json();
+          const chunkText = chunkData.content?.[0]?.text || '';
+          chunkResponses.push(chunkText);
+          console.log(`✅ Chunk ${i+1} processed:`, chunkText.length, 'characters');
+        }
+        
+        // Consolidate all responses
+        console.log('🔄 Consolidating', chunkResponses.length, 'chunk responses...');
+        const consolidationPrompt = `Consolidar as análises das ${chunks.length} partes:\n\n${
+          chunkResponses.map((r, i) => `PARTE ${i+1}:\n${r}`).join('\n\n---\n\n')
+        }\n\nPergunta original: ${message}`;
         
         processedMessages = [{
           role: 'user',
-          content: processedMessage
+          content: consolidationPrompt
         }];
       }
     }
@@ -252,7 +287,33 @@ serve(async (req) => {
       }
 
       console.log('🎉 Retornando resposta final para o cliente...');
-      return new Response(JSON.stringify({ response: finalResponse }), {
+      
+      // Create document context for follow-ups
+      let documentContext = null;
+      if (chunkResponses.length > 0) {
+        const compactSummary = finalResponse.length > 2000 
+          ? finalResponse.substring(0, 2000) + '...\n\n[Resposta completa disponível no histórico]'
+          : finalResponse;
+        
+        documentContext = {
+          summary: compactSummary,
+          totalChunks: chunkResponses.length,
+          fileNames: files?.map((f: any) => f.name),
+          estimatedTokens: estimateTokenCount(finalMessage),
+          processedAt: new Date().toISOString()
+        };
+        
+        console.log('📄 Document context created:', {
+          fileNames: documentContext.fileNames,
+          totalChunks: documentContext.totalChunks,
+          tokens: documentContext.estimatedTokens
+        });
+      }
+      
+      return new Response(JSON.stringify({ 
+        response: finalResponse,
+        documentContext 
+      }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
       
