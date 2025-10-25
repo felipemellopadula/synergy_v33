@@ -344,8 +344,9 @@ serve(async (req) => {
               role: 'user',
               content: chunkMessage
             }],
-            max_completion_tokens: isNewerModel ? Math.min(4096, limits.output) : undefined,
-            max_tokens: !isNewerModel ? Math.min(4096, limits.output) : undefined,
+            // OTIMIZAÇÃO 1: Usar 60% do output para permitir respostas detalhadas
+            max_completion_tokens: isNewerModel ? Math.floor(limits.output * 0.6) : undefined,
+            max_tokens: !isNewerModel ? Math.floor(limits.output * 0.6) : undefined,
           };
 
           if (!isNewerModel) {
@@ -371,12 +372,27 @@ serve(async (req) => {
           const chunkData = await chunkResponse.json();
           const chunkText = chunkData.choices?.[0]?.message?.content || `[Sem resposta para seção ${i + 1}]`;
           chunkResponses.push(chunkText);
+          
+          // OTIMIZAÇÃO 4: Log de tokens de cada chunk
+          console.log(`✅ Chunk ${i + 1} processado: ${estimateTokenCount(chunkText)} tokens`);
         }
+        
+        // OTIMIZAÇÃO 4: Log do total de tokens das análises parciais
+        const totalChunkTokens = chunkResponses.reduce((sum, resp) => sum + estimateTokenCount(resp), 0);
+        console.log(`📊 Total de tokens das análises parciais: ${totalChunkTokens.toLocaleString()}`);
         
         responsePrefix += `\n✅ Todas as ${chunks.length} seções processadas. Consolidando respostas...\n\n`;
         
-        // Reduce phase: consolidate all chunk responses
-        const consolidationPrompt = `Você processou um documento extenso em ${chunks.length} partes. Aqui estão as análises de cada parte:\n\n${chunkResponses.map((resp, idx) => `=== PARTE ${idx + 1} ===\n${resp}`).join('\n\n')}\n\nAgora consolide todas essas análises em uma resposta única, completa e coerente. Pergunta original do usuário: ${message}`;
+        // OTIMIZAÇÃO 3: Prompt de consolidação melhorado
+        const consolidationPrompt = `Você é um especialista em análise de documentos. Processou ${estimatedTokens.toLocaleString()} tokens em ${chunks.length} partes.
+
+CRÍTICO: Sua resposta final deve ser COMPLETA e DETALHADA, mantendo TODAS as informações das análises abaixo. Não resuma - preserve o máximo de detalhes possível.
+
+${chunkResponses.map((resp, idx) => `=== ANÁLISE PARTE ${idx + 1}/${chunks.length} ===\n${resp}`).join('\n\n')}
+
+Consolide em uma resposta única e coerente preservando o máximo de detalhes.
+
+Pergunta original: ${message}`;
         
         processedMessages = [{
           role: 'user',
@@ -399,11 +415,15 @@ Este documento foi processado em múltiplas partes. Use este contexto para respo
       }
     }
     
+    // OTIMIZAÇÃO 2: Na consolidação, NÃO limitar output (deixar modelo usar capacidade máxima)
+    const isConsolidationPhase = chunkResponses.length > 0;
+    
     const requestBody: any = {
       model: model,
       messages: processedMessages,
-      max_completion_tokens: isNewerModel ? limits.output : undefined,
-      max_tokens: !isNewerModel ? limits.output : undefined,
+      // Consolidação: sem limite. Processamento normal: usar limite padrão
+      max_completion_tokens: isNewerModel && !isConsolidationPhase ? limits.output : undefined,
+      max_tokens: !isNewerModel && !isConsolidationPhase ? limits.output : undefined,
     };
 
     // Only add temperature for legacy models
