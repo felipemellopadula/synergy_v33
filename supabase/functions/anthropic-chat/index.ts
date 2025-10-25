@@ -97,7 +97,7 @@ serve(async (req) => {
       const mainMessageTokens = estimateTokenCount(finalMessage);
       if (mainMessageTokens < limits.input * 0.4) {
         // Add limited conversation history
-        const recentHistory = conversationHistory.slice(-3); // Only last 3 messages
+        const recentHistory = conversationHistory.slice(-1); // Only last 1 message for faster response
         messages = recentHistory.map((historyMsg: any) => ({
           role: historyMsg.role,
           content: historyMsg.content
@@ -128,7 +128,7 @@ serve(async (req) => {
     let responsePrefix = '';
 
     // If message is too large, process in chunks
-    if (estimatedTokens > limits.input * 0.6) {
+    if (estimatedTokens > limits.input * 0.4) {
       console.log('Message too large, processing in chunks...');
       
       // Claude models have high context window, use larger chunks
@@ -169,7 +169,7 @@ serve(async (req) => {
 
     // Add timeout to prevent hanging requests
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
+    const timeoutId = setTimeout(() => controller.abort(), 180000); // 3 minutes timeout
 
     console.log('🚀 Iniciando fetch para Anthropic API...');
     
