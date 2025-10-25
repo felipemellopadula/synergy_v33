@@ -197,8 +197,7 @@ const Image2Page = () => {
 
       const uniqueImages = data
         ? data.filter(
-            (img, index, self) =>
-              index === self.findIndex((t) => t.id === img.id && t.image_path === img.image_path),
+            (img, index, self) => index === self.findIndex((t) => t.id === img.id && t.image_path === img.image_path),
           )
         : [];
 
@@ -461,21 +460,25 @@ const Image2Page = () => {
       {/* Grid de Imagens */}
       <main className="flex-1 overflow-auto p-4 pb-48">
         <div className="container mx-auto max-w-7xl">
-        {isLoadingHistory ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Card key={i} className="aspect-square animate-pulse bg-muted" />
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+          {isLoadingHistory ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              {Array.from({ length: 8 }).map((_, i) => (
+                <Card key={i} className="aspect-square animate-pulse bg-muted" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               {images.map((img) => (
                 <Card
                   key={img.id}
                   className="relative aspect-square overflow-hidden group cursor-pointer hover:ring-2 hover:ring-primary transition-all"
                   onClick={() => setSelectedImageForModal(img)}
                 >
-                  <img src={getImageUrl(img)} alt={img.prompt || "Generated image"} className="w-full h-full object-cover" />
+                  <img
+                    src={getImageUrl(img)}
+                    alt={img.prompt || "Generated image"}
+                    className="w-full h-full object-cover"
+                  />
 
                   {/* Overlay no hover */}
                   <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
@@ -501,21 +504,21 @@ const Image2Page = () => {
                       >
                         <Share2 className="h-4 w-4" />
                       </Button>
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setImageToDelete(img);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setImageToDelete(img);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </div>
                 </Card>
               ))}
-          </div>
+            </div>
           )}
         </div>
       </main>
@@ -528,7 +531,12 @@ const Image2Page = () => {
             <div className="mb-3 flex items-center gap-2 p-2 bg-white/10 rounded-lg">
               <img src={previewUrl} alt="Preview" className="h-12 w-12 object-cover rounded" />
               <p className="text-white text-sm flex-1 truncate">{selectedFile?.name}</p>
-              <Button size="sm" variant="ghost" className="text-white hover:text-white/80" onClick={() => setSelectedFile(null)}>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="text-white hover:text-white/80"
+                onClick={() => setSelectedFile(null)}
+              >
                 <X className="h-4 w-4" />
               </Button>
             </div>
@@ -588,13 +596,7 @@ const Image2Page = () => {
               >
                 <Paperclip className="h-4 w-4" />
               </Button>
-              <input
-                id="file-input"
-                type="file"
-                accept="image/*"
-                onChange={handleFileChange}
-                className="hidden"
-              />
+              <input id="file-input" type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
 
               {/* Magic Prompt */}
               <div className="flex items-center gap-2 px-2 py-2 rounded-md bg-white/5 border border-white/10">
@@ -606,7 +608,7 @@ const Image2Page = () => {
               <Button
                 onClick={generate}
                 disabled={isGenerating || !prompt.trim()}
-                className="bg-[#c4ff00] hover:bg-[#d4ff30] text-black font-bold px-8 h-11 shadow-lg shadow-[#c4ff00]/20 hover:shadow-[#c4ff00]/40 transition-all disabled:opacity-50 disabled:shadow-none min-w-[140px]"
+                className="bg-[#c4ff00] hover:bg-[#8C00FF] text-black font-bold px-8 h-11 shadow-lg shadow-[#c4ff00]/20 hover:shadow-[#c4ff00]/40 transition-all disabled:opacity-50 disabled:shadow-none min-w-[140px]"
               >
                 {isGenerating ? (
                   <>
@@ -635,19 +637,11 @@ const Image2Page = () => {
               <div className="absolute bottom-0 left-0 right-0 bg-black/80 p-4 text-white">
                 <p className="text-sm">{selectedImageForModal.prompt}</p>
                 <div className="flex gap-2 mt-2">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => downloadImage(selectedImageForModal)}
-                  >
+                  <Button size="sm" variant="secondary" onClick={() => downloadImage(selectedImageForModal)}>
                     <Download className="h-4 w-4 mr-2" />
                     Download
                   </Button>
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() => shareImage(selectedImageForModal)}
-                  >
+                  <Button size="sm" variant="secondary" onClick={() => shareImage(selectedImageForModal)}>
                     <Share2 className="h-4 w-4 mr-2" />
                     Compartilhar
                   </Button>
