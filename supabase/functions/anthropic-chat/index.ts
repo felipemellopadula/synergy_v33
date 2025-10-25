@@ -171,6 +171,8 @@ serve(async (req) => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 120000); // 2 minutes timeout
 
+    console.log('🚀 Iniciando fetch para Anthropic API...');
+    
     try {
       const response = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -183,9 +185,11 @@ serve(async (req) => {
         signal: controller.signal,
       });
 
+      console.log('✅ Fetch completado, status:', response.status);
       clearTimeout(timeoutId);
 
       if (!response.ok) {
+        console.log('❌ Response não OK, status:', response.status);
         const errorData = await response.text();
         console.error('Anthropic API error:', {
           status: response.status,
@@ -195,13 +199,20 @@ serve(async (req) => {
         throw new Error(`Erro da API Anthropic: ${response.status} - ${errorData}`);
       }
 
-      console.log('Anthropic API response status:', response.status);
+      console.log('📥 Anthropic API response status:', response.status);
+      console.log('🔄 Iniciando parse do JSON...');
       
       // Continue processing the response
       const data = await response.json();
-      console.log('Response data received, parsing...');
+      console.log('✅ JSON parseado com sucesso');
+      console.log('📊 Data structure:', { 
+        hasContent: !!data.content, 
+        contentLength: data.content?.length,
+        hasUsage: !!data.usage 
+      });
       
       let generatedText = data.content?.[0]?.text || "Não foi possível gerar resposta";
+      console.log('📝 Texto gerado, comprimento:', generatedText.length);
       
       // Normalize line breaks and remove excessive spacing
       generatedText = generatedText
@@ -210,23 +221,35 @@ serve(async (req) => {
         .replace(/\n{3,}/g, '\n\n')
         .trim();
       
+      console.log('🔧 Texto normalizado, comprimento final:', generatedText.length);
+      
       // Add prefix if message was processed in chunks
       const finalResponse = responsePrefix + generatedText;
 
-      console.log('Anthropic response received successfully', {
+      console.log('✨ Anthropic response received successfully', {
         responseLength: finalResponse.length,
         hadPrefix: !!responsePrefix
       });
 
       // Record token usage in database
+      console.log('💾 Iniciando gravação de token usage...');
       const authHeader = req.headers.get('authorization');
       if (authHeader) {
         const token = authHeader.replace('Bearer ', '');
+        
+        // Create supabase client
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+        const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+        
         const { data: userData } = await supabaseClient.auth.getUser(token);
         
         if (userData.user) {
           const inputTokens = data.usage?.input_tokens || 0;
           const outputTokens = data.usage?.output_tokens || 0;
+          
+          console.log('📊 Token usage:', { inputTokens, outputTokens, total: inputTokens + outputTokens });
           
           await supabaseClient.from('token_usage').insert({
             user_id: userData.user.id,
@@ -235,19 +258,24 @@ serve(async (req) => {
             input_tokens: inputTokens,
             output_tokens: outputTokens,
           });
+          
+          console.log('✅ Token usage gravado com sucesso');
         }
       }
 
+      console.log('🎉 Retornando resposta final para o cliente...');
       return new Response(JSON.stringify({ response: finalResponse }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
       
     } catch (fetchError) {
       clearTimeout(timeoutId);
+      console.error('❌ Erro no fetch:', fetchError);
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        console.error('Request timeout after 2 minutes');
+        console.error('⏱️ Request timeout after 2 minutes');
         throw new Error('A requisição excedeu o tempo limite de 2 minutos. Por favor, tente novamente com um prompt menor.');
       }
+      console.error('💥 Erro inesperado:', fetchError instanceof Error ? fetchError.message : fetchError);
       throw fetchError;
     }
   } catch (error) {
