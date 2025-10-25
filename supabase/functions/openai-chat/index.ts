@@ -123,11 +123,31 @@ serve(async (req) => {
       }
       
       if (fileContents.length > 0) {
-        finalMessage = `${message}\n\n${fileContents.join('\n\n---\n\n')}`;
+        // OTIMIZAÇÃO: Instrução explícita para análise DETALHADA
+        const docTokens = estimateTokenCount(fileContents.join('\n\n'));
+        finalMessage = `${message}
+
+DOCUMENTO ANEXADO (${docTokens.toLocaleString()} tokens):
+${fileContents.join('\n\n---\n\n')}
+
+IMPORTANTE: Forneça uma análise DETALHADA e COMPLETA do documento acima. Não resuma - expanda cada ponto relevante com exemplos e dados específicos.`;
         console.log('Final message with file content length:', finalMessage.length);
       }
     }
     
+    // OTIMIZAÇÃO: System prompt para forçar respostas detalhadas
+    const systemPrompt = `Você é um assistente especializado em análise detalhada de documentos. 
+
+INSTRUÇÕES CRÍTICAS:
+- Forneça respostas EXTENSAS e COMPLETAS
+- Inclua TODOS os detalhes relevantes do documento
+- Cite exemplos específicos e dados concretos
+- Organize a resposta em seções claras com títulos
+- Não resuma - expanda e elabore cada ponto
+- Use listas, tabelas e formatação quando apropriado
+- Sua resposta deve ter pelo menos 2000-3000 palavras quando analisando documentos longos
+- Preserve números, estatísticas e citações exatas`;
+
     // Build messages array with conversation history if context is enabled
     let messages = [];
     
@@ -156,6 +176,14 @@ serve(async (req) => {
           content: historyMsg.content
         }));
       }
+    }
+    
+    // Add system prompt at the beginning (unless it's a comparison with its own system prompt)
+    if (!isComparison) {
+      messages.unshift({
+        role: 'system',
+        content: systemPrompt
+      });
     }
     
     // Add current user message (with images if present)
@@ -350,7 +378,7 @@ serve(async (req) => {
           };
 
           if (!isNewerModel) {
-            chunkRequestBody.temperature = 0.7;
+            chunkRequestBody.temperature = 0.8; // Temperatura maior para detalhes
           }
 
           const chunkResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -426,9 +454,9 @@ Este documento foi processado em múltiplas partes. Use este contexto para respo
       max_tokens: !isNewerModel && !isConsolidationPhase ? limits.output : undefined,
     };
 
-    // Only add temperature for legacy models
+    // OTIMIZAÇÃO: temperature aumentada para respostas mais elaboradas
     if (!isNewerModel) {
-      requestBody.temperature = 0.7;
+      requestBody.temperature = 0.8; // Era 0.7 - aumentado para incentivar respostas mais detalhadas
     }
 
     console.log('Sending request to OpenAI with model:', model);
