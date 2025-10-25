@@ -388,10 +388,12 @@ INSTRUÇÕES CRÍTICAS:
       if (chunks.length > 1) {
         responsePrefix = `📄 Documento com ${estimatedTokens.toLocaleString()} tokens dividido em ${chunks.length} seções\n\n`;
         
-        // Process ALL chunks (Map phase)
-        for (let i = 0; i < chunks.length; i++) {
-          console.log(`Processing chunk ${i + 1}/${chunks.length}...`);
-          responsePrefix += `🔄 Processando seção ${i + 1}/${chunks.length}...\n`;
+        // Process ALL chunks in PARALLEL (Map phase - OTIMIZADO)
+        console.log(`⚡ Processando ${chunks.length} chunks em paralelo...`);
+        responsePrefix += `⚡ Processando ${chunks.length} seções simultaneamente...\n`;
+        
+        const chunkPromises = chunks.map(async (chunk, i) => {
+          console.log(`⏳ Iniciando chunk ${i + 1}/${chunks.length}...`);
           
           const chunkMessage = `━━━━━ DOCUMENTO EXTENSO - PARTE ${i + 1} DE ${chunks.length} ━━━━━
 
@@ -408,7 +410,7 @@ Você está analisando UMA SEÇÃO de um documento maior. Sua tarefa é fazer um
 Pergunta do usuário: ${message}
 
 ━━━ TRECHO DO DOCUMENTO ━━━
-${chunks[i]}
+${chunk}
 
 IMPORTANTE: Seja EXTENSO e MINUCIOSO. Preserve todos os detalhes relevantes desta seção.`;
           
@@ -427,29 +429,35 @@ IMPORTANTE: Seja EXTENSO e MINUCIOSO. Preserve todos os detalhes relevantes dest
             chunkRequestBody.temperature = 0.8; // Temperatura maior para detalhes
           }
 
-          const chunkResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${openaiApiKey}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(chunkRequestBody),
-          });
+          try {
+            const chunkResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${openaiApiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(chunkRequestBody),
+            });
 
-          if (!chunkResponse.ok) {
-            const errorData = await chunkResponse.text();
-            console.error(`Error processing chunk ${i + 1}:`, errorData);
-            chunkResponses.push(`[Erro ao processar seção ${i + 1}]`);
-            continue;
+            if (!chunkResponse.ok) {
+              const errorData = await chunkResponse.text();
+              console.error(`❌ Error processing chunk ${i + 1}:`, errorData);
+              return `[Erro ao processar seção ${i + 1}]`;
+            }
+
+            const chunkData = await chunkResponse.json();
+            const chunkText = chunkData.choices?.[0]?.message?.content || `[Sem resposta para seção ${i + 1}]`;
+            
+            console.log(`✅ Chunk ${i + 1} processado: ${estimateTokenCount(chunkText)} tokens`);
+            return chunkText;
+          } catch (error) {
+            console.error(`❌ Exception processing chunk ${i + 1}:`, error);
+            return `[Erro ao processar seção ${i + 1}]`;
           }
-
-          const chunkData = await chunkResponse.json();
-          const chunkText = chunkData.choices?.[0]?.message?.content || `[Sem resposta para seção ${i + 1}]`;
-          chunkResponses.push(chunkText);
-          
-          // OTIMIZAÇÃO 4: Log de tokens de cada chunk
-          console.log(`✅ Chunk ${i + 1} processado: ${estimateTokenCount(chunkText)} tokens`);
-        }
+        });
+        
+        // Aguardar todas as chunks processarem em paralelo
+        const chunkResponses = await Promise.all(chunkPromises);
         
         // OTIMIZAÇÃO 4: Log do total de tokens das análises parciais
         const totalChunkTokens = chunkResponses.reduce((sum, resp) => sum + estimateTokenCount(resp), 0);
