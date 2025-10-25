@@ -380,11 +380,13 @@ INSTRUÇÕES CRÍTICAS:
       console.log(`⚠️ Documento excede limite (${estimatedTokens.toLocaleString()} tokens) → ${targetChunks} chunks obrigatórios`);
     }
     
+    // ✅ Declarar chunkResponses no escopo externo para ser acessível na consolidação
+    let chunkResponses: string[] = [];
+    
     if (shouldChunk) {
       console.log('🔄 Iniciando Map-Reduce...')
       
       const chunks = splitIntoChunks(finalMessage, maxChunkTokens);
-      let chunkResponses: string[] = []; // Declarar no escopo correto
       
       if (chunks.length > 1) {
         responsePrefix = `📄 Documento com ${estimatedTokens.toLocaleString()} tokens dividido em ${chunks.length} seções\n\n`;
@@ -524,6 +526,11 @@ Este documento foi processado em múltiplas partes. Use este contexto para respo
     }
     
     // OTIMIZAÇÃO 2: Na consolidação, NÃO limitar output (deixar modelo usar capacidade máxima)
+    console.log('🔍 Debug escopo:', {
+      chunkResponsesDefined: typeof chunkResponses !== 'undefined',
+      chunkResponsesLength: chunkResponses?.length || 0,
+      willBeConsolidation: (chunkResponses?.length || 0) > 0
+    });
     const isConsolidationPhase = chunkResponses.length > 0;
     
     const requestBody: any = {
@@ -544,8 +551,11 @@ Este documento foi processado em múltiplas partes. Use este contexto para respo
       console.log('📤 Enviando prompt de consolidação:', {
         consolidationPromptLength: processedMessages[0]?.content?.length || 0,
         totalChunks: chunkResponses.length,
+        totalChunkTokens: chunkResponses.reduce((sum, r) => sum + estimateTokenCount(r), 0),
         isConsolidation: true
       });
+    } else {
+      console.log('📤 Enviando requisição normal (sem consolidação)');
     }
 
     console.log('Sending request to OpenAI with model:', model);
