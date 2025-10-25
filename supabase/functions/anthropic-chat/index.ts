@@ -31,7 +31,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, model = 'claude-sonnet-4-5', files, conversationHistory = [], contextEnabled = false } = await req.json();
+    const { message, model = 'claude-3-5-sonnet-20241022', files, conversationHistory = [], contextEnabled = false } = await req.json();
     
     const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
     if (!anthropicApiKey) {
@@ -93,15 +93,20 @@ serve(async (req) => {
       // Add conversation history for context (but keep it simple for large files)
       console.log('Building conversation context with', conversationHistory.length, 'previous messages');
       
-      // Only add recent context if the main message isn't too large
+      // Only add recent context if the main message isn't too large (< 1000 tokens)
       const mainMessageTokens = estimateTokenCount(finalMessage);
-      if (mainMessageTokens < limits.input * 0.4) {
-        // Add limited conversation history
-        const recentHistory = conversationHistory.slice(-1); // Only last 1 message for faster response
+      console.log('Main message tokens:', mainMessageTokens);
+      
+      if (mainMessageTokens < 1000) {
+        // Add only last message for faster response
+        const recentHistory = conversationHistory.slice(-1);
         messages = recentHistory.map((historyMsg: any) => ({
           role: historyMsg.role,
           content: historyMsg.content
         }));
+        console.log('Added', messages.length, 'history messages');
+      } else {
+        console.log('⚠️ Message too large (', mainMessageTokens, 'tokens), skipping history for faster response');
       }
     }
     
@@ -159,6 +164,12 @@ serve(async (req) => {
       max_tokens: limits.output,
       messages: processedMessages
     };
+
+    // Log request body details for debugging
+    const bodySize = JSON.stringify(requestBody).length;
+    console.log('📤 Request body size:', bodySize, 'bytes');
+    console.log('📤 Messages count:', requestBody.messages.length);
+    console.log('📤 First message preview:', requestBody.messages[0].content.substring(0, 100) + '...');
 
     console.log('Sending request to Anthropic with model:', model);
     console.log('Request config:', { 
@@ -272,8 +283,8 @@ serve(async (req) => {
       clearTimeout(timeoutId);
       console.error('❌ Erro no fetch:', fetchError);
       if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-        console.error('⏱️ Request timeout after 2 minutes');
-        throw new Error('A requisição excedeu o tempo limite de 2 minutos. Por favor, tente novamente com um prompt menor.');
+        console.error('⏱️ Request timeout after 3 minutes');
+        throw new Error('A requisição excedeu o tempo limite de 3 minutos. Por favor, tente novamente com um prompt menor.');
       }
       console.error('💥 Erro inesperado:', fetchError instanceof Error ? fetchError.message : fetchError);
       throw fetchError;
