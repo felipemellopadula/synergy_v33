@@ -86,14 +86,18 @@ const CleanMarkdownRenderer: React.FC<CleanMarkdownRendererProps> = ({ content, 
               </code>
             );
           },
-          p({ children, node }) {
-            const isInsideListItem = node?.position?.start.line && 
-              content.split('\n')[node.position.start.line - 1]?.match(/^\s*\d+\./);
-            return (
-              <p className={isInsideListItem ? "inline" : "mb-2 leading-relaxed last:mb-0"}>
-                {children}
-              </p>
-            );
+          p({ children, node, ...props }: any) {
+            // Check if we're inside a list item by looking at parent nodes
+            let currentNode = node;
+            while (currentNode?.parent) {
+              if (currentNode.parent.tagName === 'li') {
+                // Inside a list item - render inline
+                return <span className="inline">{children}</span>;
+              }
+              currentNode = currentNode.parent;
+            }
+            // Regular paragraph
+            return <p className="mb-2 leading-relaxed last:mb-0" {...props}>{children}</p>;
           },
           h1({ children }) {
             return <h1 className="text-xl font-bold mb-2 mt-4 first:mt-0">{children}</h1>;
