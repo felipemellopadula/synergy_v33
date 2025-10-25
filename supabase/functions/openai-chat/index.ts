@@ -189,8 +189,9 @@ serve(async (req) => {
 
     let processedMessages = messages;
     let responsePrefix = '';
+    let chunkResponses: string[] = [];
 
-    // If message is too large, split into chunks and summarize
+    // If message is too large, split into chunks and process ALL chunks
     // Comparações podem usar 20% mais do limite
     const comparisonMultiplier = isComparison ? 1.2 : 1.0;
     
@@ -208,14 +209,58 @@ serve(async (req) => {
       const chunks = splitIntoChunks(finalMessage, maxChunkTokens);
       
       if (chunks.length > 1) {
-        responsePrefix = `⚠️ Documento muito grande para ${model}. Processando em ${chunks.length} partes:\n\n`;
+        responsePrefix = `📄 Documento com ${estimatedTokens.toLocaleString()} tokens dividido em ${chunks.length} seções\n\n`;
         
-        // Process first chunk with instructions to summarize
-        const processedMessage = `Analise e resuma este trecho de um documento extenso (parte 1 de ${chunks.length}). Foque nos pontos principais:\n\n${chunks[0]}`;
+        // Process ALL chunks (Map phase)
+        for (let i = 0; i < chunks.length; i++) {
+          console.log(`Processing chunk ${i + 1}/${chunks.length}...`);
+          responsePrefix += `🔄 Processando seção ${i + 1}/${chunks.length}...\n`;
+          
+          const chunkMessage = `Analise este trecho de um documento extenso (parte ${i + 1} de ${chunks.length}). ${message}\n\nTrecho do documento:\n\n${chunks[i]}`;
+          
+          const chunkRequestBody: any = {
+            model: model,
+            messages: [{
+              role: 'user',
+              content: chunkMessage
+            }],
+            max_completion_tokens: isNewerModel ? Math.min(4096, limits.output) : undefined,
+            max_tokens: !isNewerModel ? Math.min(4096, limits.output) : undefined,
+          };
+
+          if (!isNewerModel) {
+            chunkRequestBody.temperature = 0.7;
+          }
+
+          const chunkResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openaiApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(chunkRequestBody),
+          });
+
+          if (!chunkResponse.ok) {
+            const errorData = await chunkResponse.text();
+            console.error(`Error processing chunk ${i + 1}:`, errorData);
+            chunkResponses.push(`[Erro ao processar seção ${i + 1}]`);
+            continue;
+          }
+
+          const chunkData = await chunkResponse.json();
+          const chunkText = chunkData.choices?.[0]?.message?.content || `[Sem resposta para seção ${i + 1}]`;
+          chunkResponses.push(chunkText);
+        }
+        
+        responsePrefix += `\n✅ Todas as ${chunks.length} seções processadas. Consolidando respostas...\n\n`;
+        
+        // Reduce phase: consolidate all chunk responses
+        const consolidationPrompt = `Você processou um documento extenso em ${chunks.length} partes. Aqui estão as análises de cada parte:\n\n${chunkResponses.map((resp, idx) => `=== PARTE ${idx + 1} ===\n${resp}`).join('\n\n')}\n\nAgora consolide todas essas análises em uma resposta única, completa e coerente. Pergunta original do usuário: ${message}`;
         
         processedMessages = [{
           role: 'user',
-          content: processedMessage
+          content: consolidationPrompt
         }];
       }
     }
