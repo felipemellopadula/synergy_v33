@@ -264,20 +264,31 @@ const Image2Page = () => {
       }
 
       if (inputImageBase64 && canAttachImage) {
-        const editBody = {
-          model,
-          positivePrompt: finalPrompt,
-          inputImage: inputImageBase64,
-          width: selectedQualityInfo.width,
-          height: selectedQualityInfo.height,
-        };
+        // Decidir qual edge function chamar baseado no modelo
+        const edgeFunction = model === "google:4@1" 
+          ? "edit-image-nano-banana" 
+          : "edit-image";
 
-        const { data: editData, error: editError } = await supabase.functions.invoke("edit-image", {
+        const editBody = model === "google:4@1"
+          ? {
+              prompt: finalPrompt,
+              imageBase64: inputImageBase64 // Nano Banana espera campo 'imageBase64'
+            }
+          : {
+              model,
+              positivePrompt: finalPrompt,
+              inputImage: inputImageBase64, // Runware espera 'inputImage'
+              width: selectedQualityInfo.width,
+              height: selectedQualityInfo.height,
+            };
+
+        const { data: editData, error: editError } = await supabase.functions.invoke(edgeFunction, {
           body: editBody,
         });
         if (editError) {
+          console.error("Erro detalhado ao editar imagem:", editError);
           toast.error("Erro ao editar imagem", {
-            description: editError.message || "Ocorreu um erro ao processar a imagem",
+            description: editError.message || "Verifique se a imagem está no formato correto (PNG/JPG/WEBP)",
           });
           throw editError;
         }
