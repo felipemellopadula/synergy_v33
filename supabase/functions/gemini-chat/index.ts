@@ -96,12 +96,38 @@ serve(async (req) => {
       hasFiles: files && files.length > 0
     });
 
+    // Validar tamanho dos arquivos (limite Google: 500MB)
+    if (files && files.length > 0) {
+      const MAX_FILE_SIZE_MB = 500;
+      
+      for (const file of files) {
+        const content = file.pdfContent || file.wordContent || '';
+        const fileSizeMB = new Blob([content]).size / (1024 * 1024);
+        
+        if (fileSizeMB > MAX_FILE_SIZE_MB) {
+          console.error(`❌ Arquivo ${file.name} muito grande:`, fileSizeMB.toFixed(1), 'MB');
+          return new Response(JSON.stringify({ 
+            error: `Arquivo "${file.name}" excede o limite de 500MB (tamanho: ${fileSizeMB.toFixed(1)}MB). Por favor, divida o documento em arquivos menores.`,
+            fileSizeMB: fileSizeMB.toFixed(1),
+            maxSizeMB: MAX_FILE_SIZE_MB
+          }), {
+            status: 413,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+      
+      console.log('✅ Validação de tamanho:', 
+        files.map((f: any) => `${f.name}: ${(new Blob([f.pdfContent || f.wordContent || '']).size / (1024 * 1024)).toFixed(1)}MB`)
+      );
+    }
+
     // Check absolute maximum limit
-    const MAX_DOCUMENT_TOKENS = 500000; // ~700 páginas
+    const MAX_DOCUMENT_TOKENS = 700000; // ~980 páginas (70% de 1M tokens)
     if (estimatedTokens > MAX_DOCUMENT_TOKENS) {
       console.error('❌ Documento excede limite:', estimatedTokens, 'tokens');
       return new Response(JSON.stringify({ 
-        error: `Documento muito grande: ${Math.ceil(estimatedTokens/1000)}k tokens. Máximo permitido: 500k tokens (~700 páginas de PDF).`,
+        error: `Documento muito grande: ${Math.ceil(estimatedTokens/1000)}k tokens. Máximo permitido: 700k tokens (~980 páginas de PDF).`,
         estimatedTokens,
         maxTokens: MAX_DOCUMENT_TOKENS
       }), {
@@ -114,11 +140,16 @@ serve(async (req) => {
     console.log('📊 DIAGNÓSTICO DE PROCESSAMENTO:', {
       caracteres: finalMessage.length,
       tokens: estimatedTokens,
-      limiteTotal: limits.input,
+      limiteTotal: limits.input, // 1M
+      limiteMaximoSeguro: MAX_DOCUMENT_TOKENS, // 700k
       percentualUsado: `${((estimatedTokens / limits.input) * 100).toFixed(1)}%`,
-      usaraMapReduce: estimatedTokens > 200000,
-      chunks: estimatedTokens > 200000 ? Math.ceil(estimatedTokens / 250000) : 1,
-      arquivos: files?.map((f: any) => f.name).join(', ') || 'nenhum'
+      percentualMaximoSeguro: `${((estimatedTokens / MAX_DOCUMENT_TOKENS) * 100).toFixed(1)}%`,
+      usaraMapReduce: estimatedTokens > 600000,
+      chunks: estimatedTokens > 600000 ? Math.ceil(estimatedTokens / 250000) : 1,
+      arquivos: files?.map((f: any) => f.name).join(', ') || 'nenhum',
+      tamanhosArquivos: files?.map((f: any) => 
+        `${f.name}: ${(new Blob([f.pdfContent || f.wordContent || '']).size / (1024 * 1024)).toFixed(1)}MB`
+      ) || []
     });
 
     // Build contents array with conversation history if context is enabled
@@ -126,7 +157,7 @@ serve(async (req) => {
     let chunkResponses: string[] = [];
     
     // If document is large, process in chunks with Map-Reduce
-    if (estimatedTokens > 200000) { // 200k tokens (~280 páginas)
+    if (estimatedTokens > 600000) { // 600k tokens (~840 páginas)
       console.log('📄 Large document detected, processing in chunks...');
       const chunks = splitIntoChunks(finalMessage, Math.floor(limits.input * 0.25)); // 250k tokens per chunk
       
