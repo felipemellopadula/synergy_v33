@@ -62,14 +62,25 @@ serve(async (req) => {
     // Check if it's a newer model that uses max_completion_tokens
     const isNewerModel = model.includes('gpt-5') || model.includes('gpt-4.1') || model.includes('o3') || model.includes('o4');
     
-    // Define token limits for different models - Tier 2 limits
+    // Define token limits for different models - Tier 2 limits (OTIMIZADO)
     const getModelLimits = (modelName: string) => {
-      if (modelName.includes('gpt-5-nano')) return { input: 50000, output: 8192 };    // Tier 2: doubled
-      if (modelName.includes('gpt-5-mini')) return { input: 100000, output: 16384 };  // Tier 2: doubled
-      if (modelName.includes('gpt-5')) return { input: 200000, output: 32768 };       // Tier 2: increased
-      if (modelName.includes('o4-mini')) return { input: 50000, output: 8192 };       // Tier 2: doubled
-      if (modelName.includes('o3') || modelName.includes('o4')) return { input: 200000, output: 32768 }; // Tier 2: increased
-      return { input: 100000, output: 16384 }; // Tier 2 default
+      // GPT-5 series (400k context window)
+      if (modelName.includes('gpt-5-nano')) return { input: 200000, output: 8192 };     // +300%
+      if (modelName.includes('gpt-5-mini')) return { input: 400000, output: 16384 };    // +300%
+      if (modelName.includes('gpt-5')) return { input: 400000, output: 100000 };        // +100%
+      
+      // GPT-4.1 series (1M context window!)
+      if (modelName.includes('gpt-4.1-mini')) return { input: 400000, output: 16384 };  // +300%
+      if (modelName.includes('gpt-4.1')) return { input: 1000000, output: 32768 };      // +900% 🚀
+      
+      // O3/O4 reasoning models (200k context)
+      if (modelName.includes('o4-mini')) return { input: 200000, output: 100000 };      // +300%
+      if (modelName.includes('o3') || modelName.includes('o4')) return { input: 200000, output: 100000 };
+      
+      // Legacy models (128k context)
+      if (modelName.includes('gpt-4o')) return { input: 128000, output: 16384 };
+      
+      return { input: 128000, output: 16384 }; // Default conservador
     };
 
     const limits = getModelLimits(model);
@@ -199,17 +210,55 @@ serve(async (req) => {
       contextMessages: messages.length - 1
     });
 
+    // Validar tamanho máximo do documento
+    const MAX_DOCUMENT_TOKENS: { [key: string]: number } = {
+      'gpt-5': 1200000,        // ~1.2M (3x context window)
+      'gpt-5-mini': 1200000,   // ~1.2M (3x context window)
+      'gpt-5-nano': 600000,    // ~600k (3x context window)
+      'gpt-4.1': 3000000,      // ~3M (3x context window) 🚀
+      'gpt-4.1-mini': 1200000, // ~1.2M (3x context window)
+      'o3': 600000,            // ~600k (3x context window)
+      'o4': 600000,            // ~600k (3x context window)
+      'default': 384000        // ~384k (3x 128k default)
+    };
+
+    const modelKey = Object.keys(MAX_DOCUMENT_TOKENS).find(key => model.includes(key)) || 'default';
+    const maxTokens = MAX_DOCUMENT_TOKENS[modelKey];
+
+    if (estimatedTokens > maxTokens) {
+      console.error('❌ Documento excede limite máximo:', estimatedTokens, 'tokens');
+      return new Response(JSON.stringify({ 
+        error: `Documento muito grande: ${Math.ceil(estimatedTokens/1000)}k tokens. Máximo permitido para ${model}: ${Math.ceil(maxTokens/1000)}k tokens.`,
+        estimatedTokens,
+        maxTokens,
+        model
+      }), {
+        status: 413,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     let processedMessages = messages;
     let responsePrefix = '';
     let chunkResponses: string[] = [];
 
-    // 📊 Diagnostic logging
+    // 📊 Diagnostic logging (APRIMORADO)
+    const estimatedChunks = estimatedTokens > limits.input * 0.8 
+      ? Math.ceil(estimatedTokens / (model.includes('gpt-5') ? Math.floor(limits.input * 0.5) : Math.floor(limits.input * 0.6)))
+      : 1;
+
     console.log('📊 DIAGNÓSTICO DE PROCESSAMENTO:', {
+      model,
       estimatedTokens,
       inputLimit: limits.input,
+      outputLimit: limits.output,
+      maxDocumentTokens: maxTokens,
       usedPercentage: ((estimatedTokens / limits.input) * 100).toFixed(1) + '%',
-      willChunk: estimatedTokens > limits.input * 0.6,
-      model,
+      usedPercentageOfMax: ((estimatedTokens / maxTokens) * 100).toFixed(1) + '%',
+      willChunk: estimatedTokens > limits.input * 0.8,
+      estimatedChunks,
+      tier: 'Tier 2',
+      tpmLimit: model.includes('gpt-5') ? '1M TPM' : 'Variable',
       hasFiles: files?.length > 0,
       fileTypes: files?.map(f => f.type).join(', '),
       conversationHistorySize: conversationHistory.length,
@@ -220,15 +269,17 @@ serve(async (req) => {
     // Comparações podem usar 20% mais do limite
     const comparisonMultiplier = isComparison ? 1.2 : 1.0;
     
-    if (estimatedTokens > limits.input * 0.6 * comparisonMultiplier) { // Tier 2: use 60% of limit (increased from 40%)
+    if (estimatedTokens > limits.input * 0.8 * comparisonMultiplier) { // OTIMIZADO: 80% (era 60%)
       console.log('Message too large, processing in chunks...');
       
-      // Tier 2: Much larger chunks for all models
+      // OTIMIZADO: Chunks maiores por modelo
       let maxChunkTokens;
       if (model.includes('gpt-5')) {
-        maxChunkTokens = Math.min(50000, Math.floor(limits.input * 0.5)); // Tier 2: 50K chunks (was 15K)
+        maxChunkTokens = Math.floor(limits.input * 0.5); // 200k chunks (era 50k)
+      } else if (model.includes('gpt-4.1')) {
+        maxChunkTokens = Math.floor(limits.input * 0.4); // 400k chunks (novo)
       } else {
-        maxChunkTokens = Math.floor(limits.input * 0.7); // Tier 2: 70% of limit
+        maxChunkTokens = Math.floor(limits.input * 0.6); // 120k+ chunks (era 70%)
       }
       
       const chunks = splitIntoChunks(finalMessage, maxChunkTokens);
