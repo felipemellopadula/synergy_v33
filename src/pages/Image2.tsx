@@ -123,6 +123,7 @@ const Image2Page = () => {
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState(MODELS[0].id);
   const [quality, setQuality] = useState(QUALITY_SETTINGS[0].id);
+  const [numberOfImages, setNumberOfImages] = useState(1);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [magicPromptEnabled, setMagicPromptEnabled] = useState(false);
@@ -370,7 +371,7 @@ const Image2Page = () => {
           positivePrompt: finalPrompt,
           width: selectedQualityInfo.width,
           height: selectedQualityInfo.height,
-          numberResults: 1,
+          numberResults: numberOfImages,
           outputFormat: "PNG",
           ...(inputImageBase64 ? { inputImage: inputImageBase64 } : {}),
         };
@@ -383,14 +384,15 @@ const Image2Page = () => {
           throw apiError;
         }
 
-        if (!apiData?.image) {
+        if (!apiData?.images || apiData.images.length === 0) {
           toast.error("Erro ao gerar imagem", {
-            description: "A API não retornou uma imagem",
+            description: "A API não retornou nenhuma imagem",
           });
-          throw new Error("A API não retornou uma imagem.");
+          throw new Error("A API não retornou nenhuma imagem.");
         }
 
-        toast.success("Imagem gerada com sucesso!");
+        const imageCount = apiData.images.length;
+        toast.success(`${imageCount} ${imageCount === 1 ? 'imagem gerada' : 'imagens geradas'} com sucesso!`);
         setTimeout(() => loadSavedImages(), 1000);
       }
     } catch (e: any) {
@@ -630,6 +632,23 @@ const Image2Page = () => {
                 </SelectContent>
               </Select>
 
+              {/* Quantidade de Imagens */}
+              <Select 
+                value={numberOfImages.toString()} 
+                onValueChange={(value) => setNumberOfImages(parseInt(value))} 
+                disabled={isGenerating}
+              >
+                <SelectTrigger className="w-full lg:w-24 bg-white/5 border-white/10 text-white hover:bg-white/10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-black/95 border-white/20">
+                  <SelectItem value="1" className="text-white hover:bg-white/10">1x</SelectItem>
+                  <SelectItem value="2" className="text-white hover:bg-white/10">2x</SelectItem>
+                  <SelectItem value="3" className="text-white hover:bg-white/10">3x</SelectItem>
+                  <SelectItem value="4" className="text-white hover:bg-white/10">4x</SelectItem>
+                </SelectContent>
+              </Select>
+
               {/* Anexar arquivo */}
               <Button
                 variant="outline"
@@ -661,7 +680,7 @@ const Image2Page = () => {
                     Gerando...
                   </>
                 ) : (
-                  "Generate +1"
+                  `Generate +${numberOfImages}`
                 )}
               </Button>
             </div>
