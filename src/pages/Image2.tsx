@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import imageCompression from "browser-image-compression";
 import {
   Download,
   Share2,
@@ -254,13 +255,37 @@ const Image2Page = () => {
 
       let inputImageBase64: string | undefined;
       if (selectedFile) {
-        const reader = new FileReader();
-        reader.readAsDataURL(selectedFile);
-        await new Promise<void>((resolve, reject) => {
-          reader.onload = () => resolve();
-          reader.onerror = (error) => reject(error);
-        });
-        inputImageBase64 = (reader.result as string).split(",")[1];
+        console.log('📸 Tamanho original da imagem:', (selectedFile.size / 1024 / 1024).toFixed(2), 'MB');
+        
+        // Comprimir imagem para reduzir tamanho do payload
+        const options = {
+          maxSizeMB: 1, // Máximo 1MB
+          maxWidthOrHeight: 2048, // Máximo 2048px
+          useWebWorker: true,
+          fileType: selectedFile.type,
+        };
+        
+        try {
+          const compressedFile = await imageCompression(selectedFile, options);
+          console.log('✅ Tamanho após compressão:', (compressedFile.size / 1024 / 1024).toFixed(2), 'MB');
+          
+          const reader = new FileReader();
+          reader.readAsDataURL(compressedFile);
+          await new Promise<void>((resolve, reject) => {
+            reader.onload = () => resolve();
+            reader.onerror = (error) => reject(error);
+          });
+          inputImageBase64 = (reader.result as string).split(",")[1];
+          
+          const base64SizeKB = (inputImageBase64.length * 0.75 / 1024).toFixed(2);
+          console.log('📦 Tamanho do base64:', base64SizeKB, 'KB');
+        } catch (compressionError) {
+          console.error('Erro ao comprimir imagem:', compressionError);
+          toast.error("Erro ao processar imagem", {
+            description: "Não foi possível comprimir a imagem. Tente uma imagem menor.",
+          });
+          throw compressionError;
+        }
       }
 
       if (inputImageBase64 && canAttachImage) {
