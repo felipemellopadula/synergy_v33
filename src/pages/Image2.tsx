@@ -257,17 +257,18 @@ const Image2Page = () => {
       if (selectedFile) {
         console.log('📸 Tamanho original da imagem:', (selectedFile.size / 1024 / 1024).toFixed(2), 'MB');
         
-        // Comprimir imagem para reduzir tamanho do payload
+        // Comprimir agressivamente para evitar payload muito grande
         const options = {
-          maxSizeMB: 1, // Máximo 1MB
-          maxWidthOrHeight: 2048, // Máximo 2048px
+          maxSizeMB: 0.4, // Máximo 400KB (gera ~533KB de base64)
+          maxWidthOrHeight: 1536, // Máximo 1536px
           useWebWorker: true,
           fileType: selectedFile.type,
+          initialQuality: 0.7, // Reduzir qualidade inicial
         };
         
         try {
           const compressedFile = await imageCompression(selectedFile, options);
-          console.log('✅ Tamanho após compressão:', (compressedFile.size / 1024 / 1024).toFixed(2), 'MB');
+          console.log('✅ Tamanho após compressão:', (compressedFile.size / 1024).toFixed(0), 'KB');
           
           const reader = new FileReader();
           reader.readAsDataURL(compressedFile);
@@ -277,8 +278,16 @@ const Image2Page = () => {
           });
           inputImageBase64 = (reader.result as string).split(",")[1];
           
-          const base64SizeKB = (inputImageBase64.length * 0.75 / 1024).toFixed(2);
+          const base64SizeKB = (inputImageBase64.length * 0.75 / 1024).toFixed(0);
           console.log('📦 Tamanho do base64:', base64SizeKB, 'KB');
+          
+          // Validar tamanho final
+          if (inputImageBase64.length > 700000) { // ~525KB de base64
+            toast.error("Imagem muito grande", {
+              description: "A imagem anexada é muito grande. Tente uma imagem menor ou de menor resolução.",
+            });
+            throw new Error("Payload muito grande");
+          }
         } catch (compressionError) {
           console.error('Erro ao comprimir imagem:', compressionError);
           toast.error("Erro ao processar imagem", {
