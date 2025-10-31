@@ -384,7 +384,7 @@ const processChunksInParallel = async (
   openAIApiKey: string,
   progressCallback?: (status: string) => void
 ): Promise<string[]> => {
-  const batchSize = 2; // Reduzido de 5 para 2 para evitar rate limit
+  const batchSize = 3; // Aumentado de 2 para 3 (compromisso velocidade/rate-limit)
   const results: string[] = [];
   
   for (let i = 0; i < chunks.length; i += batchSize) {
@@ -409,10 +409,10 @@ const processChunksInParallel = async (
       }
     });
     
-    // Delay de 5s entre batches para evitar rate limit
+    // Delay de 2s entre batches para evitar rate limit
     if (i + batchSize < chunks.length) {
-      console.log('⏳ Aguardando 5s antes do próximo batch...');
-      await delay(5000);
+      console.log('⏳ Aguardando 2s antes do próximo batch...');
+      await delay(2000);
     }
   }
   
@@ -468,10 +468,10 @@ serve(async (req) => {
       const synthesis = await synthesizeSection(sections[i], i, sections.length, openAIApiKey);
       sectionSyntheses.push(synthesis);
       
-      // Delay de 3s entre sínteses para evitar rate limit
+      // Delay de 1s entre sínteses para evitar rate limit
       if (i < sections.length - 1) {
-        console.log('⏳ Aguardando 3s antes da próxima síntese...');
-        await delay(3000);
+        console.log('⏳ Aguardando 1s antes da próxima síntese...');
+        await delay(1000);
       }
     }
     

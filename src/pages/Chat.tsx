@@ -1859,9 +1859,25 @@ Forneça uma resposta abrangente que integre informações de todos os documento
         await upsertConversation(finalMessages, convId);
       } catch (error: any) {
         console.error("Error sending message:", error);
+        
+        // Detectar tipo de erro
+        let errorTitle = "Erro";
+        let errorDescription = "Não foi possível enviar a mensagem.";
+        
+        if (error.name === "AbortError" || error.message?.includes("aborted")) {
+          errorTitle = "⏱️ Tempo esgotado";
+          errorDescription = "O processamento demorou mais de 10 minutos. Para documentos muito grandes, tente resumir ou dividir em partes menores.";
+        } else if (error.message?.includes("Failed to fetch") || error.message?.includes("NetworkError")) {
+          errorTitle = "🔌 Erro de conexão";
+          errorDescription = "A conexão foi interrompida. Isso pode acontecer com documentos muito grandes. Tente com um documento menor ou divida em partes.";
+        } else if (error.message?.includes("429")) {
+          errorTitle = "⏳ Muitas requisições";
+          errorDescription = "Aguarde alguns minutos antes de tentar novamente.";
+        }
+        
         toast({
-          title: "Erro",
-          description: "Não foi possível enviar a mensagem.",
+          title: errorTitle,
+          description: errorDescription,
           variant: "destructive",
         });
         setMessages(newMessages);
