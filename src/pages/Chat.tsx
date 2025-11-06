@@ -1703,9 +1703,10 @@ Forneça uma resposta abrangente que integre informações de todos os documento
             
             let fullContent = '';
             
+            // USAR APENAS A PERGUNTA DO USUÁRIO, NÃO O DOCUMENTO COMPLETO
             for await (const chunk of rag.consolidateAndStream(
               sections,
-              messageWithFiles,
+              currentInput, // ✅ CORRIGIDO: usar pergunta original, não messageWithFiles
               documentFileName,
               documentPageCount
             )) {
