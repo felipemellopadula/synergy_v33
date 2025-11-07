@@ -18,9 +18,11 @@ serve(async (req) => {
     console.log(`[RAG Filter] Filtrando ${sections.length} seções para objetivo do usuário`);
 
     // Criar sumário compacto das seções para o LLM analisar
-    const sectionsSummary = sections.map((s: any, i: number) => 
-      `[${i}] "${s.title}" (${s.keywords.join(', ')}) - ${s.content.slice(0, 200)}...`
-    ).join('\n\n');
+    const sectionsSummary = sections.map((s: any, i: number) => {
+      const keywords = Array.isArray(s.keywords) ? s.keywords.join(', ') : 'N/A';
+      const content = s.content || '';
+      return `[${i}] "${s.title || 'Sem título'}" (${keywords}) - ${content.slice(0, 200)}...`;
+    }).join('\n\n');
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
