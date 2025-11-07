@@ -239,9 +239,9 @@ export class AgenticRAG {
     let workingSections = relevantSections;
     
     // Limitar quantidade máxima de seções
-    if (workingSections.length > 10) {
-      console.log(`⚠️ Limitando de ${workingSections.length} para 10 seções mais importantes`);
-      workingSections = workingSections.slice(0, 10);
+    if (workingSections.length > 15) {
+      console.log(`⚠️ Limitando de ${workingSections.length} para 15 seções mais importantes`);
+      workingSections = workingSections.slice(0, 15);
     }
     
     const finalChars = workingSections.reduce((sum, s) => sum + s.length, 0);
@@ -256,9 +256,19 @@ export class AgenticRAG {
       length: s.length
     })));
     
-    // HARD LIMIT: Max 10 seções × 3K chars = 30K chars = 12K tokens
-    if (backendEstimate > 12000) {
-      throw new Error(`Documento muito grande: ${backendEstimate} tokens. Limite: 12K tokens.`);
+    // HARD LIMIT: Max 15 seções × 3K chars = 45K chars = 15K tokens
+    if (backendEstimate > 15000) {
+      console.warn(`⚠️ Tokens estimados (${backendEstimate}) excedem 15K. Reduzindo para 12 seções.`);
+      workingSections = workingSections.slice(0, 12);
+      
+      // Recalcular após redução
+      const reducedChars = workingSections.reduce((sum, s) => sum + s.length, 0);
+      const reducedEstimate = Math.floor(reducedChars / 2.5);
+      console.log(`✅ Reduzido para: ${workingSections.length} seções, ${reducedChars} chars (~${reducedEstimate} tokens)`);
+      
+      if (reducedEstimate > 15000) {
+        throw new Error(`Documento muito grande mesmo após redução: ${reducedEstimate} tokens. Limite: 15K tokens.`);
+      }
     }
     
     // Log detalhado

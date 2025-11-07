@@ -41,22 +41,22 @@ serve(async (req) => {
     console.log(`[RAG] Total seções: ${totalCharsInSections} chars (~${sectionsTokens} tokens)`);
     
     // Validação: se as seções são gigantes, algo deu errado no frontend
-    if (sectionsTokens > 12000) {
-      console.error(`❌ SEÇÕES MUITO GRANDES: ${sectionsTokens} tokens (limite: 12000)`);
+    if (sectionsTokens > 15000) {
+      console.error(`❌ SEÇÕES MUITO GRANDES: ${sectionsTokens} tokens (limite: 15000)`);
       console.error(`❌ Tamanho individual das seções:`);
       sections.forEach((s: string, i: number) => {
         console.error(`   Seção ${i+1}: ${s.length} chars (~${Math.floor(s.length/2.5)} tokens)`);
       });
       return new Response(
-        JSON.stringify({ error: `Seções muito grandes: ${sectionsTokens} tokens. Limite: 12K tokens.` }),
+        JSON.stringify({ error: `Seções muito grandes: ${sectionsTokens} tokens. Limite: 15K tokens.` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
 
     // Calcular output tokens primeiro
-    const targetPages = Math.min(Math.floor(totalPages * 0.4), 30);
-    const maxOutputTokens = Math.min(5000, Math.floor(targetPages * 80));
+    const targetPages = Math.min(Math.floor(totalPages * 0.5), 40);
+    const maxOutputTokens = Math.min(8000, Math.floor(targetPages * 300));
     
     // ADICIONAR LOGGING ANTES DO TEMPLATE para identificar a variável gigante
     console.log(`[PRE-TEMPLATE] fileName length: ${fileName.length}`);
@@ -74,7 +74,7 @@ serve(async (req) => {
     const sectionsTextLength = sectionsText.length;
     console.log(`[RAG] sectionsText gerado: ${sectionsTextLength} chars`);
 
-    if (sectionsTextLength > 100000) {
+    if (sectionsTextLength > 120000) {
       console.error(`❌ SECTIONS TEXT GIGANTE: ${sectionsTextLength} chars`);
       throw new Error('Bug detectado: sectionsText muito grande');
     }
@@ -92,8 +92,8 @@ Task: Análise ~${targetPages}p com visão geral, análise, insights, dados, res
     console.log(`[RAG Consolidate] Prompt total: ${promptTokens} tokens (${promptTemplate.length} chars)`);
 
     // HARD LIMIT baseado no prompt REAL
-    if (promptTokens > 13000) {
-      console.error(`❌ PROMPT MUITO GRANDE: ${promptTokens} tokens (limite: 13000)`);
+    if (promptTokens > 16000) {
+      console.error(`❌ PROMPT MUITO GRANDE: ${promptTokens} tokens (limite: 16000)`);
       return new Response(
         JSON.stringify({ 
           error: `Prompt muito grande: ${promptTokens} tokens. Reduza o conteúdo antes de enviar.` 
@@ -105,7 +105,7 @@ Task: Análise ~${targetPages}p com visão geral, análise, insights, dados, res
     const totalEstimatedTokens = promptTokens + maxOutputTokens;
     console.log(`[RAG Consolidate] Total estimado: ${totalEstimatedTokens} tokens (prompt: ${promptTokens}, output: ${maxOutputTokens})`);
 
-    if (totalEstimatedTokens > 18000) {
+    if (totalEstimatedTokens > 25000) {
       console.error(`❌ TOTAL EXCEDE LIMITE: ${totalEstimatedTokens} tokens`);
       return new Response(
         JSON.stringify({ 
