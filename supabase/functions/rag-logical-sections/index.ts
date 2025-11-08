@@ -58,7 +58,7 @@ FORMATO DE RESPOSTA (JSON):
 
 ⚠️ Retorne APENAS o JSON, sem texto adicional.`
         }],
-        max_tokens: Math.min(12000, Math.floor(synthesizedContent.length / 3)),
+        max_tokens: Math.min(20000, Math.floor(synthesizedContent.length / 2.5)),
         response_format: { type: "json_object" }
       }),
     });
