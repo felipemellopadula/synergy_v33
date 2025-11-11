@@ -73,6 +73,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { WordTablesPreview } from "@/components/WordTablesPreview";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 // =====================
 // Tipos
@@ -531,6 +532,10 @@ const Chat: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [isWebSearchMode, setIsWebSearchMode] = useState(false);
+  const [wordVisionDialog, setWordVisionDialog] = useState<{ show: boolean; file: File | null }>({
+    show: false,
+    file: null
+  });
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [filePreviewUrls, setFilePreviewUrls] = useState<Map<string, string>>(new Map());
   const [processedPdfs, setProcessedPdfs] = useState<Map<string, string>>(new Map());
@@ -2145,6 +2150,17 @@ Forneça uma resposta abrangente que integre informações de todos os documento
               throw new Error(result.error || "Erro ao processar PDF");
             }
           } else if (isWordFile(file)) {
+            // Para arquivos grandes (> 1MB), oferecer escolha entre métodos
+            const shouldAskVisionAPI = file.size > 1024 * 1024;
+            
+            if (shouldAskVisionAPI) {
+              // Mostrar dialog e pausar processamento
+              setWordVisionDialog({ show: true, file });
+              setFileProcessingStatus((prev) => new Map(prev.set(fileName, "completed"))); // Marcar como "aguardando escolha"
+              return { fileName, success: true, needsUserChoice: true };
+            }
+            
+            // Arquivos menores: processar automaticamente com HTML parsing
             const result = await WordProcessor.processWord(file);
             if (result.success && result.content) {
               setProcessedDocuments(
@@ -2948,6 +2964,115 @@ Forneça uma resposta abrangente que integre informações de todos os documento
                   </div>
                 </div>
               )}
+
+              {/* Dialog para escolher método de processamento Word */}
+              <Dialog open={wordVisionDialog.show} onOpenChange={(open) => {
+                if (!open) {
+                  setWordVisionDialog({ show: false, file: null });
+                }
+              }}>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Escolher Método de Processamento</DialogTitle>
+                    <DialogDescription>
+                      Escolha como processar o documento Word: <strong>{wordVisionDialog.file?.name}</strong>
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm">HTML Parsing (Recomendado)</h4>
+                      <ul className="text-xs text-muted-foreground space-y-1 pl-4 list-disc">
+                        <li>⚡ Rápido (2-3 segundos)</li>
+                        <li>💰 Gratuito</li>
+                        <li>✅ Boa qualidade (80-90%)</li>
+                        <li>📊 Detecta maioria das tabelas</li>
+                      </ul>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <h4 className="font-medium text-sm">Vision API (Máxima Qualidade)</h4>
+                      <ul className="text-xs text-muted-foreground space-y-1 pl-4 list-disc">
+                        <li>🐢 Lento (30-60 segundos)</li>
+                        <li>💵 Pago (~$1.80 por documento)</li>
+                        <li>⭐ Qualidade máxima (95-99%)</li>
+                        <li>🎯 Detecta tabelas complexas e merged cells</li>
+                      </ul>
+                    </div>
+                  </div>
+                  <DialogFooter className="flex-col sm:flex-row gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        const file = wordVisionDialog.file;
+                        setWordVisionDialog({ show: false, file: null });
+                        
+                        if (file) {
+                          // Processar com HTML parsing (rápido)
+                          await processFilesInParallel([file]);
+                        }
+                      }}
+                      className="w-full sm:w-auto"
+                    >
+                      HTML Parsing (Rápido)
+                    </Button>
+                    <Button
+                      onClick={async () => {
+                        const file = wordVisionDialog.file;
+                        setWordVisionDialog({ show: false, file: null });
+                        
+                        if (file) {
+                          // Processar com Vision API
+                          const { WordVisionProcessor } = await import('@/utils/WordVisionProcessor');
+                          const fileName = file.name;
+                          
+                          setFileProcessingStatus((prev) => new Map(prev.set(fileName, "processing")));
+                          
+                          const result = await WordVisionProcessor.processWithVision(file, (current, total, status) => {
+                            console.log(`[Vision] ${status} (${current}/${total})`);
+                          });
+                          
+                          if (result.success && result.content) {
+                            setProcessedDocuments(
+                              (prev) =>
+                                new Map(
+                                  prev.set(fileName, {
+                                    content: result.content!,
+                                    type: "word",
+                                    fileSize: file.size,
+                                    pages: result.pageCount,
+                                    layout: result.layout,
+                                    tables: result.tables,
+                                  }),
+                                ),
+                            );
+                            setProcessedWords((prev) => new Map(prev).set(fileName, result.content || ""));
+                            setFileProcessingStatus((prev) => new Map(prev.set(fileName, "completed")));
+                            
+                            if (!attachedFiles.some(f => f.name === fileName)) {
+                              setAttachedFiles((prev) => [...prev, file]);
+                            }
+                            
+                            toast({
+                              title: "Sucesso!",
+                              description: `${fileName} processado com Vision API (qualidade máxima)`,
+                            });
+                          } else {
+                            setFileProcessingStatus((prev) => new Map(prev.set(fileName, "error")));
+                            toast({
+                              title: "Erro no processamento Vision API",
+                              description: result.error || "Tente novamente ou use HTML Parsing",
+                              variant: "destructive",
+                            });
+                          }
+                        }
+                      }}
+                      className="w-full sm:w-auto"
+                    >
+                      Vision API (Qualidade Máxima)
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
 
               <form onSubmit={handleSendMessage} className="flex items-end gap-2">
                 <div className="flex-1 relative">
