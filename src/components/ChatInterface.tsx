@@ -495,11 +495,12 @@ export const ChatInterface = ({ isOpen, onClose }: ChatInterfaceProps) => {
         messagePreview: messageContent.substring(0, 300) + '...'
       });
 
-      // Prepare files for sending if we have PDF/Word content
-      const requestBody: any = {
-        message: messageContent,
-        model: selectedModel,
-      };
+    // Prepare files for sending if we have PDF/Word content
+    const requestBody: any = {
+      message: messageContent,
+      model: selectedModel,
+      hasLargeDocument: filePages > 20, // ✅ Marcar como documento grande se >20 páginas
+    };
 
       // Add files if we processed any PDF/Word documents
       if (attachedFiles.length > 0 && (fileName?.endsWith('.pdf') || fileName?.endsWith('.docx') || fileName?.endsWith('.doc'))) {
