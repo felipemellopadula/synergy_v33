@@ -240,15 +240,22 @@ serve(async (req) => {
       console.log(`🗂️ Large document detected (${estimatedTokens} tokens) - using Map-Reduce approach`);
       
       try {
-        // MAP PHASE: Dividir em chunks e processar cada um
+        // MAP PHASE: Dividir em chunks e processar SEQUENCIALMENTE
         const chunks = chunkText(message, 20000); // ✅ TIER 2: ~20k tokens por chunk (~50 páginas)
-        console.log(`📚 Processing ${chunks.length} chunks in parallel...`);
+        console.log(`📚 Processing ${chunks.length} chunks SEQUENTIALLY to avoid RPM limits...`);
         
-        const chunkPromises = chunks.map((chunk, i) => 
-          processChunk(chunk, i, chunks.length, apiModel, openAIApiKey, 1)
-        );
-        
-        const chunkResponses = await Promise.all(chunkPromises);
+        // ✅ Processar sequencialmente para evitar Rate Limit (RPM)
+        const chunkResponses: string[] = [];
+        for (let i = 0; i < chunks.length; i++) {
+          const response = await processChunk(chunks[i], i, chunks.length, apiModel, openAIApiKey, 1);
+          chunkResponses.push(response);
+          
+          // Aguardar 2 segundos entre chunks para respeitar RPM limits
+          if (i < chunks.length - 1) {
+            console.log(`⏱️ Waiting 2s before next chunk to respect RPM limits...`);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+          }
+        }
         console.log(`✅ All ${chunks.length} chunks processed successfully`);
         
         // REDUCE PHASE: Consolidar respostas e fazer streaming
@@ -389,7 +396,9 @@ serve(async (req) => {
       
       if (response.status === 429) {
         return new Response(
-          JSON.stringify({ error: "Rate limit exceeded. Please try again later." }),
+          JSON.stringify({ 
+            error: "⏱️ Limite de requisições atingido\n\nAguarde 1-2 minutos antes de tentar novamente. A OpenAI limita requisições por minuto." 
+          }),
           {
             status: 429,
             headers: { ...corsHeaders, "Content-Type": "application/json" },
