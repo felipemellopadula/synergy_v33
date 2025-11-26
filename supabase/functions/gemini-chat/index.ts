@@ -25,6 +25,8 @@ function splitIntoChunks(text: string, maxTokens: number): string[] {
 
 // Dynamic Map-Reduce threshold based on model capabilities
 function getMapReduceThreshold(model: string): number {
+  if (model.includes('gemini-3')) return 900000; // ~1.260 páginas (Gemini 3 Pro: 1M tokens)
+  if (model.includes('gemini-2.5')) return 900000; // ~1.260 páginas
   if (model.includes('gemini-2.0')) return 750000; // ~1.050 páginas
   if (model.includes('gemini-1.5')) return 600000; // ~840 páginas
   return 500000; // ~700 páginas para modelos menores
@@ -93,7 +95,12 @@ serve(async (req) => {
       }
     }
 
-    const limits = { input: 1000000, output: 8192 }; // Gemini 2.0 Flash
+    // Define token limits based on model
+    const limits = actualModel.includes('gemini-3-pro') 
+      ? { input: 1048576, output: 65536 }  // Gemini 3 Pro: 1M in, 65K out
+      : actualModel.includes('gemini-2.5')
+      ? { input: 1048576, output: 65536 }  // Gemini 2.5: 1M in, 65K out
+      : { input: 1000000, output: 8192 };  // Gemini 2.0 Flash default
     const estimatedTokens = estimateTokenCount(finalMessage);
     const mapReduceThreshold = getMapReduceThreshold(actualModel);
     
