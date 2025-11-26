@@ -11,6 +11,9 @@ const MODEL_COSTS = {
   'claude-opus-4-1-20250805': 15000,
   'claude-sonnet-4-5': 10000,
   'claude-haiku-4-5': 2500,
+  // xAI Grok Models (Preços oficiais de https://docs.x.ai - atualizado 2025-11-26)
+  'grok-4-1-fast-reasoning': 3500, // $0.20 entrada + $0.50 saída = $0.70 total (média $0.35/1M)
+  'grok-4-1-fast-non-reasoning': 3500, // $0.20 entrada + $0.50 saída = $0.70 total (média $0.35/1M)
   'grok-4-0709': 15000,
   'grok-3': 10000,
   'grok-3-mini': 3000,
@@ -168,6 +171,9 @@ export const useTokens = () => {
       'claude-opus-4-1-20250805': 'Claude Opus 4.1',
       'claude-sonnet-4-5': 'Claude Sonnet 4.5',
       'claude-haiku-4-5': 'Claude Haiku 4.5',
+      // xAI Grok Models
+      'grok-4-1-fast-reasoning': 'Grok 4.1 Fast (Reasoning)',
+      'grok-4-1-fast-non-reasoning': 'Grok 4.1 Fast (Non-Reasoning)',
       'grok-4-0709': 'Grok 4',
       'grok-3': 'Grok 3', 
       'grok-3-mini': 'Grok 3 Mini',

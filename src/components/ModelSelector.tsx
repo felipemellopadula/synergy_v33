@@ -48,6 +48,8 @@ const modelsByProvider = {
     { id: 'llama-3.2-1b-instruct', name: 'Llama 3.2 1B Instruct', provider: 'APILLM', category: 'fast' as const },
   ],
   'xAI': [
+    { id: 'grok-4-1-fast-reasoning', name: 'Grok 4.1 Fast (Reasoning)', provider: 'xAI', category: 'premium' as const },
+    { id: 'grok-4-1-fast-non-reasoning', name: 'Grok 4.1 Fast (Non-Reasoning)', provider: 'xAI', category: 'standard' as const },
     { id: 'grok-4', name: 'Grok 4', provider: 'xAI', category: 'premium' as const },
     { id: 'grok-3', name: 'Grok 3', provider: 'xAI', category: 'standard' as const },
     { id: 'grok-3-mini', name: 'Grok 3 Mini', provider: 'xAI', category: 'fast' as const },

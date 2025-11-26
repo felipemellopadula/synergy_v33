@@ -62,8 +62,10 @@ const GEMINI_PRICING: Record<string, { input: number; output: number }> = {
   "gemini-2.5-flash-lite": { input: 0.31 / 1_000_000, output: 2.5 / 1_000_000 }, // US$ 0.31/2.5 per million
 };
 
-// Grok (xAI) pricing per million tokens (USD) - Official xAI pricing
+// Grok (xAI) pricing per million tokens (USD) - Official xAI pricing (updated 2025-11-26)
 const GROK_PRICING: Record<string, { input: number; output: number }> = {
+  "grok-4-1-fast-reasoning": { input: 0.20, output: 0.50 }, // US$ 0.20/0.50 per million
+  "grok-4-1-fast-non-reasoning": { input: 0.20, output: 0.50 }, // US$ 0.20/0.50 per million
   "grok-4": { input: 3.0, output: 15.0 },
   "grok-4-0709": { input: 3.0, output: 15.0 }, // Same as grok-4
   "grok-3": { input: 3.0, output: 15.0 },
