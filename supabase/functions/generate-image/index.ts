@@ -66,8 +66,10 @@ serve(async (req) => {
     
     // Modelos Google (como google:4@1 - Gemini Flash) não suportam width/height
     const isGoogleModel = model.startsWith('google:');
+    // Nano Banana 2 Pro (google:4@2) suporta dimensões customizadas, diferente do Gemini Flash (google:4@1)
+    const isNanoBanana2Pro = model === 'google:4@2';
     // Modelos que suportam dimensões altas - Seedream especificamente suporta até 6048x6048
-    const isHighResModel = model === 'bytedance:5@0' || model === 'ideogram:4@1' || model === 'bfl:3@1';
+    const isHighResModel = model === 'bytedance:5@0' || model === 'ideogram:4@1' || model === 'bfl:3@1' || model === 'google:4@2';
     // Seedream tem limite específico maior
     const isSeedreamModel = model === 'bytedance:5@0';
     // Qwen-Image tem limite de pixels: máximo 1048576 pixels (1024x1024)
@@ -162,6 +164,9 @@ serve(async (req) => {
           if (isSeedreamModel) {
             maxDimension = 6144;
             console.log('Seedream detectado - limite máximo ajustado para:', maxDimension);
+          } else if (isNanoBanana2Pro) {
+            maxDimension = 6144; // Suporta até 4K (6336x2688 para 21:9)
+            console.log('Nano Banana 2 Pro detectado - limite máximo ajustado para:', maxDimension);
           } else if (isHighResModel) {
             maxDimension = 8192;
           }
@@ -278,7 +283,8 @@ serve(async (req) => {
     };
 
     // Apenas adicionar width/height para modelos que suportam
-    if (!isGoogleModel) {
+    // Nano Banana 2 Pro (google:4@2) suporta width/height, diferente do Gemini Flash (google:4@1)
+    if (!isGoogleModel || isNanoBanana2Pro) {
       inferenceObject.width = width;
       inferenceObject.height = height;
       
@@ -286,6 +292,15 @@ serve(async (req) => {
       if (isSeedreamModel) {
         console.log('=== SEEDREAM CONFIGURATION ===');
         console.log('Modelo Seedream detectado:', model);
+        console.log('Dimensões finais:', { width, height });
+        console.log('É resolução 4K?', (width >= 4096 || height >= 4096));
+        console.log('Dimensões solicitadas originais:', { originalWidth: body.width, originalHeight: body.height });
+      }
+      
+      // Log específico para Nano Banana 2 Pro
+      if (isNanoBanana2Pro) {
+        console.log('=== NANO BANANA 2 PRO CONFIGURATION ===');
+        console.log('Modelo Nano Banana 2 Pro detectado:', model);
         console.log('Dimensões finais:', { width, height });
         console.log('É resolução 4K?', (width >= 4096 || height >= 4096));
         console.log('Dimensões solicitadas originais:', { originalWidth: body.width, originalHeight: body.height });
