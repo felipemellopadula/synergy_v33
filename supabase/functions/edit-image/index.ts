@@ -27,6 +27,7 @@ serve(async (req) => {
     console.log('Editando imagem com Runware:', { model, width, height, promptLength: positivePrompt.length });
 
     const isGoogleModel = model && model.startsWith('google:');
+    const isNanoBanana2Pro = model === 'google:4@2';
     
     let runwarePayload: any[] = [
       {
@@ -90,8 +91,14 @@ serve(async (req) => {
           outputFormat: "PNG",
           outputType: "URL",
           includeCost: true,
+          // Adicionar width/height apenas para Nano Banana 2 Pro
+          ...(isNanoBanana2Pro && width && height ? { width, height } : {}),
         }
       ];
+      
+      if (isNanoBanana2Pro) {
+        console.log('Nano Banana 2 Pro - adicionando dimensões:', { width, height });
+      }
 
       console.log('Enviando inferência para Runware API...');
       const inferenceResponse = await fetch(RUNWARE_API_URL, {
