@@ -228,6 +228,7 @@ Pergunta/contexto original do usuário: ${originalMessage}`;
       }
     ],
     stream: true,
+    store: true, // Enable prompt caching for consolidation
   };
 
   if (!isNewerModel) {
@@ -399,6 +400,7 @@ serve(async (req) => {
       model: apiModel,
       messages,
       stream: true,
+      store: true, // Enable prompt caching (50% discount on cached tokens)
     };
 
     // ✅ TIER-2-MAXOUT: Output dinâmico inteligente baseado no modelo e input
@@ -474,10 +476,21 @@ serve(async (req) => {
 
     console.log("✅ Streaming response from OpenAI");
     
-    // 💾 CACHE MONITORING: Log usage headers if available
+    // 💾 PROMPT CACHING: Monitor cache status
     const cacheHeader = response.headers.get('openai-cache-status');
     if (cacheHeader) {
-      console.log(`💾 Cache Status: ${cacheHeader}`);
+      console.log(`💾 Prompt Cache Status: ${cacheHeader}`);
+    }
+    
+    // Log cache-related headers for debugging
+    const cacheReadTokens = response.headers.get('openai-cache-read-tokens');
+    const cacheWriteTokens = response.headers.get('openai-cache-write-tokens');
+    
+    if (cacheReadTokens) {
+      console.log(`🔄 Cache Read Tokens: ${cacheReadTokens} (50% discount applied)`);
+    }
+    if (cacheWriteTokens) {
+      console.log(`📝 Cache Write Tokens: ${cacheWriteTokens} (full price)`);
     }
 
     // Retornar stream SSE diretamente

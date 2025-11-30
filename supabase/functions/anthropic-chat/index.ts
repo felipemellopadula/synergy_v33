@@ -86,12 +86,37 @@ serve(async (req) => {
       }
     }
     
-    // Build messages array - ONLY current message (no history for faster response)
-    console.log('⚠️ Sending ONLY current message (no history) for faster response');
-    const messages = [{
+    // Build messages array with conversation history if context is enabled
+    let messages: any[] = [];
+    let cachedTokens = 0;
+    
+    if (contextEnabled && conversationHistory.length > 0) {
+      console.log('Building conversation context with', conversationHistory.length, 'previous messages');
+      const recentHistory = conversationHistory.slice(-4); // Last 4 messages for Claude
+      
+      // For Claude, add cache_control to enable prompt caching (90% discount on cache reads)
+      messages = recentHistory.map((historyMsg: any, index: number) => {
+        const msg: any = {
+          role: historyMsg.role,
+          content: historyMsg.content
+        };
+        
+        // Add cache_control to the last user message in history to cache the conversation
+        // Claude requires cache_control only on the last eligible message before the new one
+        if (index === recentHistory.length - 1 && historyMsg.role === 'user') {
+          msg.cache_control = { type: "ephemeral" };
+          cachedTokens = Math.ceil((historyMsg.content?.length || 0) / 3.2);
+          console.log('🔄 Cache enabled for conversation history:', cachedTokens, 'tokens');
+        }
+        
+        return msg;
+      });
+    }
+    
+    messages.push({
       role: 'user',
       content: finalMessage
-    }];
+    });
     
     // Calculate total token count for the entire conversation
     const totalText = messages.map((msg: any) => msg.content).join('\n');
@@ -275,14 +300,30 @@ serve(async (req) => {
         if (userData.user) {
           const inputTokens = data.usage?.input_tokens || 0;
           const outputTokens = data.usage?.output_tokens || 0;
+          const cacheCreationTokens = data.usage?.cache_creation_input_tokens || 0;
+          const cacheReadTokens = data.usage?.cache_read_input_tokens || 0;
           
-          console.log('📊 Token usage:', { inputTokens, outputTokens, total: inputTokens + outputTokens });
+          // Calculate effective token usage with 90% discount on cache reads
+          // Cache reads cost only 10% of normal price
+          const regularInputTokens = inputTokens - cacheReadTokens;
+          const effectiveInputTokens = regularInputTokens + Math.ceil(cacheReadTokens * 0.1);
+          const totalEffectiveTokens = effectiveInputTokens + outputTokens;
+          
+          console.log('📊 Token usage:', { 
+            inputTokens, 
+            outputTokens, 
+            cacheCreationTokens,
+            cacheReadTokens,
+            effectiveInputTokens,
+            total: totalEffectiveTokens,
+            savedTokens: cacheReadTokens > 0 ? Math.ceil(cacheReadTokens * 0.9) : 0
+          });
           
           await supabaseClient.from('token_usage').insert({
             user_id: userData.user.id,
-            tokens_used: inputTokens + outputTokens,
+            tokens_used: totalEffectiveTokens,
             model: model,
-            input_tokens: inputTokens,
+            input_tokens: effectiveInputTokens,
             output_tokens: outputTokens,
           });
           
