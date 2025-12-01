@@ -166,7 +166,9 @@ const Image2Page = () => {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [selectedImageForModal, setSelectedImageForModal] = useState<DatabaseImage | null>(null);
   const [imageToDelete, setImageToDelete] = useState<DatabaseImage | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const isLoadingRef = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const canAttachImage = useMemo(
     () =>
@@ -259,6 +261,37 @@ const Image2Page = () => {
       setSelectedFile(null);
     }
   };
+
+  const handleDrop = useCallback((e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    if (!canAttachImage || isGenerating) return;
+
+    const files = e.dataTransfer.files;
+    if (files && files[0] && files[0].type.startsWith('image/')) {
+      setSelectedFile(files[0]);
+    } else {
+      toast.error("Formato inválido", {
+        description: "Por favor, arraste apenas arquivos de imagem (PNG, JPG, WEBP)",
+      });
+    }
+  }, [canAttachImage, isGenerating]);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (canAttachImage && !isGenerating) {
+      setIsDragging(true);
+    }
+  }, [canAttachImage, isGenerating]);
+
+  const handleDragLeave = useCallback((e: React.DragEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
 
   const generate = async () => {
     if (!prompt.trim()) {
@@ -674,18 +707,30 @@ const Image2Page = () => {
                 </SelectContent>
               </Select>
 
-              {/* Anexar arquivo */}
+              {/* Anexar arquivo com Drag & Drop */}
               <Button
                 variant="outline"
                 size="icon"
                 disabled={!canAttachImage || isGenerating}
-                onClick={() => document.getElementById("file-input")?.click()}
-                title={canAttachImage ? "Anexar imagem" : "Modelo não suporta anexo"}
-                className="bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white"
+                onClick={() => fileInputRef.current?.click()}
+                onDrop={handleDrop}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                title={canAttachImage ? "Anexar imagem (clique ou arraste)" : "Modelo não suporta anexo"}
+                className={`bg-white/5 border-white/10 text-white hover:bg-white/10 hover:text-white transition-all ${
+                  isDragging ? "border-[#8C00FF] border-2 bg-[#8C00FF]/20 scale-110" : ""
+                }`}
               >
                 <Paperclip className="h-4 w-4" />
               </Button>
-              <input id="file-input" type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+              <input 
+                ref={fileInputRef}
+                id="file-input" 
+                type="file" 
+                accept="image/*" 
+                onChange={handleFileChange} 
+                className="hidden" 
+              />
 
               {/* Magic Prompt */}
               <div className="flex items-center gap-2 px-2 py-2 rounded-md bg-white/5 border border-white/10">

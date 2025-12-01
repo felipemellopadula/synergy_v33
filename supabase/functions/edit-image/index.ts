@@ -27,7 +27,11 @@ serve(async (req) => {
     console.log('Editando imagem com Runware:', { model, width, height, promptLength: positivePrompt.length });
 
     const isGoogleModel = model && model.startsWith('google:');
+    const isSeedream = model === 'bytedance:5@0';
     const isNanoBanana2Pro = model === 'google:4@2';
+    
+    // Seedream e Google precisam de upload + referenceImages
+    const needsUploadFlow = isGoogleModel || isSeedream;
     
     let runwarePayload: any[] = [
       {
@@ -36,9 +40,9 @@ serve(async (req) => {
       }
     ];
 
-    // Para modelos Google (Gemini), precisa fazer upload da imagem primeiro
-    if (isGoogleModel) {
-      console.log('Modelo Google detectado, fazendo upload da imagem primeiro...');
+    // Para modelos Google (Gemini) e Seedream, precisa fazer upload da imagem primeiro
+    if (needsUploadFlow) {
+      console.log(`Modelo ${isGoogleModel ? 'Google' : 'Seedream'} detectado, fazendo upload da imagem primeiro...`);
       
       const uploadTaskUUID = crypto.randomUUID();
       runwarePayload.push({
@@ -91,13 +95,13 @@ serve(async (req) => {
           outputFormat: "PNG",
           outputType: "URL",
           includeCost: true,
-          // Adicionar width/height apenas para Nano Banana 2 Pro
-          ...(isNanoBanana2Pro && width && height ? { width, height } : {}),
+          // Adicionar width/height para Nano Banana 2 Pro e Seedream
+          ...((isNanoBanana2Pro || isSeedream) && width && height ? { width, height } : {}),
         }
       ];
       
-      if (isNanoBanana2Pro) {
-        console.log('Nano Banana 2 Pro - adicionando dimensões:', { width, height });
+      if (isNanoBanana2Pro || isSeedream) {
+        console.log(`${isNanoBanana2Pro ? 'Nano Banana 2 Pro' : 'Seedream 4.0'} - adicionando dimensões:`, { width, height });
       }
 
       console.log('Enviando inferência para Runware API...');
