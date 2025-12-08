@@ -53,12 +53,16 @@ serve(async (req) => {
     const apiModel = isThinkingOnlyMode ? 'deepseek-reasoner' : model;
     const isReasonerModel = apiModel === 'deepseek-reasoner';
 
-    console.log(`DeepSeek Chat - Modelo: ${model} (API: ${apiModel})`);
-    console.log(`Modo Thinking Only: ${isThinkingOnlyMode}`);
-    console.log(`Stream Reasoning: ${streamReasoning} (type: ${typeof streamReasoning})`);
-    console.log(`Is Reasoner Model: ${isReasonerModel}`);
-    console.log(`Will use SSE streaming: ${streamReasoning && isReasonerModel}`);
-    console.log(`Tamanho da mensagem: ${message.length} caracteres`);
+    console.log('==========================================');
+    console.log('🚀 DEEPSEEK-CHAT v2 - NOVA VERSAO');
+    console.log('==========================================');
+    console.log(`📌 Modelo recebido: ${model}`);
+    console.log(`📌 API Model: ${apiModel}`);
+    console.log(`📌 Is Thinking Only: ${isThinkingOnlyMode}`);
+    console.log(`📌 Stream Reasoning: ${streamReasoning} (type: ${typeof streamReasoning})`);
+    console.log(`📌 Is Reasoner Model: ${isReasonerModel}`);
+    console.log(`📌 WILL USE SSE: ${streamReasoning && isReasonerModel}`);
+    console.log(`📌 Message length: ${message.length} chars`);
 
     const deepseekApiKey = Deno.env.get('DEEPSEEK_API_KEY');
     if (!deepseekApiKey) {

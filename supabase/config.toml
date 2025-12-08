@@ -56,3 +56,6 @@ verify_jwt = true
 
 [functions.extract-tables]
 verify_jwt = true
+
+[functions.deepseek-chat]
+verify_jwt = true
