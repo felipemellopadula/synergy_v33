@@ -87,7 +87,19 @@ const IDEOGRAM_QUALITY_SETTINGS = [
   { id: "10:21", label: "10:21 (Ultra-Tall / Portrait)", width: 762, height: 1600, steps: 15 },
 ];
 
-const GEMINI_QUALITY_SETTINGS = [{ id: "1:1", label: "1:1 (Square)", width: 1024, height: 1024, steps: 15 }];
+const GEMINI_QUALITY_SETTINGS = [
+  { id: "auto", label: "Auto", width: 1024, height: 1024, steps: 15 },
+  { id: "1:1", label: "1:1 (Square)", width: 1024, height: 1024, steps: 15 },
+  { id: "3:2", label: "3:2 (Classic / Landscape)", width: 1536, height: 1024, steps: 15 },
+  { id: "2:3", label: "2:3 (Classic / Portrait)", width: 1024, height: 1536, steps: 15 },
+  { id: "4:3", label: "4:3 (Standard / Landscape)", width: 1365, height: 1024, steps: 15 },
+  { id: "3:4", label: "3:4 (Standard / Portrait)", width: 1024, height: 1365, steps: 15 },
+  { id: "4:5", label: "4:5 (Portrait)", width: 1024, height: 1280, steps: 15 },
+  { id: "5:4", label: "5:4 (Landscape)", width: 1280, height: 1024, steps: 15 },
+  { id: "9:16", label: "9:16 (Tall / Portrait)", width: 576, height: 1024, steps: 15 },
+  { id: "16:9", label: "16:9 (Wide / Landscape)", width: 1820, height: 1024, steps: 15 },
+  { id: "21:9", label: "21:9 (Ultra-Wide / Landscape)", width: 2389, height: 1024, steps: 15 },
+];
 
 const NANO_BANANA_PRO_QUALITY_SETTINGS = [
   { id: "1:1-1k", label: "1:1 (1K / Square)", width: 1024, height: 1024, steps: 15 },
