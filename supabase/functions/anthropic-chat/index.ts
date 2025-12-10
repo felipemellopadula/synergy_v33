@@ -30,6 +30,16 @@ function supportsExtendedThinking(model: string): boolean {
          model.includes('claude-opus-4');
 }
 
+// Check if model supports Web Search
+function supportsWebSearch(model: string): boolean {
+  return model.includes('claude-sonnet-4-5') ||
+         model.includes('claude-sonnet-4-') ||
+         model.includes('claude-3-7-sonnet') ||
+         model.includes('claude-haiku-4') ||
+         model.includes('claude-3-5-haiku') ||
+         model.includes('claude-opus-4');
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -42,7 +52,8 @@ serve(async (req) => {
       files, 
       conversationHistory = [], 
       contextEnabled = false,
-      reasoningEnabled = false 
+      reasoningEnabled = false,
+      webSearchEnabled = false
     } = await req.json();
     
     const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY');
@@ -64,8 +75,15 @@ serve(async (req) => {
 
     const limits = getModelLimits(model);
     const useExtendedThinking = reasoningEnabled && supportsExtendedThinking(model);
+    const useWebSearch = webSearchEnabled && supportsWebSearch(model);
     
-    console.log('Extended Thinking:', { enabled: useExtendedThinking, model, reasoningEnabled });
+    console.log('Claude Chat config:', { 
+      model, 
+      extendedThinking: useExtendedThinking, 
+      webSearch: useWebSearch,
+      reasoningEnabled,
+      webSearchEnabled 
+    });
     
     if (files && files.length > 0) {
       console.log('Files received:', files.map((f: any) => ({ 
@@ -216,22 +234,43 @@ serve(async (req) => {
       ? Math.min(Math.floor(limits.output * 0.5), limits.output)
       : Math.min(Math.floor(limits.output * 0.8), limits.output);
     
-    // Build request body based on whether Extended Thinking is enabled
+    // Build request body based on mode (Extended Thinking, Web Search, or standard)
     let requestBody: any;
     
+    // Build tools array for web search
+    const tools: any[] = [];
+    if (useWebSearch) {
+      tools.push({
+        type: "web_search_20250305",
+        name: "web_search",
+        max_uses: 5
+      });
+      console.log('🌐 Web Search tool enabled for Claude');
+    }
+    
     if (useExtendedThinking) {
-      // Extended Thinking mode with streaming
+      // Extended Thinking mode with streaming (cannot use web search with thinking)
       requestBody = {
         model: model,
-        max_tokens: 16000, // Required for extended thinking
+        max_tokens: 16000,
         thinking: {
           type: "enabled",
-          budget_tokens: 10000 // Budget for thinking process
+          budget_tokens: 10000
         },
         messages: processedMessages,
         stream: true
       };
       console.log('🧠 Extended Thinking enabled with streaming');
+    } else if (useWebSearch) {
+      // Web Search mode - needs streaming to handle tool results
+      requestBody = {
+        model: model,
+        max_tokens: maxTokens,
+        messages: processedMessages,
+        tools: tools,
+        stream: true
+      };
+      console.log('🌐 Web Search mode with streaming');
     } else {
       requestBody = {
         model: model,
@@ -249,7 +288,8 @@ serve(async (req) => {
       model, 
       maxTokens: requestBody.max_tokens,
       messageCount: processedMessages.length,
-      extendedThinking: useExtendedThinking
+      extendedThinking: useExtendedThinking,
+      webSearch: useWebSearch
     });
 
     const controller = new AbortController();
@@ -408,7 +448,160 @@ serve(async (req) => {
         });
       }
 
-      // Non-streaming response (no extended thinking)
+      // Handle streaming for Web Search
+      if (useWebSearch && response.body) {
+        console.log('🔄 Processing Web Search stream...');
+        
+        const encoder = new TextEncoder();
+        const stream = new ReadableStream({
+          async start(controller) {
+            const reader = response.body!.getReader();
+            const decoder = new TextDecoder();
+            let buffer = '';
+            let textContent = '';
+            let citations: any[] = [];
+            let searchQueries: string[] = [];
+            let inputTokens = 0;
+            let outputTokens = 0;
+
+            try {
+              while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+
+                for (const line of lines) {
+                  if (!line.trim() || line.startsWith(':')) continue;
+                  
+                  if (line.startsWith('event: ')) {
+                    continue;
+                  }
+                  
+                  if (line.startsWith('data: ')) {
+                    const jsonStr = line.slice(6);
+                    if (jsonStr === '[DONE]') continue;
+
+                    try {
+                      const data = JSON.parse(jsonStr);
+                      
+                      // Handle different event types for web search
+                      if (data.type === 'content_block_start') {
+                        if (data.content_block?.type === 'server_tool_use' && 
+                            data.content_block?.name === 'web_search') {
+                          console.log('🌐 Web search started');
+                          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                            type: 'web_search_status', 
+                            status: '🔍 Buscando na web...' 
+                          })}\n\n`));
+                        }
+                      } else if (data.type === 'content_block_delta') {
+                        if (data.delta?.type === 'text_delta') {
+                          const text = data.delta.text || '';
+                          textContent += text;
+                          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                            type: 'content', 
+                            content: text 
+                          })}\n\n`));
+                        } else if (data.delta?.type === 'input_json_delta') {
+                          // Search query being built
+                          if (data.delta.partial_json) {
+                            try {
+                              const partialQuery = JSON.parse(data.delta.partial_json);
+                              if (partialQuery.query) {
+                                searchQueries.push(partialQuery.query);
+                              }
+                            } catch (e) { /* ignore partial JSON */ }
+                          }
+                        }
+                      } else if (data.type === 'content_block_stop') {
+                        // Check if this block has citations
+                        if (data.content_block?.citations) {
+                          citations.push(...data.content_block.citations);
+                        }
+                      } else if (data.type === 'message_delta') {
+                        if (data.usage) {
+                          outputTokens = data.usage.output_tokens || 0;
+                        }
+                      } else if (data.type === 'message_start') {
+                        if (data.message?.usage) {
+                          inputTokens = data.message.usage.input_tokens || 0;
+                        }
+                      }
+                    } catch (e) {
+                      console.error('Error parsing SSE data:', e);
+                    }
+                  }
+                }
+              }
+
+              // Send citations if we have them
+              if (citations.length > 0) {
+                const formattedCitations = citations
+                  .filter(c => c.type === 'web_search_result_location')
+                  .map(c => ({
+                    url: c.url,
+                    title: c.title,
+                    citedText: c.cited_text
+                  }));
+                
+                if (formattedCitations.length > 0) {
+                  controller.enqueue(encoder.encode(`data: ${JSON.stringify({ 
+                    type: 'citations', 
+                    citations: formattedCitations,
+                    webSearchQueries: searchQueries
+                  })}\n\n`));
+                }
+              }
+
+              // Send done marker
+              controller.enqueue(encoder.encode('data: [DONE]\n\n'));
+              controller.close();
+
+              // Record token usage
+              const authHeader = req.headers.get('authorization');
+              if (authHeader) {
+                const token = authHeader.replace('Bearer ', '');
+                const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+                const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+                const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+                const supabaseClient = createClient(supabaseUrl, supabaseServiceKey);
+                
+                const { data: userData } = await supabaseClient.auth.getUser(token);
+                
+                if (userData.user) {
+                  const totalTokens = inputTokens + outputTokens;
+                  console.log('📊 Web Search token usage:', { inputTokens, outputTokens, total: totalTokens });
+                  
+                  await supabaseClient.from('token_usage').insert({
+                    user_id: userData.user.id,
+                    tokens_used: totalTokens,
+                    model_name: model,
+                    input_tokens: inputTokens,
+                    output_tokens: outputTokens,
+                  });
+                }
+              }
+            } catch (e) {
+              console.error('Stream error:', e);
+              controller.error(e);
+            }
+          }
+        });
+
+        return new Response(stream, {
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+          },
+        });
+      }
+
+      // Non-streaming response (no extended thinking, no web search)
       console.log('📥 Anthropic API response status:', response.status);
       console.log('🔄 Iniciando parse do JSON...');
       

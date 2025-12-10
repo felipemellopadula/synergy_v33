@@ -1637,9 +1637,10 @@ Forneça uma resposta abrangente que integre informações de todos os documento
           hasLargeDocument: false,
         };
         
-        // Add webSearchEnabled for OpenAI and Gemini models
+        // Add webSearchEnabled for OpenAI, Gemini, and Claude models
         const isOpenAIModel = internalModel.includes('gpt') || internalModel.includes('o3') || internalModel.includes('o4');
         const isGeminiModel = internalModel.includes('gemini');
+        const isClaudeModel = internalModel.includes('claude');
         if (isWebSearchMode && isOpenAIModel) {
           requestBody.webSearchEnabled = true;
           console.log('🌐 Web Search mode enabled for OpenAI model');
@@ -1649,6 +1650,11 @@ Forneça uma resposta abrangente que integre informações de todos os documento
           requestBody.webSearchEnabled = true;
           console.log('🌐 Web Search (Google Search Grounding) enabled for Gemini model');
           setProcessingStatus('🔍 Buscando na web com Google Search...');
+        }
+        if (isWebSearchMode && isClaudeModel) {
+          requestBody.webSearchEnabled = true;
+          console.log('🌐 Web Search enabled for Claude model');
+          setProcessingStatus('🔍 Buscando na web...');
         }
         
         // Add reasoningEnabled for Gemini, Claude, and Grok models
