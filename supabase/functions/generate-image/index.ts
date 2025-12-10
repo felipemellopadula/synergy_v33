@@ -369,12 +369,50 @@ serve(async (req) => {
         console.log(`[Imagem ${index + 1}/${imageItems.length}] Processando: ${imageURL}`);
 
         try {
-          // Baixar imagem
-          const imgRes = await fetch(imageURL);
-          if (!imgRes.ok) {
-            const t = await imgRes.text();
-            console.error(`[Imagem ${index + 1}] Falha ao baixar:`, t);
-            throw new Error(`Falha ao baixar imagem ${index + 1}`);
+          // Baixar imagem com retry
+          let imgRes: Response | null = null;
+          let lastError: string = '';
+          const maxRetries = 3;
+          
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+              console.log(`[Imagem ${index + 1}] Tentativa ${attempt}/${maxRetries} de download...`);
+              imgRes = await fetch(imageURL, {
+                headers: {
+                  'User-Agent': 'Mozilla/5.0 (compatible; ImageDownloader/1.0)',
+                  'Accept': 'image/*',
+                }
+              });
+              
+              if (imgRes.ok) {
+                console.log(`[Imagem ${index + 1}] Download bem sucedido na tentativa ${attempt}`);
+                break;
+              }
+              
+              lastError = `Status ${imgRes.status}: ${imgRes.statusText}`;
+              const responseText = await imgRes.text();
+              console.warn(`[Imagem ${index + 1}] Tentativa ${attempt} falhou: ${lastError}, Body: ${responseText.slice(0, 200)}`);
+              
+              if (attempt < maxRetries) {
+                // Aguardar antes de retry (exponential backoff)
+                const delay = attempt * 1000;
+                console.log(`[Imagem ${index + 1}] Aguardando ${delay}ms antes de retry...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+              }
+            } catch (fetchError) {
+              lastError = fetchError instanceof Error ? fetchError.message : String(fetchError);
+              console.warn(`[Imagem ${index + 1}] Tentativa ${attempt} erro de fetch: ${lastError}`);
+              
+              if (attempt < maxRetries) {
+                const delay = attempt * 1000;
+                await new Promise(resolve => setTimeout(resolve, delay));
+              }
+            }
+          }
+          
+          if (!imgRes || !imgRes.ok) {
+            console.error(`[Imagem ${index + 1}] Todas as tentativas falharam: ${lastError}`);
+            throw new Error(`Falha ao baixar imagem ${index + 1} após ${maxRetries} tentativas: ${lastError}`);
           }
 
           const ab = await imgRes.arrayBuffer();
@@ -433,9 +471,9 @@ serve(async (req) => {
                       const IMAGE_COSTS: Record<string, number> = {
                         'gpt-image-1': 0.167, 'gemini-flash': 0.039, 'qwen-image': 0.0058,
                         'ideogram-3.0': 0.06, 'flux.1-kontext-max': 0.08, 'seedream-4.0': 0.03,
-                        'runware:100@1': 0.04, 'runware:101@1': 0.04, 'openai:1@1': 0.167,
+                        'seedream-4.5': 0.03, 'runware:100@1': 0.04, 'runware:101@1': 0.04, 'openai:1@1': 0.167,
                         'google:4@1': 0.039, 'google:4@2': 0.08, 'ideogram:4@1': 0.06, 'bfl:3@1': 0.08,
-                        'bytedance:5@0': 0.03, 'runware:108@1': 0.0058,
+                        'bytedance:5@0': 0.03, 'bytedance:seedream@4.5': 0.03, 'runware:108@1': 0.0058,
                       };
                       
                       let modelCost = 0.02;
@@ -462,6 +500,9 @@ serve(async (req) => {
                       } else if (model === 'bytedance:5@0') {
                         modelForTracking = 'seedream-4.0';
                         modelCost = IMAGE_COSTS['seedream-4.0'] || 0.03;
+                      } else if (model === 'bytedance:seedream@4.5' || model?.startsWith('bytedance:seedream')) {
+                        modelForTracking = 'seedream-4.5';
+                        modelCost = IMAGE_COSTS['seedream-4.5'] || 0.03;
                       } else if (model === 'runware:100@1' || model === 'runware:101@1') {
                         modelForTracking = 'flux-context';
                         modelCost = IMAGE_COSTS['runware:100@1'] || 0.04;
