@@ -354,12 +354,28 @@ const Image2Page = () => {
           throw new Error("A API não retornou nenhuma imagem.");
         }
 
-        const imageCount = apiData.images.length;
-        toast.success(`${imageCount} ${imageCount === 1 ? 'imagem gerada' : 'imagens geradas'} com sucesso!`);
+        const totalCount = apiData.count || apiData.images.length;
+        const backgroundCount = apiData.backgroundProcessing || 0;
+        
+        if (backgroundCount > 0) {
+          toast.success(`1 imagem gerada! Mais ${backgroundCount} sendo processadas...`);
+        } else {
+          toast.success(`${totalCount} ${totalCount === 1 ? 'imagem gerada' : 'imagens geradas'} com sucesso!`);
+        }
         
         // Recarregar imagens do banco de dados após geração bem-sucedida
-        // A edge function já salvou as imagens no banco, então podemos recarregar imediatamente
         await loadSavedImages();
+        
+        // Se há imagens em background, recarregar novamente após delays para capturá-las
+        if (backgroundCount > 0) {
+          // Recarregar a cada 3 segundos por imagem em background
+          for (let i = 1; i <= backgroundCount; i++) {
+            setTimeout(async () => {
+              console.log(`Recarregando para capturar imagem ${i} de background...`);
+              await loadSavedImages();
+            }, i * 3000);
+          }
+        }
       }
     } catch (e: any) {
       console.error("Erro no processo de geração de imagem:", e);

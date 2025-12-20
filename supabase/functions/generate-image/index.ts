@@ -362,17 +362,10 @@ serve(async (req) => {
       );
     }
 
-    // Processar imagens SEQUENCIALMENTE para evitar estouro de memória
-    // Promise.all processa todas ao mesmo tempo, causando pico de memória ~25-30MB
-    // Loop sequencial mantém pico em ~8MB (uma imagem por vez)
-    console.log(`Iniciando processamento SEQUENCIAL de ${imageItems.length} imagens...`);
-    
-    const processedImages: any[] = [];
-    
-    for (let index = 0; index < imageItems.length; index++) {
-      const item = imageItems[index];
+    // Função auxiliar para processar uma única imagem
+    async function processOneImage(item: any, index: number, totalCount: number, isFirst: boolean): Promise<any> {
       const imageURL: string = item.imageURL || item.imageUrl || item.image_url;
-      console.log(`[Imagem ${index + 1}/${imageItems.length}] Processando: ${imageURL}`);
+      console.log(`[Imagem ${index + 1}/${totalCount}] Processando: ${imageURL}`);
 
       try {
         // Baixar imagem com retry
@@ -397,50 +390,37 @@ serve(async (req) => {
             
             lastError = `Status ${imgRes.status}: ${imgRes.statusText}`;
             const responseText = await imgRes.text();
-            console.warn(`[Imagem ${index + 1}] Tentativa ${attempt} falhou: ${lastError}, Body: ${responseText.slice(0, 200)}`);
+            console.warn(`[Imagem ${index + 1}] Tentativa ${attempt} falhou: ${lastError}`);
             
             if (attempt < maxRetries) {
-              const delay = attempt * 1000;
-              console.log(`[Imagem ${index + 1}] Aguardando ${delay}ms antes de retry...`);
-              await new Promise(resolve => setTimeout(resolve, delay));
+              await new Promise(resolve => setTimeout(resolve, attempt * 1000));
             }
           } catch (fetchError) {
             lastError = fetchError instanceof Error ? fetchError.message : String(fetchError);
-            console.warn(`[Imagem ${index + 1}] Tentativa ${attempt} erro de fetch: ${lastError}`);
-            
+            console.warn(`[Imagem ${index + 1}] Tentativa ${attempt} erro: ${lastError}`);
             if (attempt < maxRetries) {
-              const delay = attempt * 1000;
-              await new Promise(resolve => setTimeout(resolve, delay));
+              await new Promise(resolve => setTimeout(resolve, attempt * 1000));
             }
           }
         }
         
         if (!imgRes || !imgRes.ok) {
-          console.error(`[Imagem ${index + 1}] Todas as tentativas falharam: ${lastError}`);
-          console.log(`[Imagem ${index + 1}] Continuando com as próximas imagens...`);
-          processedImages.push(null);
-          continue;
+          console.error(`[Imagem ${index + 1}] Todas as tentativas falharam`);
+          return null;
         }
 
         const ab = await imgRes.arrayBuffer();
         console.log(`[Imagem ${index + 1}] ArrayBuffer size: ${ab.byteLength} bytes`);
         
-        // Verificar tamanho - limites ajustados para 4K
-        let maxSize = 5 * 1024 * 1024; // 5MB padrão
-        if (width >= 4096 || height >= 4096) {
-          maxSize = 50 * 1024 * 1024; // 50MB para 4K+
-        } else if (width >= 2048 || height >= 2048) {
-          maxSize = 20 * 1024 * 1024; // 20MB para 2K+
-        }
+        // Verificar tamanho
+        let maxSize = 5 * 1024 * 1024;
+        if (width >= 4096 || height >= 4096) maxSize = 50 * 1024 * 1024;
+        else if (width >= 2048 || height >= 2048) maxSize = 20 * 1024 * 1024;
         
         if (ab.byteLength > maxSize) {
-          console.error(`[Imagem ${index + 1}] Muito grande:`, ab.byteLength, 'bytes');
-          console.log(`[Imagem ${index + 1}] Continuando com as próximas imagens...`);
-          processedImages.push(null);
-          continue;
+          console.error(`[Imagem ${index + 1}] Muito grande: ${ab.byteLength} bytes`);
+          return null;
         }
-        
-        const b64 = b64encode(ab);
         
         // Inferir formato
         let format: string = 'webp';
@@ -448,8 +428,6 @@ serve(async (req) => {
         else if (imageURL.endsWith('.png')) format = 'png';
         else if (imageURL.endsWith('.jpg')) format = 'jpg';
         else if (imageURL.endsWith('.jpeg')) format = 'jpeg';
-        
-        console.log(`[Imagem ${index + 1}] Formato: ${format}, Base64 length: ${b64.length}`);
 
         // Salvar no Storage se usuário autenticado
         if (userId && SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY) {
@@ -474,8 +452,8 @@ serve(async (req) => {
               } else {
                 console.log(`[Imagem ${index + 1}] Registro inserido no banco`);
                 
-                // Registrar custo apenas na PRIMEIRA imagem (evitar duplicação)
-                if (index === 0) {
+                // Registrar custo apenas na PRIMEIRA imagem
+                if (isFirst) {
                   try {
                     const IMAGE_COSTS: Record<string, number> = {
                       'gpt-image-1': 0.167, 'gemini-flash': 0.039, 'qwen-image': 0.0058,
@@ -488,67 +466,30 @@ serve(async (req) => {
                     let modelCost = 0.02;
                     let modelForTracking = model || 'unknown';
                     
-                    if (model === 'openai:1@1') {
-                      modelForTracking = 'gpt-image-1';
-                      modelCost = IMAGE_COSTS['gpt-image-1'] || 0.167;
-                    } else if (model === 'google:4@1') {
-                      modelForTracking = 'gemini-flash-image';
-                      modelCost = IMAGE_COSTS['google:4@1'] || 0.039;
-                    } else if (model === 'google:4@2') {
-                      modelForTracking = 'nano-banana-2-pro';
-                      modelCost = IMAGE_COSTS['google:4@2'] || 0.08;
-                    } else if (model === 'runware:108@1') {
-                      modelForTracking = 'qwen-image';
-                      modelCost = IMAGE_COSTS['qwen-image'] || 0.0058;
-                    } else if (model === 'ideogram:4@1') {
-                      modelForTracking = 'ideogram-3.0';
-                      modelCost = IMAGE_COSTS['ideogram-3.0'] || 0.06;
-                    } else if (model === 'bfl:3@1') {
-                      modelForTracking = 'flux.1-kontext-max';
-                      modelCost = IMAGE_COSTS['flux.1-kontext-max'] || 0.08;
-                    } else if (model === 'bfl:4@1') {
-                      modelForTracking = 'flux.2-pro';
-                      modelCost = IMAGE_COSTS['flux.2-pro'] || 0.045;
-                    } else if (model === 'bytedance:5@0') {
-                      modelForTracking = 'seedream-4.0';
-                      modelCost = IMAGE_COSTS['seedream-4.0'] || 0.03;
-                    } else if (model === 'bytedance:seedream@4.5' || model?.startsWith('bytedance:seedream')) {
-                      modelForTracking = 'seedream-4.5';
-                      modelCost = IMAGE_COSTS['seedream-4.5'] || 0.03;
-                    } else if (model === 'runware:100@1' || model === 'runware:101@1') {
-                      modelForTracking = 'flux-context';
-                      modelCost = IMAGE_COSTS['runware:100@1'] || 0.04;
-                    } else {
-                      for (const [modelName, cost] of Object.entries(IMAGE_COSTS)) {
-                        if (model && model.toLowerCase().includes(modelName.toLowerCase())) {
-                          modelForTracking = modelName;
-                          modelCost = cost;
-                          break;
-                        }
-                      }
-                    }
+                    if (model === 'openai:1@1') { modelForTracking = 'gpt-image-1'; modelCost = IMAGE_COSTS['gpt-image-1'] || 0.167; }
+                    else if (model === 'google:4@1') { modelForTracking = 'gemini-flash-image'; modelCost = IMAGE_COSTS['google:4@1'] || 0.039; }
+                    else if (model === 'google:4@2') { modelForTracking = 'nano-banana-2-pro'; modelCost = IMAGE_COSTS['google:4@2'] || 0.08; }
+                    else if (model === 'runware:108@1') { modelForTracking = 'qwen-image'; modelCost = IMAGE_COSTS['qwen-image'] || 0.0058; }
+                    else if (model === 'ideogram:4@1') { modelForTracking = 'ideogram-3.0'; modelCost = IMAGE_COSTS['ideogram-3.0'] || 0.06; }
+                    else if (model === 'bfl:3@1') { modelForTracking = 'flux.1-kontext-max'; modelCost = IMAGE_COSTS['flux.1-kontext-max'] || 0.08; }
+                    else if (model === 'bfl:4@1') { modelForTracking = 'flux.2-pro'; modelCost = IMAGE_COSTS['flux.2-pro'] || 0.045; }
+                    else if (model === 'bytedance:5@0') { modelForTracking = 'seedream-4.0'; modelCost = IMAGE_COSTS['seedream-4.0'] || 0.03; }
+                    else if (model === 'bytedance:seedream@4.5' || model?.startsWith('bytedance:seedream')) { modelForTracking = 'seedream-4.5'; modelCost = IMAGE_COSTS['seedream-4.5'] || 0.03; }
+                    else if (model === 'runware:100@1' || model === 'runware:101@1') { modelForTracking = 'flux-context'; modelCost = IMAGE_COSTS['runware:100@1'] || 0.04; }
                     
-                    console.log(`Registrando custo: ${imageItems.length}x imagens, modelo=${modelForTracking}, custo=$${modelCost * imageItems.length}`);
+                    console.log(`Registrando custo: ${totalCount}x imagens, modelo=${modelForTracking}`);
                     
-                    const { error: usageErr } = await supabaseAdmin
-                      .from('token_usage')
-                      .insert({
-                        user_id: userId,
-                        model_name: modelForTracking,
-                        message_content: `${prompt || 'Image generation request'} (${imageItems.length}x images)`,
-                        ai_response_content: `${imageItems.length} image(s) generated successfully`,
-                        tokens_used: imageItems.length,
-                        input_tokens: imageItems.length,
-                        output_tokens: imageItems.length,
-                      });
-                    
-                    if (usageErr) {
-                      console.error('Erro ao inserir token_usage:', usageErr);
-                    } else {
-                      console.log('Custo registrado no token_usage');
-                    }
+                    await supabaseAdmin.from('token_usage').insert({
+                      user_id: userId,
+                      model_name: modelForTracking,
+                      message_content: `${prompt || 'Image generation request'} (${totalCount}x images)`,
+                      ai_response_content: `${totalCount} image(s) generated successfully`,
+                      tokens_used: totalCount,
+                      input_tokens: totalCount,
+                      output_tokens: totalCount,
+                    });
                   } catch (costErr) {
-                    console.error('Erro ao calcular/registrar custo:', costErr);
+                    console.error('Erro ao registrar custo:', costErr);
                   }
                 }
               }
@@ -558,35 +499,89 @@ serve(async (req) => {
           }
         }
 
-        processedImages.push({ image: b64, url: imageURL, width, height, format });
-        console.log(`[Imagem ${index + 1}] Processamento completo. Total processadas: ${processedImages.filter(img => img !== null).length}`);
+        // Apenas retornar Base64 para a primeira imagem (para preview imediato)
+        // As outras são salvas no storage e carregadas depois
+        if (isFirst) {
+          const b64 = b64encode(ab);
+          console.log(`[Imagem ${index + 1}] Base64 gerado para preview`);
+          return { image: b64, url: imageURL, width, height, format };
+        }
+        
+        // Para imagens em background, retornar apenas metadata
+        console.log(`[Imagem ${index + 1}] Salva no storage (sem Base64)`);
+        return { url: imageURL, width, height, format, savedToStorage: true };
         
       } catch (error) {
         console.error(`[Imagem ${index + 1}] Erro no processamento:`, error);
-        processedImages.push(null);
-        console.log(`[Imagem ${index + 1}] Continuando com as próximas imagens...`);
+        return null;
       }
     }
 
-    // Filtrar imagens que deram erro (null)
-    const successfulImages = processedImages.filter(img => img !== null);
+    // Processar imagens com estratégia híbrida para evitar estouro de memória
+    // - Primeira imagem: processada inline (retorna Base64 para preview)
+    // - Demais imagens: processadas em background (salvas no storage)
+    console.log(`Iniciando processamento de ${imageItems.length} imagens...`);
     
-    if (successfulImages.length === 0) {
-      console.error('Todas as imagens falharam no processamento');
+    if (imageItems.length === 1) {
+      // Uma única imagem: processar normalmente
+      const result = await processOneImage(imageItems[0], 0, 1, true);
+      
+      if (!result) {
+        return new Response(
+          JSON.stringify({ error: 'Falha ao processar a imagem' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      console.log('=== SUCESSO - 1 imagem processada ===');
       return new Response(
-        JSON.stringify({ error: 'Falha ao processar todas as imagens' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({ images: [result], count: 1 }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } else {
+      // Múltiplas imagens: processar primeira inline, resto em background
+      console.log('Múltiplas imagens detectadas - usando processamento híbrido');
+      
+      // Processar primeira imagem inline
+      const firstResult = await processOneImage(imageItems[0], 0, imageItems.length, true);
+      
+      if (!firstResult) {
+        return new Response(
+          JSON.stringify({ error: 'Falha ao processar a primeira imagem' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+      
+      // Processar demais imagens em BACKGROUND usando waitUntil
+      // Isso permite que o response seja retornado imediatamente
+      const backgroundTask = async () => {
+        console.log(`[BACKGROUND] Iniciando processamento de ${imageItems.length - 1} imagens restantes...`);
+        for (let i = 1; i < imageItems.length; i++) {
+          await processOneImage(imageItems[i], i, imageItems.length, false);
+        }
+        console.log('[BACKGROUND] Todas as imagens processadas com sucesso');
+      };
+      
+      // @ts-ignore - EdgeRuntime.waitUntil existe no Supabase Edge Functions
+      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime.waitUntil) {
+        EdgeRuntime.waitUntil(backgroundTask());
+        console.log('Background task iniciada via EdgeRuntime.waitUntil');
+      } else {
+        // Fallback: processar sequencialmente se waitUntil não disponível
+        console.log('EdgeRuntime.waitUntil não disponível - processando sequencialmente');
+        await backgroundTask();
+      }
+      
+      console.log(`=== SUCESSO - Primeira imagem processada, ${imageItems.length - 1} em background ===`);
+      return new Response(
+        JSON.stringify({ 
+          images: [firstResult], 
+          count: imageItems.length,
+          backgroundProcessing: imageItems.length - 1
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-    
-    console.log(`=== SUCESSO - ${successfulImages.length}/${imageItems.length} imagens processadas ===`);
-    return new Response(
-      JSON.stringify({ 
-        images: successfulImages,
-        count: successfulImages.length 
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
   } catch (error: any) {
     console.error('=== ERRO DETALHADO NA FUNÇÃO GENERATE-IMAGE ===');
     console.error('Erro capturado:', error);
