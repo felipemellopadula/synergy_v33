@@ -1,15 +1,21 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, Suspense, lazy } from 'react';
 import { motion, AnimatePresence, Transition } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { ChevronDown, Sparkles, ArrowUpCircle, UserCircle, Smile, Video } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { ChevronDown, Sparkles, ArrowUpCircle, UserCircle, Smile, Video, LogOut } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { useAuth } from "@/contexts/AuthContext";
 import { useIsTabletOrMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+
+// Lazy load UserProfile
+const UserProfile = lazy(() => import("@/components/UserProfile"));
 
 // --- Types ---
 type Side = 'left' | 'right' | null;
@@ -285,6 +291,18 @@ const VideoLoop: React.FC<VideoLoopProps> = ({ isActive, isTabletOrMobile }) => 
 const DashboardNovo: React.FC = () => {
   const [hoveredSide, setHoveredSide] = useState<Side>(null);
   const isTabletOrMobile = useIsTabletOrMobile();
+  const navigate = useNavigate();
+  const { signOut } = useAuth();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/', { replace: true });
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+      navigate('/', { replace: true });
+    }
+  };
 
   const transitionSettings: Transition = {
     type: "spring",
@@ -331,6 +349,35 @@ const DashboardNovo: React.FC = () => {
       "relative w-full h-screen bg-black flex overflow-hidden font-sans antialiased",
       isTabletOrMobile && "flex-col"
     )}>
+      {/* Header */}
+      <header className="absolute top-0 left-0 right-0 z-50 bg-black/30 backdrop-blur-md border-b border-white/10">
+        <div className="container mx-auto px-4 py-3 flex justify-between items-center">
+          <Link to="/" className="flex items-center gap-2">
+            <img
+              src="/lovable-uploads/76f92d5d-608b-47a5-a829-bdb436a60274.png"
+              alt="Synergy AI"
+              className="h-7 w-auto"
+            />
+          </Link>
+
+          <div className="flex items-center gap-3">
+            <Suspense fallback={<div className="w-7 h-7 animate-pulse bg-white/20 rounded-full" />}>
+              <UserProfile />
+            </Suspense>
+            <ThemeToggle />
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleSignOut}
+              className="flex items-center gap-2 border-white/20 text-white hover:bg-white/10"
+            >
+              <LogOut className="h-4 w-4" />
+              <span className="hidden sm:inline">Sair</span>
+            </Button>
+          </div>
+        </div>
+      </header>
+
       {/* Left Side (Top on mobile) */}
       <motion.div
         className={cn(
