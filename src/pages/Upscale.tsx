@@ -1,7 +1,7 @@
 import { useState, useCallback, Suspense, lazy } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Download, Loader2, LogOut, ZoomIn, Image as ImageIcon, Sparkles, RefreshCw, ChevronLeft } from "lucide-react";
+import { Upload, Download, Loader2, LogOut, ZoomIn, Image as ImageIcon, Sparkles, RefreshCw, ChevronLeft, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -459,12 +459,20 @@ export default function Upscale() {
                   </p>
                 </motion.div>
               ) : (
-                <div className="relative rounded-xl overflow-hidden bg-muted">
+                <div className="relative rounded-xl overflow-hidden bg-muted group">
                   <img
                     src={originalImage}
                     alt="Original"
                     className="w-full h-auto max-h-[400px] object-contain"
                   />
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={handleReset}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
                 </div>
               )}
             </Card>
