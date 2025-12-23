@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { ImageCompareSlider } from "@/components/ImageCompareSlider";
 import { cn } from "@/lib/utils";
 
 const UserProfile = lazy(() => import("@/components/UserProfile"));
@@ -468,7 +469,7 @@ export default function Upscale() {
               )}
             </Card>
 
-            {/* Upscaled Image */}
+            {/* Image Comparison Slider */}
             <AnimatePresence>
               {(upscaledImage || isLoading) && (
                 <motion.div
@@ -480,7 +481,7 @@ export default function Upscale() {
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-sm font-medium text-muted-foreground flex items-center gap-2">
                         <Sparkles className="w-4 h-4 text-primary" />
-                        Imagem Ampliada ({scaleFactor}x via {provider === "magnific" ? "Magnific" : "Runware"})
+                        Comparação ({scaleFactor}x via {provider === "magnific" ? "Magnific" : "Runware"})
                       </h3>
                       {upscaledImage && (
                         <Button
@@ -500,14 +501,13 @@ export default function Upscale() {
                         <p className="text-lg font-medium">Processando sua imagem...</p>
                         <p className="text-sm">Isso pode levar alguns segundos</p>
                       </div>
-                    ) : upscaledImage ? (
-                      <div className="relative rounded-xl overflow-hidden bg-muted">
-                        <img
-                          src={upscaledImage}
-                          alt="Upscaled"
-                          className="w-full h-auto max-h-[500px] object-contain"
-                        />
-                      </div>
+                    ) : upscaledImage && originalImage ? (
+                      <ImageCompareSlider
+                        beforeImage={originalImage}
+                        afterImage={upscaledImage}
+                        beforeLabel="Original"
+                        afterLabel={`${scaleFactor}x`}
+                      />
                     ) : null}
                   </Card>
                 </motion.div>
