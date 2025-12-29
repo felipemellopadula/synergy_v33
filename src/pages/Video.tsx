@@ -113,15 +113,9 @@ const RESOLUTIONS_BY_MODEL: Record<string, Resolution[]> = {
     { id: "9:16-1080p", label: "9:16 (Tall / Portrait) - 1080p", w: 1080, h: 1920 },
   ],
   "klingai:kling@o1-standard": [
-    { id: "1:1", label: "1:1 (Square)", w: 1080, h: 1080 },
-    { id: "21:9", label: "21:9 (Ultra-Wide / Landscape)", w: 1890, h: 810 },
-    { id: "16:9", label: "16:9 (Wide / Landscape)", w: 1920, h: 1080 },
-    { id: "4:3", label: "4:3 (Standard / Landscape)", w: 1440, h: 1080 },
-    { id: "3:2", label: "3:2 (Classic / Landscape)", w: 1620, h: 1080 },
-    { id: "2:3", label: "2:3 (Classic / Portrait)", w: 1080, h: 1620 },
-    { id: "3:4", label: "3:4 (Standard / Portrait)", w: 1080, h: 1440 },
-    { id: "9:16", label: "9:16 (Tall / Portrait)", w: 1080, h: 1920 },
-    { id: "9:21", label: "9:21 (Ultra-Tall / Portrait)", w: 810, h: 1890 },
+    { id: "16:9", label: "16:9 (Wide / Landscape) - 1080p", w: 1920, h: 1080 },
+    { id: "1:1", label: "1:1 (Square) - 1440p", w: 1440, h: 1440 },
+    { id: "9:16", label: "9:16 (Tall / Portrait) - 1080p", w: 1080, h: 1920 },
   ],
 };
 
