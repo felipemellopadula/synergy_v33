@@ -92,10 +92,10 @@ const heroSlides: HeroSlide[] = [
   },
   {
     id: '3',
-    title: 'CINEMA STUDIO',
-    subtitle: 'Lentes e Câmeras Reais',
+    title: 'INPAINT',
+    subtitle: 'Pinte diretamente na imagem e edite suas imagens de forma intuitiva',
     imageUrl: '/Nano_Banana_2_Pro.png',
-    ctaText: 'Criar Cena',
+    ctaText: 'Editar',
   },
   {
     id: '4',
@@ -187,8 +187,8 @@ const tools: ToolCard[] = [
 const pricingPlans = [
   {
     name: 'Start',
-    price: 'R$ 47',
-    period: '/mês',
+    monthlyPrice: 40,
+    annualPrice: 50,
     description: 'Perfeito para começar',
     icon: Star,
     features: [
@@ -197,13 +197,14 @@ const pricingPlans = [
       'Geração de vídeo limitada',
       'Suporte por email',
     ],
-    priceId: 'price_1RQAKfP8GjTimH2kLtTBPQxa',
+    monthlyPriceId: 'price_1RQAKfP8GjTimH2kLtTBPQxa',
+    annualPriceId: 'price_annual_start',
     popular: false,
   },
   {
     name: 'Pro',
-    price: 'R$ 97',
-    period: '/mês',
+    monthlyPrice: 200,
+    annualPrice: 210,
     description: 'Para criadores sérios',
     icon: Crown,
     features: [
@@ -213,13 +214,14 @@ const pricingPlans = [
       'Skin Enhancer & Upscale',
       'Suporte prioritário',
     ],
-    priceId: 'price_1RQALtP8GjTimH2kfBsIxBz5',
+    monthlyPriceId: 'price_1RQALtP8GjTimH2kfBsIxBz5',
+    annualPriceId: 'price_annual_pro',
     popular: true,
   },
   {
     name: 'Creator',
-    price: 'R$ 197',
-    period: '/mês',
+    monthlyPrice: 500,
+    annualPrice: 510,
     description: 'Para profissionais',
     icon: Zap,
     features: [
@@ -230,7 +232,8 @@ const pricingPlans = [
       'Suporte 24/7',
       'Early access a novos recursos',
     ],
-    priceId: 'price_1RQANMP8GjTimH2kAceiQGqR',
+    monthlyPriceId: 'price_1RQANMP8GjTimH2kAceiQGqR',
+    annualPriceId: 'price_annual_creator',
     popular: false,
   },
 ];
@@ -299,6 +302,7 @@ const Home3: React.FC = () => {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isAnnual, setIsAnnual] = useState(false);
 
   // Redirect authenticated users to dashboard
   useEffect(() => {
@@ -317,7 +321,7 @@ const Home3: React.FC = () => {
 
   const handleLogout = async () => {
     await signOut();
-    navigate('/');
+    navigate('/home3');
   };
 
   const openLogin = () => {
@@ -685,9 +689,35 @@ const Home3: React.FC = () => {
             </p>
           </div>
 
+          {/* Billing Toggle */}
+          <div className="flex justify-center gap-2 mb-10">
+            <button
+              onClick={() => setIsAnnual(false)}
+              className={`px-6 py-2.5 rounded-full font-semibold transition-all ${
+                !isAnnual
+                  ? 'bg-primary text-primary-foreground shadow-lg'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
+            >
+              Mensal
+            </button>
+            <button
+              onClick={() => setIsAnnual(true)}
+              className={`px-6 py-2.5 rounded-full font-semibold transition-all ${
+                isAnnual
+                  ? 'bg-primary text-primary-foreground shadow-lg'
+                  : 'bg-muted text-muted-foreground hover:bg-muted/80'
+              }`}
+            >
+              Anual
+            </button>
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
             {pricingPlans.map((plan) => {
               const IconComponent = plan.icon;
+              const currentPrice = isAnnual ? plan.annualPrice : plan.monthlyPrice;
+              const currentPriceId = isAnnual ? plan.annualPriceId : plan.monthlyPriceId;
               return (
                 <div
                   key={plan.name}
@@ -717,8 +747,8 @@ const Home3: React.FC = () => {
                   </div>
 
                   <div className="mb-4">
-                    <span className="text-4xl font-black">{plan.price}</span>
-                    <span className="text-muted-foreground">{plan.period}</span>
+                    <span className="text-4xl font-black">R$ {currentPrice}</span>
+                    <span className="text-muted-foreground">/mês</span>
                   </div>
 
                   <p className="text-muted-foreground text-sm mb-6">{plan.description}</p>
@@ -733,7 +763,7 @@ const Home3: React.FC = () => {
                   </ul>
 
                   <Button
-                    onClick={() => handlePricingClick(plan.priceId)}
+                    onClick={() => handlePricingClick(currentPriceId)}
                     className="w-full"
                     variant={plan.popular ? 'default' : 'outline'}
                   >
