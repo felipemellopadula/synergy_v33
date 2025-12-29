@@ -228,11 +228,11 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } else {
           setProfile(null);
           // Only redirect if explicitly signed out
-          if (event === 'SIGNED_OUT' && window.location.pathname !== '/') {
+          if (event === 'SIGNED_OUT' && window.location.pathname !== '/home3') {
             if (navigate) {
-              navigate('/', { replace: true });
+              navigate('/home3', { replace: true });
             } else {
-              window.location.replace('/');
+              window.location.replace('/home3');
             }
           }
         }

@@ -32,7 +32,7 @@ export default function SkinEnhancer() {
 
   const handleSignOut = async () => {
     await signOut();
-    navigate("/");
+    navigate("/home3");
   };
 
   const handleFileSelect = useCallback((file: File) => {
