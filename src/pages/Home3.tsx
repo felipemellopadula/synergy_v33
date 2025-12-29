@@ -99,7 +99,7 @@ const heroSlides: HeroSlide[] = [
     id: '3',
     title: 'INPAINT',
     subtitle: 'Pinte diretamente na imagem e edite suas imagens de forma intuitiva',
-    imageUrl: '/Nano_Banana_2_Pro.png',
+    imageUrl: 'https://images.pexels.com/photos/29645160/pexels-photo-29645160/free-photo-of-caneta-para-tablet-grafico-ferramenta-de-design-tinta-escrita-nota-estudio-interior.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1',
     ctaText: 'Editar',
     path: '/inpaint',
   },
