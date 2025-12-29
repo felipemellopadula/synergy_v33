@@ -604,11 +604,11 @@ Generate the edited image now with the green masked areas replaced according to 
             
             {/* Generated image overlay - shown when generation is complete */}
             {generatedImage && (
-              <div className="absolute inset-0 flex items-center justify-center p-4 z-20 bg-[#0d0d0d]">
+              <div className="absolute inset-0 flex items-center justify-center p-4 z-50 bg-[#0d0d0d]">
                 <img 
                   src={generatedImage} 
                   alt="Resultado" 
-                  className="max-w-full max-h-full object-contain rounded-lg"
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-2xl"
                 />
               </div>
             )}
