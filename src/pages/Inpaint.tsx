@@ -147,18 +147,37 @@ const Inpaint = () => {
 
   // Load uploaded image onto canvas
   useEffect(() => {
-    if (!fabricCanvas || !uploadedImage) return;
+    if (!fabricCanvas || !uploadedImage) {
+      console.log("🖼️ Aguardando canvas ou imagem:", { hasCanvas: !!fabricCanvas, hasImage: !!uploadedImage });
+      return;
+    }
 
     const container = containerRef.current;
-    if (!container) return;
+    if (!container) {
+      console.log("🖼️ Container não encontrado");
+      return;
+    }
+
+    console.log("🖼️ Iniciando carregamento da imagem no canvas");
+
+    let attempts = 0;
+    const maxAttempts = 20;
 
     const loadImage = () => {
+      attempts++;
       const containerWidth = container.clientWidth;
       const containerHeight = container.clientHeight;
 
+      console.log(`🖼️ Tentativa ${attempts}: dimensões do container:`, { containerWidth, containerHeight });
+
       // Wait for valid dimensions
       if (containerWidth === 0 || containerHeight === 0) {
-        requestAnimationFrame(loadImage);
+        if (attempts < maxAttempts) {
+          setTimeout(loadImage, 100);
+        } else {
+          console.error("🖼️ Falha ao obter dimensões do container após várias tentativas");
+          toast.error("Erro: não foi possível carregar o canvas");
+        }
         return;
       }
 
@@ -168,37 +187,57 @@ const Inpaint = () => {
         height: containerHeight,
       });
 
-      FabricImage.fromURL(uploadedImage)
-        .then((img) => {
-          const scale = Math.min(
-            containerWidth / (img.width || 1),
-            containerHeight / (img.height || 1)
-          ) * 0.9;
+      // Create an HTML image element first to ensure the image loads
+      const htmlImg = new Image();
+      htmlImg.crossOrigin = "anonymous";
+      
+      htmlImg.onload = () => {
+        console.log("🖼️ HTML Image carregada:", { width: htmlImg.width, height: htmlImg.height });
+        
+        FabricImage.fromURL(uploadedImage, { crossOrigin: "anonymous" })
+          .then((img) => {
+            console.log("🖼️ FabricImage criada:", { width: img.width, height: img.height });
+            
+            const scale = Math.min(
+              containerWidth / (img.width || 1),
+              containerHeight / (img.height || 1)
+            ) * 0.9;
 
-          img.scale(scale);
-          img.set({
-            left: (containerWidth - (img.width || 0) * scale) / 2,
-            top: (containerHeight - (img.height || 0) * scale) / 2,
-            selectable: false,
-            evented: false,
+            img.scale(scale);
+            img.set({
+              left: (containerWidth - (img.width || 0) * scale) / 2,
+              top: (containerHeight - (img.height || 0) * scale) / 2,
+              selectable: false,
+              evented: false,
+            });
+
+            fabricCanvas.clear();
+            fabricCanvas.backgroundColor = "#1a1a1a";
+            fabricCanvas.add(img);
+            fabricCanvas.sendObjectToBack(img);
+            fabricCanvas.renderAll();
+
+            console.log("🖼️ Imagem adicionada ao canvas com sucesso");
+            // Save initial state
+            saveToHistory();
+          })
+          .catch((err) => {
+            console.error("🖼️ Erro ao criar FabricImage:", err);
+            toast.error("Erro ao carregar imagem no canvas");
           });
+      };
 
-          fabricCanvas.clear();
-          fabricCanvas.backgroundColor = "#1a1a1a";
-          fabricCanvas.add(img);
-          fabricCanvas.sendObjectToBack(img);
-          fabricCanvas.renderAll();
+      htmlImg.onerror = (err) => {
+        console.error("🖼️ Erro ao carregar HTML Image:", err);
+        toast.error("Erro ao carregar imagem");
+      };
 
-          // Save initial state
-          saveToHistory();
-        })
-        .catch((err) => {
-          console.error("Erro ao carregar imagem:", err);
-          toast.error("Erro ao carregar imagem no canvas");
-        });
+      // Start loading
+      htmlImg.src = uploadedImage;
     };
 
-    requestAnimationFrame(loadImage);
+    // Use setTimeout to ensure canvas is fully initialized
+    setTimeout(loadImage, 50);
   }, [uploadedImage, fabricCanvas]);
 
   const saveToHistory = () => {
