@@ -200,11 +200,20 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     let mounted = true;
+    let lastEventTime = 0;
 
     // Set up auth state listener first
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
         if (!mounted) return;
+        
+        // Evitar eventos duplicados SIGNED_IN em menos de 500ms
+        const now = Date.now();
+        if (event === 'SIGNED_IN' && now - lastEventTime < 500) {
+          console.log('Auth event SIGNED_IN duplicado ignorado');
+          return;
+        }
+        lastEventTime = now;
         
         console.log('Auth state change:', event, session?.user?.id);
         
@@ -213,7 +222,12 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setLoading(false);
         
         if (session?.user && event !== 'SIGNED_OUT') {
-          fetchProfile(session.user.id, session.user);
+          // Usar setTimeout(0) para evitar deadlock com fetchProfile
+          setTimeout(() => {
+            if (mounted) {
+              fetchProfile(session.user.id, session.user);
+            }
+          }, 0);
           
           // Redirect to dashboard-novo for sign-in events (only from login pages, not /home2)
           if ((event === 'SIGNED_IN' || (event === 'TOKEN_REFRESHED' && window.location.pathname === '/')) && 

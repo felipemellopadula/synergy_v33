@@ -51,6 +51,19 @@ const Inpaint = () => {
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
 
+  // Debug: log mount/unmount
+  useEffect(() => {
+    console.log("🔄 Inpaint MOUNTED");
+    return () => {
+      console.log("🔄 Inpaint UNMOUNTED");
+    };
+  }, []);
+
+  // Debug: log uploadedImage changes
+  useEffect(() => {
+    console.log("📸 uploadedImage mudou para:", uploadedImage ? `tem imagem (${uploadedImage.length} chars)` : "null");
+  }, [uploadedImage]);
+
   // Initialize Fabric canvas - create canvas element dynamically
   useEffect(() => {
     const container = canvasContainerRef.current;

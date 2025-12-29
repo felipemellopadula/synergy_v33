@@ -93,8 +93,20 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireSubscr
   }
 
   // Check subscription requirement
+  console.log("🛡️ ProtectedRoute render:", { loading, hasUser: !!user, profileType: profile?.subscription_type });
+  
   if (requireSubscription) {
-    const hasActiveSubscription = profile?.subscription_type === 'paid' || profile?.subscription_type === 'admin';
+    // Se profile ainda não carregou, mostrar loading (não a página de pricing)
+    if (!profile) {
+      console.log("🛡️ Profile ainda carregando, mostrando loading...");
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      );
+    }
+    
+    const hasActiveSubscription = profile.subscription_type === 'paid' || profile.subscription_type === 'admin';
     
     if (!hasActiveSubscription) {
       return (
