@@ -506,10 +506,10 @@ Generate the edited image now.`;
       </header>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
-        {/* Toolbar - horizontal no mobile, vertical no desktop */}
-        <div className="order-2 md:order-1 flex md:flex-col md:w-14 w-full h-14 md:h-auto bg-[#111] border-t md:border-t-0 md:border-r border-white/10 items-center justify-center md:justify-start py-2 md:py-4 gap-1 md:gap-2">
-          <div className="flex md:flex-col items-center gap-1 md:gap-2">
+      <div className="flex-1 flex flex-col lg:flex-row overflow-hidden min-h-0">
+        {/* Toolbar - horizontal no mobile/tablet, vertical no desktop */}
+        <div className="order-2 lg:order-1 flex lg:flex-col lg:w-14 w-full h-14 lg:h-auto bg-[#111] border-t lg:border-t-0 lg:border-r border-white/10 items-center justify-center lg:justify-start py-2 lg:py-4 gap-1 lg:gap-2">
+          <div className="flex lg:flex-col items-center gap-1 lg:gap-2">
             <Button
               variant="ghost"
               size="icon"
@@ -536,9 +536,9 @@ Generate the edited image now.`;
             </Button>
           </div>
           
-          <div className="w-px md:w-8 h-6 md:h-px bg-white/10 mx-1 md:mx-0 md:my-2" />
+          <div className="w-px lg:w-8 h-6 lg:h-px bg-white/10 mx-1 lg:mx-0 lg:my-2" />
           
-          <div className="flex md:flex-col items-center gap-1 md:gap-2">
+          <div className="flex lg:flex-col items-center gap-1 lg:gap-2">
             <Button
               variant="ghost"
               size="icon"
@@ -559,7 +559,7 @@ Generate the edited image now.`;
             </Button>
           </div>
           
-          <div className="w-px md:w-8 h-6 md:h-px bg-white/10 mx-1 md:mx-0 md:my-2" />
+          <div className="w-px lg:w-8 h-6 lg:h-px bg-white/10 mx-1 lg:mx-0 lg:my-2" />
           
           <Button
             variant="ghost"
@@ -571,7 +571,7 @@ Generate the edited image now.`;
           </Button>
 
           {/* Brush size slider - only desktop */}
-          <div className="hidden md:flex flex-col items-center gap-2 mt-4">
+          <div className="hidden lg:flex flex-col items-center gap-2 mt-4">
             <span className="text-xs text-muted-foreground">{brushSize}</span>
             <input
               type="range"
@@ -584,8 +584,8 @@ Generate the edited image now.`;
             />
           </div>
           
-          {/* Brush size - mobile only */}
-          <div className="flex md:hidden items-center gap-2 ml-2">
+          {/* Brush size - mobile/tablet only */}
+          <div className="flex lg:hidden items-center gap-2 ml-2">
             <input
               type="range"
               min="5"
@@ -599,7 +599,7 @@ Generate the edited image now.`;
         </div>
 
         {/* Canvas Area */}
-        <div className="flex-1 flex flex-col order-1 md:order-2 min-h-0">
+        <div className="flex-1 flex flex-col order-1 lg:order-2 min-h-0">
           <div 
             ref={canvasContainerRef}
             className="flex-1 relative bg-[#0d0d0d] overflow-hidden min-h-0"
@@ -668,18 +668,18 @@ Generate the edited image now.`;
           </div>
 
           {/* Bottom Input Area */}
-          <div className="bg-[#111] border-t border-white/10 p-4">
-            <div className="max-w-4xl mx-auto">
-              <div className="flex gap-3">
+          <div className="bg-[#111] border-t border-white/10 p-3 md:p-4">
+            <div className="max-w-full lg:max-w-4xl mx-auto">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <div className="flex-1">
                   <Textarea
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     placeholder="Pinte sobre a área para editar e descreva suas alterações..."
-                    className="bg-[#1a1a1a] border-white/10 resize-none h-20 text-white placeholder:text-muted-foreground"
+                    className="bg-[#1a1a1a] border-white/10 resize-none min-h-[60px] h-auto sm:h-20 text-white placeholder:text-muted-foreground"
                   />
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-row sm:flex-col gap-2">
                   <input
                     ref={refImageInputRef}
                     type="file"
@@ -693,15 +693,16 @@ Generate the edited image now.`;
                     size="sm"
                     onClick={() => refImageInputRef.current?.click()}
                     disabled={referenceImages.length >= 10}
-                    className="gap-1 text-xs border-white/20 hover:border-primary/50"
+                    className="gap-1 text-xs border-white/20 hover:border-primary/50 flex-1 sm:flex-none"
                   >
                     <Plus className="w-4 h-4" />
-                    Adicionar ref ({referenceImages.length}/10)
+                    <span className="hidden sm:inline">Adicionar ref ({referenceImages.length}/10)</span>
+                    <span className="sm:hidden">Ref ({referenceImages.length}/10)</span>
                   </Button>
                   <Button
                     onClick={handleGenerate}
                     disabled={isGenerating || !uploadedImage}
-                    className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2"
+                    className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2 flex-1 sm:flex-none"
                   >
                     {isGenerating ? (
                       <Loader2 className="w-4 h-4 animate-spin" />
