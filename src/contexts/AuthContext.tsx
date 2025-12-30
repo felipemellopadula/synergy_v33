@@ -29,6 +29,7 @@ interface AuthContextType {
   profile: Profile | null;
   session: Session | null;
   loading: boolean;
+  profileLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, name: string, phone?: string) => Promise<{ error: any }>;
   signInWithGoogle: () => Promise<{ error: any }>;
@@ -58,6 +59,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   // Helper: derive best possible name from OAuth metadata
   const deriveNameFromMetadata = (u?: User | null) => {
@@ -82,6 +84,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const fetchProfile = async (userId: string, currentUser?: User) => {
+    setProfileLoading(true);
     try {
       // For Google OAuth users, create optimistic profile immediately
       const isGoogleOAuth = currentUser?.app_metadata?.provider === 'google';
@@ -189,6 +192,8 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
     } catch (error) {
       console.error('Error fetching profile:', error);
+    } finally {
+      setProfileLoading(false);
     }
   };
 
@@ -379,6 +384,7 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     profile,
     session,
     loading,
+    profileLoading,
     signIn,
     signUp,
     signInWithGoogle,

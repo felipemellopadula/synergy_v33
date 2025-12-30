@@ -53,7 +53,7 @@ const pricingPlans = [
 ];
 
 const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireSubscription = true }) => {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading, profileLoading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -62,8 +62,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireSubscr
     navigate('/', { replace: true });
   };
 
-  // Show loading spinner while checking auth
-  if (loading) {
+  // Show loading spinner while checking auth or loading profile
+  if (loading || profileLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -96,17 +96,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requireSubscr
   console.log("🛡️ ProtectedRoute render:", { loading, hasUser: !!user, profileType: profile?.subscription_type });
   
   if (requireSubscription) {
-    // Se profile ainda não carregou, mostrar loading (não a página de pricing)
-    if (!profile) {
-      console.log("🛡️ Profile ainda carregando, mostrando loading...");
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-background">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-        </div>
-      );
-    }
-    
-    const hasActiveSubscription = profile.subscription_type === 'paid' || profile.subscription_type === 'admin';
+    // Profile já deve estar carregado neste ponto devido ao check de profileLoading acima
+    const hasActiveSubscription = profile?.subscription_type === 'paid' || profile?.subscription_type === 'admin';
     
     if (!hasActiveSubscription) {
       return (
