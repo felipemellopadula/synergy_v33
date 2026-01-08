@@ -511,12 +511,9 @@ const Image2Page = () => {
             </Button>
             <div className="h-6 w-px bg-border" />
             <div className="flex items-center gap-3">
-              <img 
-                src="/images/synergy-logo.webp" 
-                alt="Synergy AI" 
-                className="h-6 w-auto"
-              />
-              <span className="text-muted-foreground">|</span>
+              <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500">
+                <ImageIcon className="h-5 w-5 text-white" />
+              </div>
               <h1 className="text-xl font-bold">Imagem</h1>
             </div>
           </div>

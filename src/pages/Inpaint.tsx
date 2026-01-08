@@ -497,12 +497,9 @@ Generate the edited image now.`;
             </Button>
             <div className="h-6 w-px bg-border" />
             <div className="flex items-center gap-3">
-              <img 
-                src="/images/synergy-logo.webp" 
-                alt="Synergy AI" 
-                className="h-6 w-auto"
-              />
-              <span className="text-muted-foreground">|</span>
+              <div className="p-1.5 rounded-lg bg-gradient-to-br from-orange-500 to-amber-500">
+                <Paintbrush className="h-5 w-5 text-white" />
+              </div>
               <h1 className="text-xl font-bold">Inpaint</h1>
             </div>
           </div>

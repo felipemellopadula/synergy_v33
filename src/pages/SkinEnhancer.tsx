@@ -146,12 +146,9 @@ export default function SkinEnhancer() {
             </Button>
             <div className="h-6 w-px bg-border" />
             <div className="flex items-center gap-3">
-              <img 
-                src="/images/synergy-logo.webp" 
-                alt="Synergy AI" 
-                className="h-6 w-auto"
-              />
-              <span className="text-muted-foreground">|</span>
+              <div className="p-1.5 rounded-lg bg-gradient-to-br from-pink-400 to-pink-600">
+                <Sparkles className="h-5 w-5 text-white" />
+              </div>
               <h1 className="text-xl font-bold">Skin Enhancer</h1>
             </div>
           </div>
