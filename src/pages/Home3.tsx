@@ -626,14 +626,13 @@ const Home3: React.FC = () => {
                 </p>
               </div>
               
-              {/* Botão CTA com Pulse */}
+              {/* Botão CTA */}
               <button className="bg-black text-yellow-400 font-bold 
                                  px-8 py-4 sm:px-10 sm:py-5 
                                  rounded-xl text-lg sm:text-xl lg:text-2xl
                                  hover:bg-black/90 hover:scale-105
                                  transition-all duration-300 shadow-xl
-                                 whitespace-nowrap group-hover:shadow-2xl
-                                 animate-[pulse_2s_ease-in-out_infinite]">
+                                 whitespace-nowrap group-hover:shadow-2xl">
                 Ver Planos →
               </button>
             </div>
