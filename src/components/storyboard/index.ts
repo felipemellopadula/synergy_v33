@@ -3,3 +3,4 @@ export { ProjectEditor } from './ProjectEditor';
 export { SceneCard } from './SceneCard';
 export { ImagePicker } from './ImagePicker';
 export { VideoPreviewModal } from './VideoPreviewModal';
+export { SceneFullScreenView } from './SceneFullScreenView';
