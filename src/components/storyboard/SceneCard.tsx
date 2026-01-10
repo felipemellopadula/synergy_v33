@@ -47,6 +47,7 @@ interface SceneCardProps {
   onGenerateImage: (scene: StoryboardScene) => void;
   onGenerateVideo: (scene: StoryboardScene) => void;
   onPreviewVideo: (videoUrl: string) => void;
+  onOpenFullScreen?: () => void;
   isGeneratingImage: boolean;
   isGeneratingVideo: boolean;
   hasReferences: boolean;
@@ -110,6 +111,7 @@ export const SceneCard: React.FC<SceneCardProps> = memo(({
   onGenerateImage,
   onGenerateVideo,
   onPreviewVideo,
+  onOpenFullScreen,
   isGeneratingImage,
   isGeneratingVideo,
   hasReferences,
@@ -186,12 +188,26 @@ export const SceneCard: React.FC<SceneCardProps> = memo(({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {/* Scene Number Badge */}
+      {/* Scene Number Badge + Fullscreen Button (mobile) */}
       <div className="absolute top-2 left-2 z-20 flex items-center gap-1">
         <div className="bg-background/90 backdrop-blur-sm px-2 py-1 rounded-md text-xs font-bold flex items-center gap-1">
           <GripVertical className="h-3 w-3 text-muted-foreground cursor-grab" />
           {index + 1}
         </div>
+        {/* Fullscreen button - visible only on mobile */}
+        {onOpenFullScreen && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 bg-background/90 backdrop-blur-sm sm:hidden"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenFullScreen();
+            }}
+          >
+            <Maximize className="h-4 w-4" />
+          </Button>
+        )}
       </div>
 
       {/* Status Badge */}

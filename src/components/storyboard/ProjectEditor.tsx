@@ -37,6 +37,7 @@ import { SceneCard } from './SceneCard';
 import { ReferencePanel } from './ReferencePanel';
 import { ImagePicker } from './ImagePicker';
 import { VideoPreviewModal } from './VideoPreviewModal';
+import { SceneFullScreenView } from './SceneFullScreenView';
 import { StoryboardProject, StoryboardScene, StoryboardReference } from '@/hooks/useStoryboard';
 
 interface ProjectEditorProps {
@@ -143,6 +144,7 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [fullScreenIndex, setFullScreenIndex] = useState<number | null>(null);
 
   // Get current model cost
   const modelCost = VIDEO_MODELS.find(m => m.id === project.video_model)?.cost || 0.5;
@@ -711,6 +713,7 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
                     onGenerateImage={generateImageForScene}
                     onGenerateVideo={generateVideoForScene}
                     onPreviewVideo={setPreviewVideo}
+                    onOpenFullScreen={() => setFullScreenIndex(index)}
                     isGeneratingImage={generatingImageSceneId === scene.id}
                     isGeneratingVideo={generatingVideoSceneId === scene.id}
                     hasReferences={references.length > 0}
@@ -743,6 +746,26 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
         onOpenChange={() => setPreviewVideo(null)}
         videoUrl={previewVideo}
       />
+
+      {/* Full Screen Scene View (Mobile) */}
+      {fullScreenIndex !== null && (
+        <SceneFullScreenView
+          scenes={scenes}
+          currentIndex={fullScreenIndex}
+          onClose={() => setFullScreenIndex(null)}
+          onNavigate={(newIndex) => {
+            if (newIndex >= 0 && newIndex < scenes.length) {
+              setFullScreenIndex(newIndex);
+            }
+          }}
+          onGenerateImage={generateImageForScene}
+          onGenerateVideo={generateVideoForScene}
+          onPreviewVideo={setPreviewVideo}
+          isGeneratingImage={generatingImageSceneId === scenes[fullScreenIndex]?.id}
+          isGeneratingVideo={generatingVideoSceneId === scenes[fullScreenIndex]?.id}
+          hasReferences={references.length > 0}
+        />
+      )}
     </div>
   );
 };
