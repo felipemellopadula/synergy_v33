@@ -104,6 +104,73 @@ export function useStoryboard() {
     }
   }, [user, toast]);
 
+  // Create project with AI-generated scenes
+  const createProjectWithScenes = useCallback(async (
+    name: string, 
+    aspectRatio: string = '16:9', 
+    videoModel: string = 'bytedance:seedance@1.5-pro',
+    generatedScenes: { sceneNumber: number; visualDescription: string; motionPrompt: string; duration: number }[]
+  ) => {
+    if (!user) return null;
+    try {
+      // Create project first
+      const { data: projectData, error: projectError } = await supabase
+        .from('storyboard_projects')
+        .insert({
+          user_id: user.id,
+          name,
+          aspect_ratio: aspectRatio,
+          video_model: videoModel,
+        })
+        .select()
+        .single();
+
+      if (projectError) throw projectError;
+      
+      const newProject = projectData as StoryboardProject;
+      
+      // Create scenes
+      const scenesToInsert = generatedScenes.map((scene, index) => ({
+        project_id: newProject.id,
+        order_index: index,
+        image_url: '',
+        prompt: scene.visualDescription,
+        duration: scene.duration || 5,
+        image_status: 'pending' as const,
+        video_status: 'pending' as const,
+      }));
+
+      const { data: scenesData, error: scenesError } = await supabase
+        .from('storyboard_scenes')
+        .insert(scenesToInsert)
+        .select();
+
+      if (scenesError) {
+        console.error('Error creating scenes:', scenesError);
+        // Project was created, continue anyway
+      }
+
+      setProjects(prev => [newProject, ...prev]);
+      if (scenesData) {
+        setScenes(scenesData as StoryboardScene[]);
+      }
+      
+      toast({
+        title: 'Projeto criado!',
+        description: `"${name}" foi criado com ${generatedScenes.length} cenas.`,
+      });
+      
+      return newProject;
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao criar projeto',
+        description: error.message,
+        variant: 'destructive',
+      });
+      return null;
+    }
+  }, [user, toast]);
+
   // Update project
   const updateProject = useCallback(async (projectId: string, updates: Partial<StoryboardProject>) => {
     try {
@@ -448,6 +515,7 @@ export function useStoryboard() {
     currentProject,
     fetchProjects,
     createProject,
+    createProjectWithScenes,
     updateProject,
     deleteProject,
     fetchScenes,

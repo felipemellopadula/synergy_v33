@@ -23,3 +23,9 @@ verify_jwt = false
 
 [functions.freepik-upscale]
 verify_jwt = true
+
+[functions.generate-storyboard-scenes]
+verify_jwt = true
+
+[functions.concatenate-videos]
+verify_jwt = true
