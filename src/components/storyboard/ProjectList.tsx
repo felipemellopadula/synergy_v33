@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, FolderOpen, Trash2, Calendar, Film } from 'lucide-react';
+import { Plus, FolderOpen, Trash2, Calendar, Film, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -30,12 +31,21 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { StoryboardProject } from '@/hooks/useStoryboard';
+import { StoryBuilderInput } from './StoryBuilderInput';
+
+interface GeneratedScene {
+  sceneNumber: number;
+  visualDescription: string;
+  motionPrompt: string;
+  duration: number;
+}
 
 interface ProjectListProps {
   projects: StoryboardProject[];
   loading: boolean;
   onSelectProject: (project: StoryboardProject) => void;
   onCreateProject: (name: string, aspectRatio: string, videoModel: string) => Promise<StoryboardProject | null>;
+  onCreateProjectWithScenes: (name: string, aspectRatio: string, videoModel: string, scenes: GeneratedScene[]) => Promise<StoryboardProject | null>;
   onDeleteProject: (projectId: string) => Promise<boolean>;
 }
 
@@ -60,13 +70,16 @@ export const ProjectList: React.FC<ProjectListProps> = ({
   loading,
   onSelectProject,
   onCreateProject,
+  onCreateProjectWithScenes,
   onDeleteProject,
 }) => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [createTab, setCreateTab] = useState<'blank' | 'ai'>('blank');
   const [newProjectName, setNewProjectName] = useState('');
   const [newAspectRatio, setNewAspectRatio] = useState('16:9');
   const [newVideoModel, setNewVideoModel] = useState('bytedance:seedance@1.5-pro');
   const [creating, setCreating] = useState(false);
+  const [isGeneratingScenes, setIsGeneratingScenes] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -78,6 +91,18 @@ export const ProjectList: React.FC<ProjectListProps> = ({
     if (project) {
       setShowCreateDialog(false);
       setNewProjectName('');
+      setCreateTab('blank');
+      onSelectProject(project);
+    }
+  };
+
+  const handleCreateWithScenes = async (scenes: GeneratedScene[]) => {
+    const projectName = newProjectName.trim() || `Story ${new Date().toLocaleDateString('pt-BR')}`;
+    const project = await onCreateProjectWithScenes(projectName, newAspectRatio, newVideoModel, scenes);
+    if (project) {
+      setShowCreateDialog(false);
+      setNewProjectName('');
+      setCreateTab('blank');
       onSelectProject(project);
     }
   };
@@ -191,71 +216,147 @@ export const ProjectList: React.FC<ProjectListProps> = ({
       )}
 
       {/* Create Project Dialog */}
-      <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent>
+      <Dialog open={showCreateDialog} onOpenChange={(open) => {
+        if (!isGeneratingScenes) {
+          setShowCreateDialog(open);
+          if (!open) setCreateTab('blank');
+        }
+      }}>
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>Novo Projeto de Storyboard</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label>Nome do Projeto</Label>
-              <Input
-                placeholder="Meu Storyboard"
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+          
+          <Tabs value={createTab} onValueChange={(v) => setCreateTab(v as 'blank' | 'ai')} className="mt-2">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="blank" disabled={isGeneratingScenes}>
+                <Plus className="h-4 w-4 mr-2" />
+                Em Branco
+              </TabsTrigger>
+              <TabsTrigger value="ai" disabled={isGeneratingScenes}>
+                <Sparkles className="h-4 w-4 mr-2" />
+                Gerar com IA
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="blank" className="space-y-4 mt-4">
+              <div className="space-y-2">
+                <Label>Nome do Projeto</Label>
+                <Input
+                  placeholder="Meu Storyboard"
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Proporção do Vídeo</Label>
+                <Select 
+                  value={newAspectRatio} 
+                  onValueChange={setNewAspectRatio}
+                  disabled={VIDEO_MODELS.find(m => m.id === newVideoModel)?.aspectRatio === '16:9'}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ASPECT_RATIOS.map((ar) => (
+                      <SelectItem key={ar.id} value={ar.id}>
+                        {ar.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Modelo de Vídeo</Label>
+                <Select value={newVideoModel} onValueChange={(v) => {
+                  setNewVideoModel(v);
+                  const selectedModel = VIDEO_MODELS.find(m => m.id === v);
+                  if (selectedModel?.aspectRatio === '16:9' && newAspectRatio !== '16:9') {
+                    setNewAspectRatio('16:9');
+                  }
+                }}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {VIDEO_MODELS.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        {model.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <DialogFooter className="pt-4">
+                <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
+                  Cancelar
+                </Button>
+                <Button onClick={handleCreate} disabled={!newProjectName.trim() || creating}>
+                  {creating ? 'Criando...' : 'Criar Projeto'}
+                </Button>
+              </DialogFooter>
+            </TabsContent>
+            
+            <TabsContent value="ai" className="mt-4">
+              <div className="space-y-4 mb-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-xs">Proporção</Label>
+                    <Select 
+                      value={newAspectRatio} 
+                      onValueChange={setNewAspectRatio}
+                      disabled={isGeneratingScenes || VIDEO_MODELS.find(m => m.id === newVideoModel)?.aspectRatio === '16:9'}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ASPECT_RATIOS.map((ar) => (
+                          <SelectItem key={ar.id} value={ar.id}>
+                            {ar.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Modelo</Label>
+                    <Select 
+                      value={newVideoModel} 
+                      onValueChange={(v) => {
+                        setNewVideoModel(v);
+                        const selectedModel = VIDEO_MODELS.find(m => m.id === v);
+                        if (selectedModel?.aspectRatio === '16:9' && newAspectRatio !== '16:9') {
+                          setNewAspectRatio('16:9');
+                        }
+                      }}
+                      disabled={isGeneratingScenes}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {VIDEO_MODELS.map((model) => (
+                          <SelectItem key={model.id} value={model.id}>
+                            {model.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              </div>
+              
+              <StoryBuilderInput
+                onScenesGenerated={handleCreateWithScenes}
+                onCancel={() => setShowCreateDialog(false)}
+                isGenerating={isGeneratingScenes}
+                setIsGenerating={setIsGeneratingScenes}
               />
-            </div>
-            <div className="space-y-2">
-              <Label>Proporção do Vídeo</Label>
-              <Select 
-                value={newAspectRatio} 
-                onValueChange={setNewAspectRatio}
-                disabled={VIDEO_MODELS.find(m => m.id === newVideoModel)?.aspectRatio === '16:9'}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {ASPECT_RATIOS.map((ar) => (
-                    <SelectItem key={ar.id} value={ar.id}>
-                      {ar.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>Modelo de Vídeo</Label>
-              <Select value={newVideoModel} onValueChange={(v) => {
-                setNewVideoModel(v);
-                // LTX models only support 16:9
-                const selectedModel = VIDEO_MODELS.find(m => m.id === v);
-                if (selectedModel?.aspectRatio === '16:9' && newAspectRatio !== '16:9') {
-                  setNewAspectRatio('16:9');
-                }
-              }}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {VIDEO_MODELS.map((model) => (
-                    <SelectItem key={model.id} value={model.id}>
-                      {model.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowCreateDialog(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleCreate} disabled={!newProjectName.trim() || creating}>
-              {creating ? 'Criando...' : 'Criar Projeto'}
-            </Button>
-          </DialogFooter>
+            </TabsContent>
+          </Tabs>
         </DialogContent>
       </Dialog>
 

@@ -9,7 +9,8 @@ import {
   Image as ImageIcon,
   Coins,
   Wand2,
-  FileVideo
+  FileVideo,
+  Play
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -37,6 +38,7 @@ import { SceneCard } from './SceneCard';
 import { ReferencePanel } from './ReferencePanel';
 import { ImagePicker } from './ImagePicker';
 import { VideoPreviewModal } from './VideoPreviewModal';
+import { StoryPreviewModal } from './StoryPreviewModal';
 import { SceneFullScreenView } from './SceneFullScreenView';
 import { StoryboardProject, StoryboardScene, StoryboardReference } from '@/hooks/useStoryboard';
 import { MODELS as IMAGE_MODELS } from '@/modules/image/config/models';
@@ -140,6 +142,7 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
   
   const [showReferencePicker, setShowReferencePicker] = useState(false);
   const [previewVideo, setPreviewVideo] = useState<string | null>(null);
+  const [showStoryPreview, setShowStoryPreview] = useState(false);
   const [generatingImageSceneId, setGeneratingImageSceneId] = useState<string | null>(null);
   const [generatingVideoSceneId, setGeneratingVideoSceneId] = useState<string | null>(null);
   const [isEditingName, setIsEditingName] = useState(false);
@@ -687,6 +690,19 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
               <span className="hidden sm:inline">Nova Cena</span>
             </Button>
 
+            {/* Preview Button */}
+            {completedVideoScenes.length >= 1 && (
+              <Button
+                onClick={() => setShowStoryPreview(true)}
+                variant="outline"
+                size="sm"
+                className="gap-1 h-8 sm:h-9"
+              >
+                <Play className="h-4 w-4" />
+                <span className="hidden sm:inline">Preview</span>
+              </Button>
+            )}
+
             {/* Export Story Button */}
             {completedVideoScenes.length >= 2 && (
               <Button
@@ -806,6 +822,13 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
         open={!!previewVideo}
         onOpenChange={() => setPreviewVideo(null)}
         videoUrl={previewVideo}
+      />
+
+      {/* Story Preview Modal */}
+      <StoryPreviewModal
+        open={showStoryPreview}
+        onOpenChange={setShowStoryPreview}
+        scenes={scenes}
       />
 
       {/* Full Screen Scene View (Mobile) */}

@@ -21,6 +21,7 @@ const StoryboardPage: React.FC = () => {
     loading,
     currentProject,
     createProject,
+    createProjectWithScenes,
     updateProject,
     deleteProject,
     addScene,
@@ -91,6 +92,7 @@ const StoryboardPage: React.FC = () => {
             loading={loading}
             onSelectProject={selectProject}
             onCreateProject={createProject}
+            onCreateProjectWithScenes={createProjectWithScenes}
             onDeleteProject={deleteProject}
           />
         )}
