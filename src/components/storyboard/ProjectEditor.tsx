@@ -188,6 +188,11 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
     await onUpdateScene(sceneId, { prompt });
   };
 
+  // Handle motion prompt update
+  const handleUpdateMotionPrompt = async (sceneId: string, motionPrompt: string) => {
+    await onUpdateScene(sceneId, { motion_prompt: motionPrompt } as Partial<StoryboardScene>);
+  };
+
   // Add empty scene
   const handleAddEmptyScene = async () => {
     await onAddScene(project.id);
@@ -364,11 +369,14 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
 
       const imageUrl = scene.generated_image_url || scene.image_url;
 
+      // Use motion_prompt if available, otherwise fall back to prompt
+      const videoPrompt = scene.motion_prompt || scene.prompt || 'Animate this image with smooth cinematic motion';
+
       const { data, error } = await supabase.functions.invoke('runware-video', {
         body: {
           action: 'start',
           modelId: project.video_model,
-          positivePrompt: scene.prompt || 'Animate this image with smooth cinematic motion',
+          positivePrompt: videoPrompt,
           frameStartUrl: imageUrl,
           durationSeconds: scene.duration,
           aspectRatio: project.aspect_ratio,
@@ -690,41 +698,38 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
               <span className="hidden sm:inline">Nova Cena</span>
             </Button>
 
-            {/* Preview Button */}
-            {completedVideoScenes.length >= 1 && (
-              <Button
-                onClick={() => setShowStoryPreview(true)}
-                variant="outline"
-                size="sm"
-                className="gap-1 h-8 sm:h-9"
-              >
-                <Play className="h-4 w-4" />
-                <span className="hidden sm:inline">Preview</span>
-              </Button>
-            )}
+            {/* Preview Button - always visible, disabled if no videos */}
+            <Button
+              onClick={() => setShowStoryPreview(true)}
+              variant="outline"
+              size="sm"
+              className="gap-1 h-8 sm:h-9"
+              disabled={completedVideoScenes.length < 1}
+            >
+              <Play className="h-4 w-4" />
+              <span className="hidden sm:inline">Preview</span>
+            </Button>
 
-            {/* Export Story Button */}
-            {completedVideoScenes.length >= 2 && (
-              <Button
-                onClick={exportFullStory}
-                variant="outline"
-                size="sm"
-                className="gap-1 h-8 sm:h-9"
-                disabled={isExporting}
-              >
-                {isExporting ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span className="hidden sm:inline">Exportando</span> {exportProgress.toFixed(0)}%
-                  </>
-                ) : (
-                  <>
-                    <FileVideo className="h-4 w-4" />
-                    <span className="hidden sm:inline">Exportar</span>
-                  </>
-                )}
-              </Button>
-            )}
+            {/* Export Story Button - always visible, disabled if < 2 videos */}
+            <Button
+              onClick={exportFullStory}
+              variant="outline"
+              size="sm"
+              className="gap-1 h-8 sm:h-9"
+              disabled={completedVideoScenes.length < 2 || isExporting}
+            >
+              {isExporting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span className="hidden sm:inline">Exportando</span> {exportProgress.toFixed(0)}%
+                </>
+              ) : (
+                <>
+                  <FileVideo className="h-4 w-4" />
+                  <span className="hidden sm:inline">Exportar</span>
+                </>
+              )}
+            </Button>
 
             {/* Generate All Videos Button */}
             {pendingVideoScenes.length > 0 && (
@@ -785,6 +790,7 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
                     scene={scene}
                     index={index}
                     onUpdatePrompt={handleUpdatePrompt}
+                    onUpdateMotionPrompt={handleUpdateMotionPrompt}
                     onUpdateDuration={(id, duration) => onUpdateScene(id, { duration })}
                     onDelete={onDeleteScene}
                     onGenerateImage={generateImageForScene}

@@ -42,6 +42,7 @@ interface SceneCardProps {
   scene: StoryboardScene;
   index: number;
   onUpdatePrompt: (sceneId: string, prompt: string) => void;
+  onUpdateMotionPrompt: (sceneId: string, motionPrompt: string) => void;
   onUpdateDuration: (sceneId: string, duration: number) => void;
   onDelete: (sceneId: string) => void;
   onGenerateImage: (scene: StoryboardScene) => void;
@@ -106,6 +107,7 @@ export const SceneCard: React.FC<SceneCardProps> = memo(({
   scene,
   index,
   onUpdatePrompt,
+  onUpdateMotionPrompt,
   onUpdateDuration,
   onDelete,
   onGenerateImage,
@@ -120,6 +122,7 @@ export const SceneCard: React.FC<SceneCardProps> = memo(({
   const [isHovered, setIsHovered] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [promptValue, setPromptValue] = useState(scene.prompt || '');
+  const [motionPromptValue, setMotionPromptValue] = useState(scene.motion_prompt || '');
   const [promptFocused, setPromptFocused] = useState(false);
   const videoRef = React.useRef<HTMLVideoElement>(null);
 
@@ -171,6 +174,12 @@ export const SceneCard: React.FC<SceneCardProps> = memo(({
     setPromptFocused(false);
     if (promptValue !== scene.prompt) {
       onUpdatePrompt(scene.id, promptValue);
+    }
+  };
+
+  const handleMotionPromptBlur = () => {
+    if (motionPromptValue !== scene.motion_prompt) {
+      onUpdateMotionPrompt(scene.id, motionPromptValue);
     }
   };
 
@@ -323,6 +332,17 @@ Ex: The man (IMG1) is holding a bottle (IMG2), extreme close up with cinematic l
             promptFocused && "ring-2 ring-primary"
           )}
         />
+
+        {/* Motion/Animation Instructions - visible after image is generated */}
+        {hasImage && (
+          <Textarea
+            placeholder="Instruções de movimento (ex: câmera se aproxima suavemente, pessoa vira para a esquerda...)"
+            value={motionPromptValue}
+            onChange={(e) => setMotionPromptValue(e.target.value)}
+            onBlur={handleMotionPromptBlur}
+            className="text-xs min-h-[40px] resize-none border-dashed"
+          />
+        )}
 
         {/* Action Buttons */}
         <div className="flex flex-wrap items-center gap-2">

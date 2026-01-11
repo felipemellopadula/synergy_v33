@@ -782,6 +782,7 @@ export type Database = {
           id: string
           image_status: string | null
           image_url: string
+          motion_prompt: string | null
           order_index: number
           project_id: string
           prompt: string | null
@@ -796,6 +797,7 @@ export type Database = {
           id?: string
           image_status?: string | null
           image_url: string
+          motion_prompt?: string | null
           order_index?: number
           project_id: string
           prompt?: string | null
@@ -810,6 +812,7 @@ export type Database = {
           id?: string
           image_status?: string | null
           image_url?: string
+          motion_prompt?: string | null
           order_index?: number
           project_id?: string
           prompt?: string | null

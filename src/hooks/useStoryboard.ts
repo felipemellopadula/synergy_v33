@@ -23,6 +23,7 @@ export interface StoryboardScene {
   generated_image_url: string | null;
   image_status: 'pending' | 'generating' | 'completed' | 'failed';
   prompt: string | null;
+  motion_prompt: string | null;
   duration: number;
   video_url: string | null;
   video_status: 'pending' | 'generating' | 'completed' | 'failed';
@@ -135,6 +136,7 @@ export function useStoryboard() {
         order_index: index,
         image_url: '',
         prompt: scene.visualDescription,
+        motion_prompt: scene.motionPrompt || null,
         duration: scene.duration || 5,
         image_status: 'pending' as const,
         video_status: 'pending' as const,
