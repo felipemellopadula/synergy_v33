@@ -881,14 +881,26 @@ const VideoPage: React.FC = () => {
         const videoURL = statusItem?.videoURL || statusItem?.url;
         
         if (videoURL) {
+          console.log("[Video] ✅ Vídeo pronto! URL:", videoURL);
           if (elapsedRef.current) window.clearInterval(elapsedRef.current);
+          
+          // ✅ Atualizar estado IMEDIATAMENTE
+          console.log("[Video] Chamando setVideoUrl...");
           setVideoUrl(videoURL);
+          console.log("[Video] setVideoUrl chamado com sucesso");
+          
           setIsSubmitting(false);
           setTaskUUID(null);
           setElapsedTime(0);
           toast({ title: "Vídeo pronto", description: "Seu vídeo foi gerado com sucesso." });
-          // ✅ Salvar o vídeo automaticamente no banco
-          saveVideoToDatabase(videoURL);
+          
+          // ✅ Salvar o vídeo automaticamente no banco (em background, não bloqueia exibição)
+          try {
+            saveVideoToDatabase(videoURL);
+          } catch (saveError) {
+            console.error("[Video] Erro ao salvar vídeo (não afeta exibição):", saveError);
+          }
+          
           // ✅ Atualizar saldo de créditos no frontend
           refreshProfile();
           return;
@@ -1624,17 +1636,27 @@ const VideoPage: React.FC = () => {
                     autoPlay
                     muted
                     playsInline
-                    preload="metadata"
+                    preload="auto"
                     crossOrigin="anonymous"
-                    className="w-full rounded-md border border-border aspect-video"
+                    className="w-full rounded-md border border-border aspect-video bg-black"
                     src={videoUrl}
                     key={videoUrl}
+                    onLoadStart={() => console.log("[Video Player] onLoadStart:", videoUrl)}
+                    onCanPlay={() => console.log("[Video Player] onCanPlay - vídeo pronto para reproduzir")}
                     onError={(e) => {
-                      // fallback simples
+                      console.error("[Video Player] Erro ao carregar vídeo:", e);
                       const video = e.currentTarget;
+                      // Se falhou com crossOrigin, tenta sem
                       if (video.crossOrigin) {
+                        console.log("[Video Player] Tentando sem crossOrigin...");
                         (video as any).crossOrigin = null;
                         video.load();
+                      } else {
+                        toast({
+                          title: "Erro ao reproduzir vídeo",
+                          description: "Tente abrir em nova aba ou baixar o vídeo.",
+                          variant: "destructive",
+                        });
                       }
                     }}
                   />
