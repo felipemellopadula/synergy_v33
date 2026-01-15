@@ -76,18 +76,24 @@ const VIDEO_MODELS = [
 
 const IMAGE_GENERATION_COST = 0.1;
 
+// Resoluções específicas por modelo (LTX requer 16:9 exato com resoluções específicas)
+const MODEL_RESOLUTIONS: Record<string, { width: number; height: number }> = {
+  'lightricks:2@1': { width: 1920, height: 1080 }, // LTX-2 Fast
+  'lightricks:2@0': { width: 1920, height: 1080 }, // LTX-2 Pro
+};
+
 // Helper: Get valid Runware API dimensions for aspect ratio
 const getDimensionsForAspectRatio = (aspectRatio: string): { width: number; height: number } => {
   switch (aspectRatio) {
     case '9:16':
-      return { width: 768, height: 1376 };
+      return { width: 720, height: 1280 };  // 720p vertical
     case '1:1':
       return { width: 1024, height: 1024 };
     case '4:3':
-      return { width: 1152, height: 896 };
+      return { width: 960, height: 720 };
     case '16:9':
     default:
-      return { width: 1376, height: 768 };
+      return { width: 1280, height: 720 };  // 720p padrão
   }
 };
 
@@ -372,6 +378,30 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
       // Use motion_prompt if available, otherwise fall back to prompt
       const videoPrompt = scene.motion_prompt || scene.prompt || 'Animate this image with smooth cinematic motion';
 
+      // Determinar dimensões: usar resolução fixa do modelo se existir (LTX)
+      const modelResolution = MODEL_RESOLUTIONS[project.video_model];
+      let finalWidth: number;
+      let finalHeight: number;
+
+      if (modelResolution) {
+        // Modelo com resolução fixa (LTX)
+        finalWidth = modelResolution.width;
+        finalHeight = modelResolution.height;
+        
+        // Avisar se aspect ratio do projeto não é 16:9
+        if (project.aspect_ratio && project.aspect_ratio !== '16:9') {
+          toast({
+            title: 'LTX só suporta 16:9',
+            description: 'O vídeo será gerado em 1920x1080.',
+          });
+        }
+      } else {
+        // Usar dimensões baseadas no aspect ratio do projeto
+        const dims = getDimensionsForAspectRatio(project.aspect_ratio || '16:9');
+        finalWidth = dims.width;
+        finalHeight = dims.height;
+      }
+
       const { data, error } = await supabase.functions.invoke('runware-video', {
         body: {
           action: 'start',
@@ -379,7 +409,8 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
           positivePrompt: videoPrompt,
           frameStartUrl: imageUrl,
           durationSeconds: scene.duration,
-          aspectRatio: project.aspect_ratio,
+          width: finalWidth,
+          height: finalHeight,
         },
       });
 
