@@ -26,6 +26,8 @@ import {
   Image as ImageIcon,
   Copy,
 } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 import { ThemeToggle } from "@/components/ThemeToggle";
 const UserProfile = lazy(() => import("@/components/UserProfile"));
 import { useAuth } from "@/contexts/AuthContext";
@@ -779,16 +781,38 @@ const Image2Page = () => {
           )}
 
           <div className="flex flex-col lg:flex-row items-end gap-3">
-            {/* Textarea */}
+            {/* Textarea com Tooltip durante geração */}
             <div className="flex-1 w-full">
-              <Textarea
-                placeholder="Describe the scene you imagine"
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                rows={1}
-                className="resize-none bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:bg-white/10 focus:border-white/20 min-h-[44px]"
-                disabled={isGenerating}
-              />
+              <TooltipProvider>
+                <Tooltip open={isGenerating ? undefined : false}>
+                  <TooltipTrigger asChild>
+                    <div className="relative">
+                      <Textarea
+                        placeholder="Describe the scene you imagine"
+                        value={prompt}
+                        onChange={(e) => setPrompt(e.target.value)}
+                        rows={1}
+                        className={cn(
+                          "resize-none bg-white/5 border-white/10 text-white placeholder:text-white/40 focus:bg-white/10 focus:border-white/20 min-h-[44px] pr-10",
+                          isGenerating && "cursor-not-allowed opacity-70 border-[#8C00FF]/50 animate-pulse"
+                        )}
+                        disabled={isGenerating}
+                      />
+                      {isGenerating && (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                          <Loader2 className="h-4 w-4 animate-spin text-[#8C00FF]" />
+                        </div>
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent 
+                    side="top" 
+                    className="bg-[#8C00FF] text-white border-none"
+                  >
+                    <p>Imagem sendo gerada. Aguarde...</p>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
 
             {/* Controles Inline - Estilo Higgsfield */}
