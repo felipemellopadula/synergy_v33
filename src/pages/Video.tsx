@@ -64,6 +64,21 @@ const DialogContentLazy = lazy(async () => {
   return { default: m.DialogContent };
 });
 
+// --- PERSISTÊNCIA DE ESTADO VIA SESSIONSTORAGE ---
+const VIDEO_GENERATION_STATE_KEY = 'video_generation_taskUUID';
+
+const setGenerationTaskUUID = (uuid: string | null) => {
+  if (uuid) {
+    sessionStorage.setItem(VIDEO_GENERATION_STATE_KEY, uuid);
+  } else {
+    sessionStorage.removeItem(VIDEO_GENERATION_STATE_KEY);
+  }
+};
+
+const getStoredTaskUUID = (): string | null => {
+  return sessionStorage.getItem(VIDEO_GENERATION_STATE_KEY);
+};
+
 // --- TIPOS ---
 interface SavedVideoData {
   id: string;
@@ -459,8 +474,9 @@ const VideoPage: React.FC = () => {
   const [keepOriginalSound, setKeepOriginalSound] = useState(false);
   const [uploadingVideo, setUploadingVideo] = useState(false);
   const [isDragOverVideo, setIsDragOverVideo] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [taskUUID, setTaskUUID] = useState<string | null>(null);
+  // Inicializar com valores do sessionStorage para sobreviver a remontagem
+  const [taskUUID, setTaskUUID] = useState<string | null>(() => getStoredTaskUUID());
+  const [isSubmitting, setIsSubmitting] = useState(() => !!getStoredTaskUUID());
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const pollRef = useRef<number | null>(null);
   const [uploadingStart, setUploadingStart] = useState(false);
@@ -496,14 +512,47 @@ const VideoPage: React.FC = () => {
   const taskUUIDRef = useRef<string | null>(null);
   const videoUrlRef = useRef<string | null>(null);
   
-  // ✅ Sincronizar refs com os states
+  // ✅ Sincronizar refs E sessionStorage com os states
   useEffect(() => {
+    console.log("[Video] taskUUID mudou para:", taskUUID);
     taskUUIDRef.current = taskUUID;
+    setGenerationTaskUUID(taskUUID); // Persistir no sessionStorage
   }, [taskUUID]);
   
   useEffect(() => {
     videoUrlRef.current = videoUrl;
   }, [videoUrl]);
+
+  // Ref para beginPolling (preenchida após definição)
+  const beginPollingRef = useRef<((uuid: string) => void) | null>(null);
+
+  // ✅ Restaurar estado de geração do sessionStorage ao montar (após remontagem)
+  useEffect(() => {
+    const storedUUID = getStoredTaskUUID();
+    console.log("[Video] Componente montado. sessionStorage taskUUID:", storedUUID);
+    
+    if (storedUUID && !taskUUID) {
+      console.log("[Video] Restaurando estado de geração do sessionStorage...");
+      flushSync(() => {
+        setTaskUUID(storedUUID);
+        setIsSubmitting(true);
+        setVideoUrl(null);
+      });
+      taskUUIDRef.current = storedUUID;
+      processingRef.current = true;
+      
+      // Reiniciar polling com o UUID recuperado (aguarda ref estar definida)
+      const checkAndPoll = () => {
+        if (beginPollingRef.current) {
+          beginPollingRef.current(storedUUID);
+        } else {
+          // Retry se a ref ainda não foi preenchida
+          setTimeout(checkAndPoll, 50);
+        }
+      };
+      setTimeout(checkAndPoll, 150);
+    }
+  }, []); // Executar apenas na montagem
   
   // Restrições por modelo (com memo para evitar recalcular)
   const allowedResolutions = useMemo<Resolution[]>(() => RESOLUTIONS_BY_MODEL[modelId] || [], [modelId]);
@@ -909,7 +958,8 @@ const VideoPage: React.FC = () => {
       window.clearInterval(elapsedRef.current);
       elapsedRef.current = null;
     }
-    processingRef.current = false; // ✅ Marcar que processamento foi cancelado
+    processingRef.current = false;
+    setGenerationTaskUUID(null); // ✅ Limpar sessionStorage
     setIsSubmitting(false);
     setTaskUUID(null);
     setElapsedTime(0);
@@ -946,7 +996,8 @@ const VideoPage: React.FC = () => {
         const elapsed = Date.now() - startTime;
         if (elapsed > MAX_DURATION) {
           if (elapsedRef.current) window.clearInterval(elapsedRef.current);
-          processingRef.current = false; // ✅ Marcar que processamento terminou por timeout
+          processingRef.current = false;
+          setGenerationTaskUUID(null); // ✅ Limpar sessionStorage no timeout
           setIsSubmitting(false);
           setTaskUUID(null);
           setElapsedTime(0);
@@ -961,7 +1012,8 @@ const VideoPage: React.FC = () => {
         // ✅ Verificar limite de tentativas
         if (attempt >= MAX_ATTEMPTS) {
           if (elapsedRef.current) window.clearInterval(elapsedRef.current);
-          processingRef.current = false; // ✅ Marcar que processamento terminou por limite
+          processingRef.current = false;
+          setGenerationTaskUUID(null); // ✅ Limpar sessionStorage no limite
           setIsSubmitting(false);
           setTaskUUID(null);
           setElapsedTime(0);
@@ -980,7 +1032,8 @@ const VideoPage: React.FC = () => {
         // ✅ Detectar falha explícita da API
         if (data?.failed) {
           if (elapsedRef.current) window.clearInterval(elapsedRef.current);
-          processingRef.current = false; // ✅ Marcar que processamento falhou
+          processingRef.current = false;
+          setGenerationTaskUUID(null); // ✅ Limpar sessionStorage na falha
           setIsSubmitting(false);
           setTaskUUID(null);
           setElapsedTime(0);
@@ -1011,6 +1064,7 @@ const VideoPage: React.FC = () => {
             setTaskUUID(null);
             setElapsedTime(0);
           });
+          setGenerationTaskUUID(null); // ✅ Limpar sessionStorage no sucesso (redundante mas seguro)
           processingRef.current = false;
           console.log("[Video] Estados aplicados com sucesso");
           toast({ 
@@ -1059,7 +1113,8 @@ const VideoPage: React.FC = () => {
         // ✅ Limite de erros consecutivos
         if (attempt >= 5) {
           if (elapsedRef.current) window.clearInterval(elapsedRef.current);
-          processingRef.current = false; // ✅ Marcar que processamento terminou com erro
+          processingRef.current = false;
+          setGenerationTaskUUID(null); // ✅ Limpar sessionStorage no erro
           setIsSubmitting(false);
           setTaskUUID(null);
           setElapsedTime(0);
@@ -1079,6 +1134,11 @@ const VideoPage: React.FC = () => {
     // Vídeos levam tempo para processar, polling mais espaçado economiza requests
     pollRef.current = window.setTimeout(() => poll(0), 3000) as unknown as number;
   }, [toast, saveVideoToDatabase, refreshProfile]);
+
+  // ✅ Preencher ref do beginPolling para uso no useEffect de montagem
+  useEffect(() => {
+    beginPollingRef.current = beginPolling;
+  }, [beginPolling]);
 
   // ✅ Listener para visibilitychange: quando usuário volta para a aba, reinicia polling se necessário
   // Usa REFS em vez de state para evitar stale closures
