@@ -164,6 +164,18 @@ const base64ToBlob = (base64: string, contentType: string = 'image/png'): Blob =
   return new Blob(byteArrays, { type: contentType });
 };
 
+// Persistência de estado via sessionStorage
+const IMAGE_GENERATING_KEY = 'storyboard_image_generating_scene_id';
+const VIDEO_GENERATING_KEY = 'storyboard_video_generating_scene_id';
+const setImageGeneratingStorage = (id: string | null) => {
+  id ? sessionStorage.setItem(IMAGE_GENERATING_KEY, id) : sessionStorage.removeItem(IMAGE_GENERATING_KEY);
+};
+const getStoredImageGeneratingId = () => sessionStorage.getItem(IMAGE_GENERATING_KEY);
+const setVideoGeneratingStorage = (id: string | null) => {
+  id ? sessionStorage.setItem(VIDEO_GENERATING_KEY, id) : sessionStorage.removeItem(VIDEO_GENERATING_KEY);
+};
+const getStoredVideoGeneratingId = () => sessionStorage.getItem(VIDEO_GENERATING_KEY);
+
 export const ProjectEditor: React.FC<ProjectEditorProps> = ({
   project,
   scenes,
@@ -185,8 +197,19 @@ export const ProjectEditor: React.FC<ProjectEditorProps> = ({
   const [showReferencePicker, setShowReferencePicker] = useState(false);
   const [previewVideo, setPreviewVideo] = useState<string | null>(null);
   const [showStoryPreview, setShowStoryPreview] = useState(false);
-  const [generatingImageSceneId, setGeneratingImageSceneId] = useState<string | null>(null);
-  const [generatingVideoSceneId, setGeneratingVideoSceneId] = useState<string | null>(null);
+  const [generatingImageSceneId, setGeneratingImageSceneIdState] = useState<string | null>(() => getStoredImageGeneratingId());
+  const [generatingVideoSceneId, setGeneratingVideoSceneIdState] = useState<string | null>(() => getStoredVideoGeneratingId());
+  
+  // Wrappers que sincronizam com sessionStorage
+  const setGeneratingImageSceneId = useCallback((id: string | null) => {
+    setGeneratingImageSceneIdState(id);
+    setImageGeneratingStorage(id);
+  }, []);
+  const setGeneratingVideoSceneId = useCallback((id: string | null) => {
+    setGeneratingVideoSceneIdState(id);
+    setVideoGeneratingStorage(id);
+  }, []);
+  
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState(project.name);
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);

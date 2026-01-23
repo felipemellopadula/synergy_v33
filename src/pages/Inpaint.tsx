@@ -34,6 +34,13 @@ interface ReferenceImage {
   dataUrl: string;
 }
 
+// Persistência de estado via sessionStorage
+const GENERATING_STATE_KEY = 'inpaint_generating_active';
+const setGeneratingActive = (active: boolean) => {
+  active ? sessionStorage.setItem(GENERATING_STATE_KEY, 'true') : sessionStorage.removeItem(GENERATING_STATE_KEY);
+};
+const isGeneratingActive = () => sessionStorage.getItem(GENERATING_STATE_KEY) === 'true';
+
 const Inpaint = () => {
   const navigate = useNavigate();
   const { signOut } = useAuth();
@@ -48,11 +55,16 @@ const Inpaint = () => {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
   const [prompt, setPrompt] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(() => isGeneratingActive());
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [brushSize, setBrushSize] = useState(20);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
+
+  // Sincronizar isGenerating com sessionStorage
+  useEffect(() => {
+    setGeneratingActive(isGenerating);
+  }, [isGenerating]);
 
   // Debug: log mount/unmount
   useEffect(() => {

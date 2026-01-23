@@ -1,4 +1,4 @@
-import { useState, useCallback, Suspense, lazy } from "react";
+import { useState, useCallback, Suspense, lazy, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, Download, Loader2, ZoomIn, Image as ImageIcon, Sparkles, RefreshCw, ArrowLeft, X } from "lucide-react";
@@ -21,6 +21,13 @@ const UserProfile = lazy(() => import("@/components/UserProfile"));
 
 type Provider = "magnific" | "runware";
 
+// Persistência de estado via sessionStorage
+const LOADING_STATE_KEY = 'upscale_loading_active';
+const setLoadingActive = (active: boolean) => {
+  active ? sessionStorage.setItem(LOADING_STATE_KEY, 'true') : sessionStorage.removeItem(LOADING_STATE_KEY);
+};
+const isLoadingActive = () => sessionStorage.getItem(LOADING_STATE_KEY) === 'true';
+
 export default function Upscale() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
@@ -29,7 +36,7 @@ export default function Upscale() {
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [imageDimensions, setImageDimensions] = useState<{ width: number; height: number } | null>(null);
   const [upscaledImage, setUpscaledImage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(() => isLoadingActive());
   const [isDragging, setIsDragging] = useState(false);
   
   // Provider selection
@@ -41,6 +48,11 @@ export default function Upscale() {
   // Magnific (Freepik) settings
   const [flavor, setFlavor] = useState("photo");
   const [ultraDetail, setUltraDetail] = useState([30]);
+
+  // Sincronizar isLoading com sessionStorage
+  useEffect(() => {
+    setLoadingActive(isLoading);
+  }, [isLoading]);
   const [sharpen, setSharpen] = useState([7]);
   const [smartGrain, setSmartGrain] = useState([7]);
 

@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, Suspense } from "react";
+import { useState, useRef, useCallback, Suspense, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, Upload, Camera, Eye, MessageSquare, Send, Settings, X, Download, ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,13 @@ interface ClickMarker {
   comment: string;
 }
 
+// Persistência de estado via sessionStorage
+const PROCESSING_STATE_KEY = 'imageeditor_processing_active';
+const setProcessingActive = (active: boolean) => {
+  active ? sessionStorage.setItem(PROCESSING_STATE_KEY, 'true') : sessionStorage.removeItem(PROCESSING_STATE_KEY);
+};
+const isProcessingActive = () => sessionStorage.getItem(PROCESSING_STATE_KEY) === 'true';
+
 const ImageEditor = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -26,7 +33,7 @@ const ImageEditor = () => {
   const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<TabType>("prompt");
   const [prompt, setPrompt] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(() => isProcessingActive());
   const [editedImage, setEditedImage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageContainerRef = useRef<HTMLDivElement>(null);
@@ -40,6 +47,11 @@ const ImageEditor = () => {
   const [rotation, setRotation] = useState(0);
   const [verticalTilt, setVerticalTilt] = useState(0);
   const [proximity, setProximity] = useState(0);
+
+  // Sincronizar isProcessing com sessionStorage
+  useEffect(() => {
+    setProcessingActive(isProcessing);
+  }, [isProcessing]);
 
   const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
