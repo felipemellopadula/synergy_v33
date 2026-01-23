@@ -32,6 +32,13 @@ const AVATAR_STYLES = [
   { id: "minimalist", label: "Minimalista", prompt: "Transform this photo into a minimalist vector-style portrait with clean lines and simple colors" },
 ];
 
+// Persistência de estado via sessionStorage
+const PROCESSING_STATE_KEY = 'aiavatar_processing_active';
+const setProcessingActive = (active: boolean) => {
+  active ? sessionStorage.setItem(PROCESSING_STATE_KEY, 'true') : sessionStorage.removeItem(PROCESSING_STATE_KEY);
+};
+const isProcessingActive = () => sessionStorage.getItem(PROCESSING_STATE_KEY) === 'true';
+
 const AIAvatar = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -41,11 +48,16 @@ const AIAvatar = () => {
   const [generatedAvatar, setGeneratedAvatar] = useState<string | null>(null);
   const [selectedStyle, setSelectedStyle] = useState<string>("professional");
   const [customPrompt, setCustomPrompt] = useState("");
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(() => isProcessingActive());
   const [savedAvatars, setSavedAvatars] = useState<SavedAvatar[]>([]);
   const [isLoadingAvatars, setIsLoadingAvatars] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Sincronizar isProcessing com sessionStorage
+  useEffect(() => {
+    setProcessingActive(isProcessing);
+  }, [isProcessing]);
 
   // Load saved avatars
   useEffect(() => {

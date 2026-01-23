@@ -1,4 +1,4 @@
-import { useState, useCallback, Suspense, lazy } from "react";
+import { useState, useCallback, Suspense, lazy, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { Upload, Download, Loader2, Sparkles, RefreshCw, ArrowLeft, X } from "lucide-react";
@@ -16,6 +16,13 @@ import { cn } from "@/lib/utils";
 
 const UserProfile = lazy(() => import("@/components/UserProfile"));
 
+// Persistência de estado via sessionStorage
+const LOADING_STATE_KEY = 'skinenhancer_loading_active';
+const setLoadingActive = (active: boolean) => {
+  active ? sessionStorage.setItem(LOADING_STATE_KEY, 'true') : sessionStorage.removeItem(LOADING_STATE_KEY);
+};
+const isLoadingActive = () => sessionStorage.getItem(LOADING_STATE_KEY) === 'true';
+
 export default function SkinEnhancer() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
@@ -23,12 +30,17 @@ export default function SkinEnhancer() {
   
   const [originalImage, setOriginalImage] = useState<string | null>(null);
   const [enhancedImage, setEnhancedImage] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(() => isLoadingActive());
   const [isDragging, setIsDragging] = useState(false);
   
   // Settings
   const [sharpen, setSharpen] = useState([0]);
   const [smartGrain, setSmartGrain] = useState([2]);
+
+  // Sincronizar isLoading com sessionStorage
+  useEffect(() => {
+    setLoadingActive(isLoading);
+  }, [isLoading]);
 
   const handleSignOut = async () => {
     await signOut();
