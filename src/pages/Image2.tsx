@@ -25,6 +25,7 @@ import {
   Maximize2,
   Image as ImageIcon,
   Copy,
+  User,
 } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
@@ -32,7 +33,10 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 const UserProfile = lazy(() => import("@/components/UserProfile"));
 import { useAuth } from "@/contexts/AuthContext";
 import { useCredits } from "@/hooks/useCredits";
+import { useCharacters } from "@/hooks/useCharacters";
 import { PurchaseCreditsModal } from "@/components/PurchaseCreditsModal";
+import { CharacterPanel } from "@/components/image/CharacterPanel";
+import { SelectedCharacterBadge } from "@/components/image/SelectedCharacterBadge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -74,6 +78,22 @@ const Image2Page = () => {
   const { user } = useAuth();
   const { isLegacyUser, checkCredits, showPurchaseModal, setShowPurchaseModal, refreshProfile } = useCredits();
   const { debounce, isDebouncing } = useButtonDebounce(1500);
+  
+  // Hook de personagens
+  const {
+    characters,
+    selectedCharacter,
+    characterImages,
+    isLoading: isLoadingCharacters,
+    isUploadingImages,
+    selectCharacter,
+    createCharacter,
+    updateCharacter,
+    deleteCharacter,
+    addImages: addCharacterImages,
+    removeImage: removeCharacterImage,
+    getCharacterImagesAsBase64,
+  } = useCharacters();
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState(MODELS[0].id);
   const [quality, setQuality] = useState(QUALITY_SETTINGS[0].id);
@@ -370,16 +390,35 @@ const Image2Page = () => {
         }
       }
 
+      // Se há personagem selecionado, adicionar imagens como referência
+      if (selectedCharacter && characterImages.length > 0) {
+        // Calcular slots disponíveis (limite do modelo menos imagens anexadas manualmente)
+        const availableSlots = Math.max(0, maxImages - inputImagesBase64.length);
+        
+        if (availableSlots > 0) {
+          console.log(`🎭 Personagem "${selectedCharacter.name}" selecionado. Adicionando até ${availableSlots} referências...`);
+          const characterBase64 = await getCharacterImagesAsBase64(availableSlots);
+          console.log(`✅ ${characterBase64.length} imagens do personagem adicionadas como referência`);
+          inputImagesBase64.push(...characterBase64);
+        } else {
+          console.log(`⚠️ Sem slots disponíveis para imagens do personagem (${inputImagesBase64.length}/${maxImages} usados)`);
+        }
+      }
+
       const inputImageBase64 = inputImagesBase64[0];
       const inputImageBase64Second = inputImagesBase64[1];
+      
+      // Flag para determinar se deve usar edit-image (quando há imagens de referência)
+      const hasReferenceImages = inputImagesBase64.length > 0 && canAttachImage;
 
-      if (inputImageBase64 && canAttachImage) {
-        // Usar edit-image da Runware para todos os modelos (incluindo Google e OpenAI)
+      if (hasReferenceImages) {
+        // Usar edit-image da Runware para modelos com imagens de referência
+        console.log(`🖼️ Usando edit-image com ${inputImagesBase64.length} imagens de referência`);
         const { data: editData, error: editError } = await supabase.functions.invoke("edit-image", {
           body: {
             model,
             positivePrompt: finalPrompt,
-            inputImages: inputImagesBase64, // Array com todas as imagens (até 6 para GPT Image 1.5)
+            inputImages: inputImagesBase64, // Array com todas as imagens
             width: selectedQualityInfo.width,
             height: selectedQualityInfo.height,
           },
@@ -692,6 +731,22 @@ const Image2Page = () => {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Botão de personagem no mobile */}
+            <div className="lg:hidden">
+              <CharacterPanel
+                characters={characters}
+                selectedCharacter={selectedCharacter}
+                characterImages={characterImages}
+                isLoading={isLoadingCharacters}
+                isUploadingImages={isUploadingImages}
+                onSelectCharacter={selectCharacter}
+                onCreateCharacter={createCharacter}
+                onUpdateCharacter={updateCharacter}
+                onDeleteCharacter={deleteCharacter}
+                onAddImages={addCharacterImages}
+                onRemoveImage={removeCharacterImage}
+              />
+            </div>
             <Suspense fallback={<div className="h-8 w-8 rounded-full bg-muted animate-pulse" />}>
               <UserProfile />
             </Suspense>
@@ -699,9 +754,26 @@ const Image2Page = () => {
         </div>
       </header>
 
-      {/* Grid de Imagens */}
-      <main className="flex-1 overflow-auto p-4 pb-48">
-        <div className="container mx-auto max-w-7xl">
+      {/* Layout com Sidebar (Desktop) */}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Character Panel - Desktop Sidebar */}
+        <CharacterPanel
+          characters={characters}
+          selectedCharacter={selectedCharacter}
+          characterImages={characterImages}
+          isLoading={isLoadingCharacters}
+          isUploadingImages={isUploadingImages}
+          onSelectCharacter={selectCharacter}
+          onCreateCharacter={createCharacter}
+          onUpdateCharacter={updateCharacter}
+          onDeleteCharacter={deleteCharacter}
+          onAddImages={addCharacterImages}
+          onRemoveImage={removeCharacterImage}
+        />
+
+        {/* Grid de Imagens */}
+        <main className="flex-1 overflow-auto p-4 pb-48">
+          <div className="container mx-auto max-w-7xl">
           {isLoadingHistory ? (
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
               {Array.from({ length: 8 }).map((_, i) => (
@@ -796,12 +868,24 @@ const Image2Page = () => {
             </div>
           )}
         </div>
-      </main>
+        </main>
+      </div>
 
       {/* Chat Bar Fixo (bottom) - Estilo Higgsfield */}
-      <div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur border-t border-white/10 shadow-2xl z-20">
+      <div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur border-t border-white/10 shadow-2xl z-20 lg:ml-[280px]">
         <div className="container mx-auto max-w-7xl p-4">
-      {/* Preview de arquivos anexados */}
+          {/* Badge do personagem selecionado */}
+          {selectedCharacter && (
+            <div className="mb-3">
+              <SelectedCharacterBadge
+                character={selectedCharacter}
+                onClear={() => selectCharacter(null)}
+                maxRefsToShow={maxImages}
+              />
+            </div>
+          )}
+          
+          {/* Preview de arquivos anexados */}
           {selectedFiles.length > 0 && (
             <div className="mb-3 flex flex-wrap items-center gap-2">
               {selectedFiles.map((file, index) => (
