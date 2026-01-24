@@ -1052,6 +1052,74 @@ export type Database = {
         }
         Relationships: []
       }
+      user_character_images: {
+        Row: {
+          character_id: string
+          created_at: string | null
+          id: string
+          image_url: string
+          order_index: number | null
+          storage_path: string | null
+        }
+        Insert: {
+          character_id: string
+          created_at?: string | null
+          id?: string
+          image_url: string
+          order_index?: number | null
+          storage_path?: string | null
+        }
+        Update: {
+          character_id?: string
+          created_at?: string | null
+          id?: string
+          image_url?: string
+          order_index?: number | null
+          storage_path?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_character_images_character_id_fkey"
+            columns: ["character_id"]
+            isOneToOne: false
+            referencedRelation: "user_characters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_characters: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          image_count: number | null
+          name: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_count?: number | null
+          name: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          image_count?: number | null
+          name?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_images: {
         Row: {
           created_at: string
