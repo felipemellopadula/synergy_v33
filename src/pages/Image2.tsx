@@ -37,6 +37,7 @@ import { useCharacters } from "@/hooks/useCharacters";
 import { PurchaseCreditsModal } from "@/components/PurchaseCreditsModal";
 import { CharacterPanel } from "@/components/image/CharacterPanel";
 import { SelectedCharacterBadge } from "@/components/image/SelectedCharacterBadge";
+import { ShareModal } from "@/components/ShareModal";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import {
   AlertDialog,
@@ -111,6 +112,7 @@ const Image2Page = () => {
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [selectedImageForModal, setSelectedImageForModal] = useState<DatabaseImage | null>(null);
   const [imageToDelete, setImageToDelete] = useState<DatabaseImage | null>(null);
+  const [shareModalImage, setShareModalImage] = useState<DatabaseImage | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const isLoadingRef = useRef(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -695,36 +697,13 @@ const Image2Page = () => {
     }
   }, []);
 
-  const shareImage = async (image: DatabaseImage) => {
-    const { data: publicData } = supabase.storage.from("images").getPublicUrl(image.image_path);
-    const url = publicData.publicUrl;
+  const shareImage = (image: DatabaseImage) => {
+    setShareModalImage(image);
+  };
 
-    // Tentar usar Web Share API, mas fazer fallback para clipboard se falhar
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "Imagem gerada por IA",
-          text: image.prompt || "Confira esta imagem gerada por IA",
-          url: url,
-        });
-        return; // Sucesso - não precisa do fallback
-      } catch (error: any) {
-        // Se o usuário cancelou, não mostrar nada
-        if (error.name === 'AbortError') {
-          return;
-        }
-        // Para outros erros (como Permission denied no iframe), usar fallback
-        console.log("Share API indisponível, usando fallback:", error.name);
-      }
-    }
-    
-    // Fallback: copiar link para clipboard
-    try {
-      await navigator.clipboard.writeText(url);
-      toast.success("Link copiado para a área de transferência");
-    } catch (clipboardError) {
-      toast.error("Não foi possível compartilhar ou copiar o link");
-    }
+  const getShareUrl = (image: DatabaseImage) => {
+    const { data: publicData } = supabase.storage.from("images").getPublicUrl(image.image_path);
+    return publicData.publicUrl;
   };
 
   const getImageUrl = (image: DatabaseImage) => {
@@ -1199,6 +1178,17 @@ const Image2Page = () => {
         open={showPurchaseModal} 
         onOpenChange={setShowPurchaseModal} 
       />
+
+      {/* Modal de compartilhamento */}
+      {shareModalImage && (
+        <ShareModal
+          isOpen={!!shareModalImage}
+          onClose={() => setShareModalImage(null)}
+          url={getShareUrl(shareModalImage)}
+          title="Imagem gerada por IA"
+          description={shareModalImage.prompt || "Confira esta imagem incrível gerada por IA!"}
+        />
+      )}
     </div>
   );
 };
