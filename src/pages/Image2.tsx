@@ -38,7 +38,7 @@ import { useMoodboards } from "@/hooks/useMoodboards";
 import { PurchaseCreditsModal } from "@/components/PurchaseCreditsModal";
 import { CharacterPanel } from "@/components/image/CharacterPanel";
 import { SelectedCharacterBadge } from "@/components/image/SelectedCharacterBadge";
-import { MoodboardPanel } from "@/components/image/MoodboardPanel";
+
 import { SelectedMoodboardBadge } from "@/components/image/SelectedMoodboardBadge";
 import { ShareModal } from "@/components/ShareModal";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -101,19 +101,11 @@ const Image2Page = () => {
     generateMasterAvatar,
   } = useCharacters();
   
-  // Hook de moodboards
+  // Hook de moodboards (apenas o necessário para SelectedMoodboardBadge)
   const {
-    moodboards,
     selectedMoodboard,
     moodboardImages,
-    isLoading: isLoadingMoodboards,
-    isUploadingImages: isUploadingMoodboardImages,
     selectMoodboard,
-    createMoodboard,
-    updateMoodboard: updateMoodboardData,
-    deleteMoodboard,
-    addImages: addMoodboardImages,
-    removeImage: removeMoodboardImage,
     getMoodboardImagesAsBase64,
   } = useMoodboards();
   
@@ -1101,22 +1093,6 @@ const Image2Page = () => {
                 className="hidden" 
               />
 
-              {/* Moodboard - apenas para modelos suportados */}
-              {currentModel?.supportsMoodboard && (
-                <MoodboardPanel
-                  moodboards={moodboards}
-                  selectedMoodboard={selectedMoodboard}
-                  moodboardImages={moodboardImages}
-                  isLoading={isLoadingMoodboards}
-                  isUploadingImages={isUploadingMoodboardImages}
-                  onSelectMoodboard={selectMoodboard}
-                  onCreateMoodboard={createMoodboard}
-                  onUpdateMoodboard={updateMoodboardData}
-                  onDeleteMoodboard={deleteMoodboard}
-                  onAddImages={addMoodboardImages}
-                  onRemoveImage={removeMoodboardImage}
-                />
-              )}
 
               {/* Magic Prompt */}
               <div className="flex items-center gap-2 px-2 py-2 rounded-md bg-white/5 border border-white/10">
