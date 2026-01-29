@@ -1,29 +1,17 @@
 
-# Plano: Corrigir Largura do Input de Prompt Quando Painel de Personagens é Colapsado
+# Plano: Remover Botão de Moodboard da Barra Inferior
 
-## Problema Identificado
+## Problema
 
-Quando o CharacterPanel é colapsado (fechado), a barra inferior com o prompt permanece com uma margem esquerda fixa de 280px, causando o efeito "espremido" que você observou.
-
-**Causa raiz:**
-
-```tsx
-// Linha 949 de Image2.tsx
-<div className="fixed bottom-0 left-0 right-0 ... lg:ml-[280px]">
-```
-
-Esta margem é **estática** e não considera o estado do painel (`showCharacterPanel`).
-
----
+O botão "Moodboard" na barra inferior está ocupando espaço excessivo e "espremendo" os outros controles (seletores de modelo, qualidade, quantidade, etc.).
 
 ## Solução
 
-Tornar a margem esquerda dinâmica, condicionada ao estado `showCharacterPanel`:
+Remover o componente `MoodboardPanel` da barra de controles inferior.
 
-```text
-Quando showCharacterPanel = true  → lg:ml-[280px] (painel aberto)
-Quando showCharacterPanel = false → lg:ml-0 (painel fechado)
-```
+**Nota:** O sistema de moodboards continuará funcionando - o usuário ainda terá acesso:
+- Via `SelectedMoodboardBadge` que aparece quando um moodboard está selecionado
+- O moodboard selecionado é persistido no localStorage e recarregado automaticamente
 
 ---
 
@@ -31,34 +19,56 @@ Quando showCharacterPanel = false → lg:ml-0 (painel fechado)
 
 ### `src/pages/Image2.tsx`
 
-**Linha 949** - Adicionar margem condicional:
+**Remover linhas 1104-1119:**
 
-De:
 ```tsx
-<div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur border-t border-white/10 shadow-2xl z-20 lg:ml-[280px]">
-```
-
-Para:
-```tsx
-<div className={cn(
-  "fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur border-t border-white/10 shadow-2xl z-20 transition-all duration-300",
-  showCharacterPanel ? "lg:ml-[280px]" : "lg:ml-0"
-)}>
+// REMOVER este bloco:
+{/* Moodboard - apenas para modelos suportados */}
+{currentModel?.supportsMoodboard && (
+  <MoodboardPanel
+    moodboards={moodboards}
+    selectedMoodboard={selectedMoodboard}
+    moodboardImages={moodboardImages}
+    isLoading={isLoadingMoodboards}
+    isUploadingImages={isUploadingMoodboardImages}
+    onSelectMoodboard={selectMoodboard}
+    onCreateMoodboard={createMoodboard}
+    onUpdateMoodboard={updateMoodboardData}
+    onDeleteMoodboard={deleteMoodboard}
+    onAddImages={addMoodboardImages}
+    onRemoveImage={removeMoodboardImage}
+  />
+)}
 ```
 
 ---
 
-## Benefícios da Correção
+## Também Remover (Limpeza)
 
-| Estado do Painel | Margem Esquerda | Resultado |
-|------------------|-----------------|-----------|
-| Aberto (280px) | `lg:ml-[280px]` | Prompt alinhado com o painel |
-| Fechado (0px) | `lg:ml-0` | Prompt ocupa largura total |
+1. **Import do MoodboardPanel** (linha ~40):
+   ```tsx
+   import { MoodboardPanel } from '@/components/image/MoodboardPanel';
+   ```
+
+2. **Variáveis não utilizadas do useMoodboards hook** - manter apenas o necessário para o `SelectedMoodboardBadge`:
+   - Manter: `selectedMoodboard`, `selectMoodboard`, `moodboardImages`, `getMoodboardImagesAsBase64`
+   - Remover da desestruturação: `moodboards`, `isLoading: isLoadingMoodboards`, `isUploadingImages: isUploadingMoodboardImages`, `createMoodboard`, `updateMoodboard`, `deleteMoodboard`, `addImages`, `removeImage`
 
 ---
 
-## Resultado Esperado
+## Resultado
 
-- Quando você colapsar o painel de personagens, a barra de prompt se expandirá suavemente para ocupar toda a largura disponível
-- A transição será animada (`transition-all duration-300`) para ser consistente com a animação do painel
-- O input não ficará mais "espremido" quando o painel estiver fechado
+| Antes | Depois |
+|-------|--------|
+| 7 elementos na barra (modelo, qualidade, qtd, anexo, **moodboard**, magic, gerar) | 6 elementos (modelo, qualidade, qtd, anexo, magic, gerar) |
+| Barra apertada/espremida | Barra com espaço adequado |
+| Acesso ao moodboard pela barra | Acesso apenas pelo badge superior (quando selecionado) |
+
+---
+
+## Consideração Futura
+
+Se o usuário quiser uma forma de gerenciar moodboards sem usar a barra inferior, podemos:
+- Adicionar um botão no painel lateral de personagens
+- Criar uma página separada de configurações de moodboards
+- Adicionar ao menu do header
