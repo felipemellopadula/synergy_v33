@@ -946,7 +946,10 @@ const Image2Page = () => {
       </div>
 
       {/* Chat Bar Fixo (bottom) - Estilo Higgsfield */}
-      <div className="fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur border-t border-white/10 shadow-2xl z-20 lg:ml-[280px]">
+      <div className={cn(
+        "fixed bottom-0 left-0 right-0 bg-black/95 backdrop-blur border-t border-white/10 shadow-2xl z-20 transition-all duration-300",
+        showCharacterPanel ? "lg:ml-[280px]" : "lg:ml-0"
+      )}>
         <div className="container mx-auto max-w-7xl p-4">
           {/* Badges de personagem e moodboard selecionados */}
           <div className="mb-3 flex flex-wrap items-center gap-2">
