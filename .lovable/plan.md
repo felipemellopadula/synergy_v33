@@ -1,183 +1,452 @@
 
 
-# Plano: Adicionar Funcionalidade para Fechar/Ocultar o Painel de Personagens
+# Plano: Implementar Funcionalidade de Moodboard para Geração de Imagens
 
 ## Resumo do Objetivo
 
-Adicionar um botão de fechar (X) no painel lateral de "Personagens" na página de Imagem, permitindo que o usuário oculte a sidebar e tenha mais espaço para visualizar as imagens geradas. Também será adicionado um botão para reabrir o painel quando estiver fechado.
+Criar um sistema completo de Moodboards inspirado no Midjourney, onde usuários podem:
+1. Criar coleções de até 14 imagens com um nome
+2. Selecionar um Moodboard ao gerar imagens para seguir padrões de cor e estilo
+3. Disponibilizar para modelos específicos: Nano Banana 2 Pro, FLUX.2 [pro] e Seedream 4.5
 
 ---
 
-## Análise do Estado Atual
+## Análise do Midjourney (Pesquisa)
 
-### Painel de Personagens (`CharacterPanel`)
-- **Desktop**: Renderizado como sidebar fixa de 280px sempre visível (linha 673-677)
-- **Mobile**: Renderizado como Sheet (drawer) com botão trigger (já possui controle de abrir/fechar)
-- **Problema**: No desktop, não existe forma de ocultar o painel
-
-### Estrutura em `Image2.tsx`
-- O `CharacterPanel` é renderizado diretamente no layout sem controle de visibilidade
-- Mobile: linha 763-780 (dentro do header)
-- Desktop: linha 789-806 (sidebar fixa)
+O Midjourney implementa Moodboards através do sistema `--profile`:
+- **Coleções de 5-14 imagens** que definem uma "assinatura estética"
+- O sistema aprende padrões recorrentes: saturação, iluminação, texturas
+- Moodboards são salvos com IDs únicos e podem ser aplicados a qualquer prompt
+- Diferente de copiar uma única imagem, ele extrai o "vocabulário visual" comum entre as imagens
 
 ---
 
-## Solução Proposta
+## Arquitetura Proposta
 
-### Abordagem 1: Controle de visibilidade via prop
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│                      PÁGINA DE IMAGEM                           │
+│  ┌──────────────┐  ┌──────────────┐  ┌────────────────────────┐│
+│  │ Personagens  │  │  Moodboards  │  │   Área de Geração      ││
+│  │   (Painel)   │  │   (Botão)    │  │   + Grid de Imagens    ││
+│  └──────────────┘  └───────┬──────┘  └────────────────────────┘│
+│                            │                                    │
+│                    ┌───────▼───────┐                           │
+│                    │ Selector de   │                           │
+│                    │ Moodboard     │                           │
+│                    │ (Dropdown)    │                           │
+│                    └───────────────┘                           │
+└─────────────────────────────────────────────────────────────────┘
+                             │
+                    ┌────────▼────────┐
+                    │ PÁGINA/MODAL DE │
+                    │ GERENCIAMENTO   │
+                    │ DE MOODBOARDS   │
+                    └─────────────────┘
+```
 
-Modificar o componente `CharacterPanel` para aceitar props de controle externo:
-- `isOpen` - controla se o painel está visível
-- `onClose` - callback para fechar o painel
-- Adicionar botão de fechar (X) no header do painel
+---
 
-Modificar `Image2.tsx` para:
-- Adicionar estado `showCharacterPanel` 
-- Adicionar botão para reabrir quando fechado
+## Arquivos a Criar
+
+### 1. Migração de Banco de Dados
+
+**Novas tabelas:**
+
+```sql
+-- Tabela principal de moodboards
+CREATE TABLE user_moodboards (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  preview_url TEXT, -- URL da primeira imagem como preview
+  image_count INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Tabela de imagens do moodboard
+CREATE TABLE user_moodboard_images (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  moodboard_id UUID NOT NULL REFERENCES user_moodboards(id) ON DELETE CASCADE,
+  image_url TEXT NOT NULL,
+  storage_path TEXT,
+  order_index INTEGER DEFAULT 0,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- RLS Policies
+ALTER TABLE user_moodboards ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_moodboard_images ENABLE ROW LEVEL SECURITY;
+
+-- Policies para moodboards
+CREATE POLICY "Users can CRUD own moodboards" ON user_moodboards
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- Policies para imagens
+CREATE POLICY "Users can CRUD own moodboard images" ON user_moodboard_images
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM user_moodboards WHERE id = moodboard_id AND user_id = auth.uid())
+  )
+  WITH CHECK (
+    EXISTS (SELECT 1 FROM user_moodboards WHERE id = moodboard_id AND user_id = auth.uid())
+  );
+
+-- Trigger para atualizar contador e preview
+CREATE OR REPLACE FUNCTION update_moodboard_on_image_change()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    UPDATE user_moodboards SET
+      image_count = (SELECT COUNT(*) FROM user_moodboard_images WHERE moodboard_id = NEW.moodboard_id),
+      preview_url = COALESCE(preview_url, NEW.image_url),
+      updated_at = NOW()
+    WHERE id = NEW.moodboard_id;
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    UPDATE user_moodboards SET
+      image_count = (SELECT COUNT(*) FROM user_moodboard_images WHERE moodboard_id = OLD.moodboard_id),
+      preview_url = (SELECT image_url FROM user_moodboard_images WHERE moodboard_id = OLD.moodboard_id ORDER BY order_index LIMIT 1),
+      updated_at = NOW()
+    WHERE id = OLD.moodboard_id;
+    RETURN OLD;
+  END IF;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE TRIGGER trigger_update_moodboard_on_image_change
+AFTER INSERT OR DELETE ON user_moodboard_images
+FOR EACH ROW EXECUTE FUNCTION update_moodboard_on_image_change();
+```
+
+### 2. `src/hooks/useMoodboards.ts` (NOVO)
+
+Hook para gerenciar moodboards, seguindo o padrão de `useCharacters.ts`:
+
+```typescript
+interface Moodboard {
+  id: string;
+  user_id: string;
+  name: string;
+  description: string | null;
+  preview_url: string | null;
+  image_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+interface MoodboardImage {
+  id: string;
+  moodboard_id: string;
+  image_url: string;
+  storage_path: string | null;
+  order_index: number;
+  created_at: string;
+}
+
+// Funcionalidades:
+- loadMoodboards(): Carregar todos os moodboards do usuário
+- loadMoodboardImages(moodboardId): Carregar imagens de um moodboard
+- createMoodboard(name, description?): Criar novo moodboard
+- updateMoodboard(id, updates): Atualizar nome/descrição
+- deleteMoodboard(id): Excluir moodboard e imagens
+- addImages(moodboardId, files[]): Upload de até 14 imagens
+- removeImage(imageId): Remover imagem individual
+- getMoodboardImagesAsBase64(moodboardId, maxCount): Converter para base64 para API
+- selectMoodboard(moodboard | null): Selecionar moodboard ativo
+```
+
+### 3. `src/components/image/MoodboardPanel.tsx` (NOVO)
+
+Componente para gerenciar moodboards (similar ao CharacterPanel):
+
+```typescript
+interface MoodboardPanelProps {
+  moodboards: Moodboard[];
+  selectedMoodboard: Moodboard | null;
+  moodboardImages: MoodboardImage[];
+  isLoading: boolean;
+  isUploadingImages: boolean;
+  onSelectMoodboard: (moodboard: Moodboard | null) => void;
+  onCreateMoodboard: (name: string, description?: string) => Promise<Moodboard | null>;
+  onUpdateMoodboard: (id: string, updates: Partial<Moodboard>) => Promise<boolean>;
+  onDeleteMoodboard: (id: string) => Promise<boolean>;
+  onAddImages: (moodboardId: string, files: File[]) => Promise<number>;
+  onRemoveImage: (imageId: string) => Promise<boolean>;
+  isOpen?: boolean;
+  onClose?: () => void;
+  onOpen?: () => void;
+}
+
+// Estrutura visual:
+// - Lista de moodboards em cards com preview
+// - Ao selecionar, mostra grid de imagens (até 14)
+// - Botão para adicionar/remover imagens
+// - Badge com contador de imagens
+```
+
+### 4. `src/components/image/MoodboardSelector.tsx` (NOVO)
+
+Dropdown simples para selecionar moodboard na área de geração:
+
+```typescript
+interface MoodboardSelectorProps {
+  moodboards: Moodboard[];
+  selectedMoodboard: Moodboard | null;
+  onSelect: (moodboard: Moodboard | null) => void;
+  disabled?: boolean;
+  supportedModels: string[]; // IDs dos modelos suportados
+  currentModel: string;
+}
+
+// Visual:
+// - Select/Dropdown com preview thumbnail
+// - Mostra "Nenhum" quando não selecionado
+// - Desabilitado se modelo não suporta
+// - Tooltip explicando quando desabilitado
+```
+
+### 5. `src/components/image/SelectedMoodboardBadge.tsx` (NOVO)
+
+Badge similar ao `SelectedCharacterBadge` para mostrar moodboard ativo:
+
+```typescript
+interface SelectedMoodboardBadgeProps {
+  moodboard: Moodboard;
+  imageCount: number;
+  onClear: () => void;
+}
+
+// Visual:
+// - Badge compacto com nome e preview
+// - Botão X para remover seleção
+// - Contador de imagens
+```
 
 ---
 
 ## Arquivos a Modificar
 
-### 1. `src/components/image/CharacterPanel.tsx`
+### 6. `src/modules/image/config/models.ts`
 
-**Alterações na interface:**
+Adicionar flag de suporte a moodboard:
+
 ```typescript
-interface CharacterPanelProps {
-  // ... props existentes
-  isOpen?: boolean;        // NOVO: controle externo de visibilidade (desktop)
-  onClose?: () => void;    // NOVO: callback para fechar
-  onOpen?: () => void;     // NOVO: callback para abrir (botão externo)
+export interface ImageModel {
+  id: string;
+  label: string;
+  maxImages: number;
+  supportsMoodboard?: boolean; // NOVO
+}
+
+export const MODELS: ImageModel[] = [
+  { id: "google:4@2", label: "Google Nano Banana 2 Pro", maxImages: 14, supportsMoodboard: true },
+  { id: "google:4@1", label: "Google Nano Banana", maxImages: 2, supportsMoodboard: false },
+  { id: "openai:4@1", label: "GPT Image 1.5", maxImages: 6, supportsMoodboard: false },
+  { id: "ideogram:4@1", label: "Ideogram 3.0", maxImages: 1, supportsMoodboard: false },
+  { id: "runware:108@1", label: "Qwen-Image", maxImages: 0, supportsMoodboard: false },
+  { id: "bfl:3@1", label: "FLUX.1 Kontext [max]", maxImages: 1, supportsMoodboard: false },
+  { id: "bfl:4@1", label: "FLUX.2 [pro]", maxImages: 10, supportsMoodboard: true },
+  { id: "bytedance:seedream@4.5", label: "Seedream 4.5", maxImages: 2, supportsMoodboard: true },
+];
+```
+
+### 7. `src/pages/Image2.tsx`
+
+Integrar o sistema de moodboards:
+
+**Novos imports e hooks:**
+```typescript
+import { useMoodboards } from '@/hooks/useMoodboards';
+import { MoodboardPanel } from '@/components/image/MoodboardPanel';
+import { MoodboardSelector } from '@/components/image/MoodboardSelector';
+import { SelectedMoodboardBadge } from '@/components/image/SelectedMoodboardBadge';
+```
+
+**Novo estado:**
+```typescript
+const {
+  moodboards,
+  selectedMoodboard,
+  moodboardImages,
+  isLoading: isLoadingMoodboards,
+  isUploadingImages: isUploadingMoodboardImages,
+  selectMoodboard,
+  createMoodboard,
+  updateMoodboard,
+  deleteMoodboard,
+  addImages: addMoodboardImages,
+  removeImage: removeMoodboardImage,
+  getMoodboardImagesAsBase64,
+} = useMoodboards();
+
+const [showMoodboardPanel, setShowMoodboardPanel] = useState(false);
+```
+
+**Modificação na função `generate()`:**
+
+Após processar imagens anexadas e personagem, adicionar moodboard:
+
+```typescript
+// Se há moodboard selecionado e modelo suporta, adicionar imagens como referência de estilo
+const modelConfig = MODELS.find(m => m.id === model);
+if (selectedMoodboard && modelConfig?.supportsMoodboard && moodboardImages.length > 0) {
+  // Calcular slots disponíveis
+  const availableSlots = Math.max(0, maxImages - inputImagesBase64.length);
+  
+  if (availableSlots > 0) {
+    console.log(`🎨 Moodboard "${selectedMoodboard.name}" selecionado. Adicionando até ${availableSlots} referências de estilo...`);
+    const moodboardBase64 = await getMoodboardImagesAsBase64(selectedMoodboard.id, availableSlots);
+    console.log(`✅ ${moodboardBase64.length} imagens do moodboard adicionadas como referência de estilo`);
+    inputImagesBase64.push(...moodboardBase64);
+  }
 }
 ```
 
-**Alterações no componente desktop (linhas 672-677):**
+**UI na área de controles (abaixo do seletor de modelo):**
 
-Adicionar animação de slide e botão de fechar no header:
-
-```typescript
-// Desktop: Sidebar colapsável com controle
-return (
-  <>
-    {/* Botão para reabrir quando fechado */}
-    {!props.isOpen && (
+```tsx
+{/* Moodboard Selector - apenas para modelos suportados */}
+{modelConfig?.supportsMoodboard && (
+  <div className="space-y-2">
+    <Label className="flex items-center gap-2">
+      <Palette className="h-4 w-4" />
+      Moodboard de Estilo
+    </Label>
+    <div className="flex items-center gap-2">
+      <MoodboardSelector
+        moodboards={moodboards}
+        selectedMoodboard={selectedMoodboard}
+        onSelect={selectMoodboard}
+        disabled={isGenerating}
+        currentModel={model}
+      />
       <Button
-        variant="ghost"
-        size="sm"
-        className="hidden lg:flex fixed left-0 top-1/2 -translate-y-1/2 z-40 
-                   bg-card border shadow-lg rounded-l-none rounded-r-lg h-auto py-3"
-        onClick={props.onOpen}
-      >
-        <User className="h-4 w-4" />
-        <ChevronRight className="h-4 w-4" />
-      </Button>
-    )}
-    
-    {/* Sidebar com animação */}
-    <div className={cn(
-      "hidden lg:flex flex-col border-r bg-card/50 shrink-0 transition-all duration-300",
-      props.isOpen ? "w-[280px]" : "w-0 overflow-hidden"
-    )}>
-      <CharacterPanelContent {...props} />
-    </div>
-  </>
-);
-```
-
-**Alterações no `CharacterPanelContent` (linha 516-524):**
-
-Adicionar botão X no header:
-
-```typescript
-{/* Header */}
-<div className="p-4 border-b">
-  <div className="flex items-center justify-between">
-    <h2 className="font-semibold text-lg flex items-center gap-2">
-      <User className="h-5 w-5" />
-      Personagens
-    </h2>
-    {/* Botão fechar - apenas desktop */}
-    {props.onClose && (
-      <Button
-        variant="ghost"
+        variant="outline"
         size="icon"
-        className="h-7 w-7 -mr-2"
-        onClick={props.onClose}
+        onClick={() => setShowMoodboardPanel(true)}
+        disabled={isGenerating}
+        title="Gerenciar Moodboards"
       >
-        <X className="h-4 w-4" />
+        <Settings className="h-4 w-4" />
       </Button>
-    )}
+    </div>
   </div>
-  <p className="text-xs text-muted-foreground mt-1">
-    Mantenha consistência visual nas gerações
-  </p>
-</div>
+)}
+
+{/* Badge do Moodboard selecionado */}
+{selectedMoodboard && modelConfig?.supportsMoodboard && (
+  <SelectedMoodboardBadge
+    moodboard={selectedMoodboard}
+    imageCount={moodboardImages.length}
+    onClear={() => selectMoodboard(null)}
+  />
+)}
 ```
 
-### 2. `src/pages/Image2.tsx`
+**Modal/Sheet para gerenciar moodboards:**
 
-**Adicionar estado (após linha ~100):**
-```typescript
-const [showCharacterPanel, setShowCharacterPanel] = useState(true);
-```
-
-**Atualizar renderização do CharacterPanel desktop (linhas 789-806):**
-```typescript
-{/* Character Panel - Desktop Sidebar */}
-<CharacterPanel
-  characters={characters}
-  selectedCharacter={selectedCharacter}
-  characterImages={characterImages}
-  isLoading={isLoadingCharacters}
-  isUploadingImages={isUploadingImages}
-  useMasterAvatar={useMasterAvatar}
-  onUseMasterAvatarChange={setUseMasterAvatar}
-  onSelectCharacter={selectCharacter}
-  onCreateCharacter={createCharacter}
-  onUpdateCharacter={updateCharacter}
-  onDeleteCharacter={deleteCharacter}
-  onAddImages={addCharacterImages}
-  onRemoveImage={removeCharacterImage}
-  onGenerateMasterAvatar={generateMasterAvatar}
-  isOpen={showCharacterPanel}
-  onClose={() => setShowCharacterPanel(false)}
-  onOpen={() => setShowCharacterPanel(true)}
-/>
+```tsx
+{/* Moodboard Panel - Modal/Sheet para gerenciamento */}
+<Sheet open={showMoodboardPanel} onOpenChange={setShowMoodboardPanel}>
+  <SheetContent side="right" className="w-[400px] sm:w-[540px]">
+    <SheetHeader>
+      <SheetTitle className="flex items-center gap-2">
+        <Palette className="h-5 w-5" />
+        Meus Moodboards
+      </SheetTitle>
+    </SheetHeader>
+    <MoodboardPanel
+      moodboards={moodboards}
+      selectedMoodboard={selectedMoodboard}
+      moodboardImages={moodboardImages}
+      isLoading={isLoadingMoodboards}
+      isUploadingImages={isUploadingMoodboardImages}
+      onSelectMoodboard={selectMoodboard}
+      onCreateMoodboard={createMoodboard}
+      onUpdateMoodboard={updateMoodboard}
+      onDeleteMoodboard={deleteMoodboard}
+      onAddImages={addMoodboardImages}
+      onRemoveImage={removeMoodboardImage}
+    />
+  </SheetContent>
+</Sheet>
 ```
 
 ---
 
-## Comportamento Visual
+## Fluxo de Uso
 
-| Estado | Desktop | Mobile |
-|--------|---------|--------|
-| Aberto | Sidebar 280px com botão X no canto | Sheet deslizante (já funciona) |
-| Fechado | Botão flutuante na lateral esquerda para reabrir | Botão "Personagem" no header |
+```text
+1. Usuário clica no botão "Moodboard" ou ícone de configuração
+2. Abre Sheet/Modal de gerenciamento de moodboards
+3. Usuário cria novo moodboard com nome
+4. Faz upload de até 14 imagens
+5. Fecha o painel
+6. No dropdown de moodboard, seleciona o criado
+7. Escreve prompt e gera imagem
+8. Sistema injeta as imagens do moodboard como referências de estilo
+9. Resultado segue padrões de cor e estilo do moodboard
+```
 
 ---
 
-## Animações
+## Prioridade de Imagens de Referência
 
-- **Fechar**: Transição suave de `w-[280px]` para `w-0` com `transition-all duration-300`
-- **Abrir**: Transição inversa
-- **Botão reabrir**: Aparece na lateral esquerda com ícone de usuário + seta
+Quando o usuário tem múltiplas fontes de referência:
+
+| Prioridade | Fonte | Descrição |
+|------------|-------|-----------|
+| 1 | Imagens anexadas | Upload direto do usuário |
+| 2 | Master Avatar do Personagem | Se personagem selecionado e Master Avatar existe |
+| 3 | Imagens do Personagem | Se personagem selecionado sem Master Avatar |
+| 4 | Imagens do Moodboard | Referências de estilo/cor |
+
+O sistema preenche os slots disponíveis respeitando o limite `maxImages` do modelo.
+
+---
+
+## Modelos Suportados
+
+| Modelo | Max Imagens | Suporta Moodboard |
+|--------|-------------|-------------------|
+| Nano Banana 2 Pro | 14 | Sim |
+| FLUX.2 [pro] | 10 | Sim |
+| Seedream 4.5 | 2 | Sim |
+| Outros | Variável | Não |
+
+---
+
+## Limitações e Validações
+
+1. **Máximo 14 imagens** por moodboard (limite do modelo mais capaz)
+2. **Limite de moodboards por usuário**: Considerar 10 moodboards (evitar abuso)
+3. **Tamanho de imagem**: Mesma compressão usada para personagens (400KB, 1536px)
+4. **Modelo não suportado**: Dropdown desabilitado com tooltip explicativo
+5. **Sem imagens no moodboard**: Não injeta nada, funciona como geração normal
 
 ---
 
 ## Ordem de Implementação
 
-1. Modificar interface de `CharacterPanelProps` para aceitar novas props
-2. Atualizar `CharacterPanelContent` para mostrar botão X no header
-3. Atualizar renderização desktop do `CharacterPanel` com animação e botão de reabrir
-4. Adicionar estado `showCharacterPanel` em `Image2.tsx`
-5. Passar novas props para os componentes
+1. **Migração SQL** - Criar tabelas e policies
+2. **Hook `useMoodboards.ts`** - Lógica de dados
+3. **Componente `MoodboardPanel.tsx`** - UI de gerenciamento
+4. **Componente `MoodboardSelector.tsx`** - Dropdown de seleção
+5. **Componente `SelectedMoodboardBadge.tsx`** - Badge visual
+6. **Atualizar `models.ts`** - Adicionar flag de suporte
+7. **Integrar em `Image2.tsx`** - Conectar tudo
 
 ---
 
 ## Resultado Esperado
 
-- O usuário poderá clicar no **X** no canto do painel de Personagens para fechá-lo
-- Quando fechado, aparecerá um **botão flutuante** na lateral esquerda da tela
-- Ao clicar no botão flutuante, o painel reabre com animação suave
-- No mobile, o comportamento permanece inalterado (já funciona como Sheet)
+- Botão de Moodboard visível na página de imagem (próximo ao seletor de modelo)
+- Ao clicar, abre painel lateral para criar/gerenciar moodboards
+- Upload de até 14 imagens por moodboard com visualização em grid
+- Dropdown de seleção rápida na área de geração
+- Badge visual mostrando moodboard ativo
+- Imagens do moodboard são injetadas automaticamente como referências de estilo
+- Resultado da geração segue padrões visuais do moodboard selecionado
 
