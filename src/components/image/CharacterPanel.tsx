@@ -41,6 +41,8 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { Character, CharacterImage } from '@/hooks/useCharacters';
+import type { Moodboard, MoodboardImage } from '@/hooks/useMoodboards';
+import { MoodboardSection } from './MoodboardSection';
 
 interface CharacterPanelProps {
   characters: Character[];
@@ -61,6 +63,18 @@ interface CharacterPanelProps {
   isOpen?: boolean;
   onClose?: () => void;
   onOpen?: () => void;
+  // Moodboard props
+  moodboards: Moodboard[];
+  selectedMoodboard: Moodboard | null;
+  moodboardImages: MoodboardImage[];
+  isLoadingMoodboards: boolean;
+  isUploadingMoodboardImages: boolean;
+  onSelectMoodboard: (moodboard: Moodboard | null) => void;
+  onCreateMoodboard: (name: string, description?: string) => Promise<Moodboard | null>;
+  onUpdateMoodboard: (id: string, updates: Partial<Moodboard>) => Promise<boolean>;
+  onDeleteMoodboard: (id: string) => Promise<boolean>;
+  onAddMoodboardImages: (moodboardId: string, files: File[]) => Promise<number>;
+  onRemoveMoodboardImage: (imageId: string) => Promise<boolean>;
 }
 
 // Componente de card do personagem
@@ -452,6 +466,18 @@ const CharacterPanelContent = ({
   onRemoveImage,
   onGenerateMasterAvatar,
   onClose,
+  // Moodboard props
+  moodboards,
+  selectedMoodboard,
+  moodboardImages,
+  isLoadingMoodboards,
+  isUploadingMoodboardImages,
+  onSelectMoodboard,
+  onCreateMoodboard,
+  onUpdateMoodboard,
+  onDeleteMoodboard,
+  onAddMoodboardImages,
+  onRemoveMoodboardImage,
 }: CharacterPanelProps) => {
   const [view, setView] = useState<'list' | 'detail'>('list');
   const [editingCharacter, setEditingCharacter] = useState<Character | null>(null);
@@ -606,6 +632,21 @@ const CharacterPanelContent = ({
           </div>
         )}
       </ScrollArea>
+
+      {/* Seção de Moodboards */}
+      <MoodboardSection
+        moodboards={moodboards}
+        selectedMoodboard={selectedMoodboard}
+        moodboardImages={moodboardImages}
+        isLoading={isLoadingMoodboards}
+        isUploadingImages={isUploadingMoodboardImages}
+        onSelectMoodboard={onSelectMoodboard}
+        onCreateMoodboard={onCreateMoodboard}
+        onUpdateMoodboard={onUpdateMoodboard}
+        onDeleteMoodboard={onDeleteMoodboard}
+        onAddImages={onAddMoodboardImages}
+        onRemoveImage={onRemoveMoodboardImage}
+      />
 
       {/* Modal de edição */}
       <AlertDialog open={!!editingCharacter} onOpenChange={() => setEditingCharacter(null)}>

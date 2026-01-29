@@ -101,11 +101,19 @@ const Image2Page = () => {
     generateMasterAvatar,
   } = useCharacters();
   
-  // Hook de moodboards (apenas o necessário para SelectedMoodboardBadge)
+  // Hook de moodboards 
   const {
+    moodboards,
     selectedMoodboard,
     moodboardImages,
+    isLoading: isLoadingMoodboards,
+    isUploadingImages: isUploadingMoodboardImages,
     selectMoodboard,
+    createMoodboard,
+    updateMoodboard: updateMoodboardData,
+    deleteMoodboard,
+    addImages: addMoodboardImages,
+    removeImage: removeMoodboardImage,
     getMoodboardImagesAsBase64,
   } = useMoodboards();
   
@@ -805,6 +813,18 @@ const Image2Page = () => {
                 onAddImages={addCharacterImages}
                 onRemoveImage={removeCharacterImage}
                 onGenerateMasterAvatar={generateMasterAvatar}
+                // Moodboard props
+                moodboards={moodboards}
+                selectedMoodboard={selectedMoodboard}
+                moodboardImages={moodboardImages}
+                isLoadingMoodboards={isLoadingMoodboards}
+                isUploadingMoodboardImages={isUploadingMoodboardImages}
+                onSelectMoodboard={selectMoodboard}
+                onCreateMoodboard={createMoodboard}
+                onUpdateMoodboard={updateMoodboardData}
+                onDeleteMoodboard={deleteMoodboard}
+                onAddMoodboardImages={addMoodboardImages}
+                onRemoveMoodboardImage={removeMoodboardImage}
               />
             </div>
             <Suspense fallback={<div className="h-8 w-8 rounded-full bg-muted animate-pulse" />}>
@@ -835,6 +855,18 @@ const Image2Page = () => {
           isOpen={showCharacterPanel}
           onClose={() => setShowCharacterPanel(false)}
           onOpen={() => setShowCharacterPanel(true)}
+          // Moodboard props
+          moodboards={moodboards}
+          selectedMoodboard={selectedMoodboard}
+          moodboardImages={moodboardImages}
+          isLoadingMoodboards={isLoadingMoodboards}
+          isUploadingMoodboardImages={isUploadingMoodboardImages}
+          onSelectMoodboard={selectMoodboard}
+          onCreateMoodboard={createMoodboard}
+          onUpdateMoodboard={updateMoodboardData}
+          onDeleteMoodboard={deleteMoodboard}
+          onAddMoodboardImages={addMoodboardImages}
+          onRemoveMoodboardImage={removeMoodboardImage}
         />
 
         {/* Grid de Imagens */}
