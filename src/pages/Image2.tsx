@@ -864,11 +864,12 @@ const Image2Page = () => {
                   />
 
                   {/* Overlay no hover */}
-                  <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
-                    <p className="text-white text-sm mb-3 line-clamp-2">{img.prompt}</p>
-                    <div className="flex gap-2">
+                  <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 sm:p-3">
+                    <p className="text-white text-xs sm:text-sm mb-2 line-clamp-2">{img.prompt}</p>
+                    <div className="flex flex-wrap gap-1 sm:gap-1.5">
                       <Button
-                        size="sm"
+                        size="icon"
+                        className="h-7 w-7"
                         variant={img.is_public ? "default" : "secondary"}
                         onClick={(e) => {
                           e.stopPropagation();
@@ -876,46 +877,50 @@ const Image2Page = () => {
                         }}
                         title={img.is_public ? "Público - clique para tornar privado" : "Privado - clique para tornar público"}
                       >
-                        {img.is_public ? <Globe className="h-4 w-4" /> : <Lock className="h-4 w-4" />}
+                        {img.is_public ? <Globe className="h-3.5 w-3.5" /> : <Lock className="h-3.5 w-3.5" />}
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
+                        className="h-7 w-7"
                         variant="secondary"
                         onClick={(e) => copyAndUsePrompt(img, e)}
                         title="Copiar prompt e usar"
                         disabled={!img.prompt}
                       >
-                        <Copy className="h-4 w-4" />
+                        <Copy className="h-3.5 w-3.5" />
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
+                        className="h-7 w-7"
                         variant="secondary"
                         onClick={(e) => {
                           e.stopPropagation();
                           downloadImage(img);
                         }}
                       >
-                        <Download className="h-4 w-4" />
+                        <Download className="h-3.5 w-3.5" />
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
+                        className="h-7 w-7"
                         variant="secondary"
                         onClick={(e) => {
                           e.stopPropagation();
                           shareImage(img);
                         }}
                       >
-                        <Share2 className="h-4 w-4" />
+                        <Share2 className="h-3.5 w-3.5" />
                       </Button>
                       <Button
-                        size="sm"
+                        size="icon"
+                        className="h-7 w-7"
                         variant="destructive"
                         onClick={(e) => {
                           e.stopPropagation();
                           setImageToDelete(img);
                         }}
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3.5 w-3.5" />
                       </Button>
                     </div>
                   </div>
