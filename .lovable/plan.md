@@ -1,142 +1,105 @@
 
-# Plano: Tornar os Botões do Modal Responsivos
+# Plano: Corrigir Botões do Overlay das Imagens na Galeria
 
 ## Diagnóstico
 
-Na imagem do modal de visualização (linhas 1171-1206 de `Image2.tsx`), os botões de ação estão em um `div` com `flex gap-2`, porém:
+Identifiquei o problema correto agora! Você está falando dos botões que aparecem **sobre as imagens na galeria** (ao passar o mouse), NÃO os do modal de tela cheia.
 
-1. **Não há `flex-wrap`** - Os botões não quebram linha quando o espaço é reduzido
-2. **Os botões têm texto fixo** - "Usar Prompt", "Download", "Compartilhar" ocupam muito espaço horizontal
-3. **Não há responsividade** - Quando o menu de personagens abre, o modal fica mais estreito mas os botões mantêm o mesmo tamanho
+Código problemático (linhas 867-920):
 
-```text
-SITUAÇÃO ATUAL:
-┌─────────────────────────────────────────────┐
-│                  IMAGEM                     │
-├─────────────────────────────────────────────┤
-│ faça um gato de bigode                      │
-│ [🔒] [📋 Usar Prompt] [⬇️ Download] [↗ Comp]│  ← Botões saem do container!
-└─────────────────────────────────────────────┘
+```tsx
+<div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
+  <p className="text-white text-sm mb-3 line-clamp-2">{img.prompt}</p>
+  <div className="flex gap-2">  {/* ← SEM flex-wrap! */}
+    <Button>🔒/🌐</Button>    {/* 5 botões em linha */}
+    <Button>📋</Button>
+    <Button>⬇️</Button>
+    <Button>↗️</Button>
+    <Button>🗑️</Button>
+  </div>
+</div>
 ```
+
+**Problema**: São **5 botões** em uma única linha sem `flex-wrap`. Quando o menu de personagens abre, os cards ficam menores (de 4 colunas para menos espaço) e os botões estouram.
 
 ## Solução
 
-Aplicar três correções para tornar os botões responsivos:
+### Arquivo: `src/pages/Image2.tsx` (linhas 867-920)
 
-### 1. Adicionar `flex-wrap` para os botões quebrarem linha se necessário
+**Mudanças a aplicar:**
 
-### 2. Esconder texto dos botões em telas menores, mostrando apenas ícones
-
-### 3. Reduzir tamanho dos botões em viewports estreitos
-
----
-
-## Arquivo a Modificar
-
-### `src/pages/Image2.tsx`
-
-**Alterar linhas 1181-1201:**
+1. **Adicionar `flex-wrap`** no container dos botões
+2. **Reduzir gap** para `gap-1.5` (menos espaço entre botões)
+3. **Reduzir padding** do overlay de `p-4` para `p-2 sm:p-3`
+4. **Botões menores** com `h-7` ou `h-8` em vez do padrão
 
 De:
 ```tsx
-<div className="absolute bottom-0 left-0 right-0 bg-black/80 p-4 text-white">
-  <p className="text-sm">{selectedImageForModal.prompt}</p>
-  <div className="flex gap-2 mt-2">
-    <Button 
-      size="sm" 
-      variant="secondary" 
-      onClick={() => copyAndUsePrompt(selectedImageForModal)}
-      disabled={!selectedImageForModal.prompt}
-    >
-      <Copy className="h-4 w-4 mr-2" />
-      Usar Prompt
-    </Button>
-    <Button size="sm" variant="secondary" onClick={() => downloadImage(selectedImageForModal)}>
-      <Download className="h-4 w-4 mr-2" />
-      Download
-    </Button>
-    <Button size="sm" variant="secondary" onClick={() => shareImage(selectedImageForModal)}>
-      <Share2 className="h-4 w-4 mr-2" />
-      Compartilhar
-    </Button>
+<div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-4">
+  <p className="text-white text-sm mb-3 line-clamp-2">{img.prompt}</p>
+  <div className="flex gap-2">
+    <Button size="sm" ...>...</Button>
+    {/* 5 botões */}
   </div>
 </div>
 ```
 
 Para:
 ```tsx
-<div className="absolute bottom-0 left-0 right-0 bg-black/80 p-3 sm:p-4 text-white">
-  <p className="text-xs sm:text-sm line-clamp-2">{selectedImageForModal.prompt}</p>
-  <div className="flex flex-wrap gap-1.5 sm:gap-2 mt-2">
-    <Button 
-      size="sm" 
-      variant="secondary" 
-      onClick={() => copyAndUsePrompt(selectedImageForModal)}
-      disabled={!selectedImageForModal.prompt}
-      className="h-8 px-2 sm:px-3"
-    >
-      <Copy className="h-4 w-4 sm:mr-2 shrink-0" />
-      <span className="hidden sm:inline">Usar Prompt</span>
-    </Button>
-    <Button 
-      size="sm" 
-      variant="secondary" 
-      onClick={() => downloadImage(selectedImageForModal)}
-      className="h-8 px-2 sm:px-3"
-    >
-      <Download className="h-4 w-4 sm:mr-2 shrink-0" />
-      <span className="hidden sm:inline">Download</span>
-    </Button>
-    <Button 
-      size="sm" 
-      variant="secondary" 
-      onClick={() => shareImage(selectedImageForModal)}
-      className="h-8 px-2 sm:px-3"
-    >
-      <Share2 className="h-4 w-4 sm:mr-2 shrink-0" />
-      <span className="hidden sm:inline">Compartilhar</span>
-    </Button>
+<div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-end p-2 sm:p-3">
+  <p className="text-white text-xs sm:text-sm mb-2 line-clamp-2">{img.prompt}</p>
+  <div className="flex flex-wrap gap-1 sm:gap-1.5">
+    <Button size="sm" className="h-7 w-7 p-0" ...>...</Button>
+    {/* Todos botões com tamanho fixo quadrado */}
   </div>
 </div>
 ```
 
----
-
-## Mudanças Aplicadas
+## Mudanças Detalhadas
 
 | Elemento | Antes | Depois |
 |----------|-------|--------|
-| Container | `p-4` | `p-3 sm:p-4` (menor padding em mobile) |
-| Prompt | `text-sm` | `text-xs sm:text-sm line-clamp-2` |
-| Flex de botões | `flex gap-2` | `flex flex-wrap gap-1.5 sm:gap-2` |
-| Botões | Tamanho fixo | `h-8 px-2 sm:px-3` (compactos) |
-| Ícones | `mr-2` | `sm:mr-2 shrink-0` (sem margem em mobile) |
-| Texto | Sempre visível | `hidden sm:inline` (esconde em mobile) |
-
----
+| Overlay padding | `p-4` | `p-2 sm:p-3` |
+| Texto prompt | `text-sm mb-3` | `text-xs sm:text-sm mb-2` |
+| Container botões | `flex gap-2` | `flex flex-wrap gap-1 sm:gap-1.5` |
+| Cada botão | `size="sm"` (padrão) | `size="icon" className="h-7 w-7"` (quadrado) |
 
 ## Resultado Esperado
 
 ```text
-TELA LARGA (menu fechado):
-┌─────────────────────────────────────────────────┐
-│                    IMAGEM                       │
-├─────────────────────────────────────────────────┤
-│ faça um gato de bigode                          │
-│ [📋 Usar Prompt] [⬇️ Download] [↗ Compartilhar] │
-└─────────────────────────────────────────────────┘
+ANTES (estourado):
+┌──────────────────────────┐
+│        IMAGEM            │
+│                          │
+│ faça um gato...          │
+│ [🔒][📋][⬇️][↗️][🗑️]    │ ← Botões saem do card!
+└──────────────────────────┘
 
-TELA ESTREITA (menu aberto):
-┌──────────────────────────────┐
-│            IMAGEM            │
-├──────────────────────────────┤
-│ faça um gato de bigode       │
-│ [📋] [⬇️] [↗]                │  ← Só ícones, cabem!
-└──────────────────────────────┘
+DEPOIS (responsivo):
+┌──────────────────────────┐
+│        IMAGEM            │
+│                          │
+│ faça um gato...          │
+│ [🔒][📋][⬇️]            │ ← Botões quebram linha
+│ [↗️][🗑️]                │    e cabem no card!
+└──────────────────────────┘
+
+OU (com espaço suficiente):
+┌──────────────────────────┐
+│        IMAGEM            │
+│                          │
+│ faça um gato de bigode   │
+│ [🔒][📋][⬇️][↗️][🗑️]   │ ← Todos cabem
+└──────────────────────────┘
 ```
 
+## Resumo
+
+| Arquivo | Linhas | Ação |
+|---------|--------|------|
+| `Image2.tsx` | 867-920 | Adicionar flex-wrap, reduzir padding/gap, botões compactos |
+
 Os botões agora:
-- Mostram apenas ícones quando o espaço é limitado
-- Podem quebrar linha se ainda assim não couberem
-- Têm tamanho menor em telas estreitas
+- Terão tamanho fixo quadrado (apenas ícones)
+- Podem quebrar em duas linhas se necessário
 - Sempre ficam dentro dos limites da imagem
