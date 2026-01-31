@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, lazy, Suspense } from "react";
+import { useState, useRef, useEffect, lazy, Suspense, useCallback } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,6 +24,7 @@ import {
   ArrowLeft
 } from "lucide-react";
 import { Canvas as FabricCanvas, PencilBrush, FabricImage } from "fabric";
+import { saveImageToStorage, loadImageFromStorage, clearImagesFromStorage } from "@/utils/imageStorage";
 
 const UserProfile = lazy(() => import("@/components/UserProfile"));
 
@@ -34,7 +35,7 @@ interface ReferenceImage {
   dataUrl: string;
 }
 
-// Persistência de estado via sessionStorage
+// Storage keys
 const GENERATING_STATE_KEY = 'inpaint_generating_active';
 const UPLOADED_IMAGE_KEY = 'inpaint_uploaded_image';
 const GENERATED_IMAGE_KEY = 'inpaint_generated_image';
@@ -44,36 +45,6 @@ const setGeneratingActive = (active: boolean) => {
   active ? sessionStorage.setItem(GENERATING_STATE_KEY, 'true') : sessionStorage.removeItem(GENERATING_STATE_KEY);
 };
 const isGeneratingActive = () => sessionStorage.getItem(GENERATING_STATE_KEY) === 'true';
-
-const saveInpaintState = (uploaded: string | null, generated: string | null, promptText: string) => {
-  if (uploaded) {
-    sessionStorage.setItem(UPLOADED_IMAGE_KEY, uploaded);
-  } else {
-    sessionStorage.removeItem(UPLOADED_IMAGE_KEY);
-  }
-  if (generated) {
-    sessionStorage.setItem(GENERATED_IMAGE_KEY, generated);
-  } else {
-    sessionStorage.removeItem(GENERATED_IMAGE_KEY);
-  }
-  if (promptText) {
-    sessionStorage.setItem(PROMPT_KEY, promptText);
-  } else {
-    sessionStorage.removeItem(PROMPT_KEY);
-  }
-};
-
-const loadInpaintState = () => ({
-  uploaded: sessionStorage.getItem(UPLOADED_IMAGE_KEY),
-  generated: sessionStorage.getItem(GENERATED_IMAGE_KEY),
-  prompt: sessionStorage.getItem(PROMPT_KEY) || '',
-});
-
-const clearInpaintState = () => {
-  sessionStorage.removeItem(UPLOADED_IMAGE_KEY);
-  sessionStorage.removeItem(GENERATED_IMAGE_KEY);
-  sessionStorage.removeItem(PROMPT_KEY);
-};
 
 const Inpaint = () => {
   const navigate = useNavigate();
@@ -86,21 +57,54 @@ const Inpaint = () => {
   
   const [canvasReady, setCanvasReady] = useState(false);
   const [activeTool, setActiveTool] = useState<Tool>("brush");
-  const [uploadedImage, setUploadedImage] = useState<string | null>(() => {
-    return sessionStorage.getItem(UPLOADED_IMAGE_KEY);
-  });
+  const [uploadedImage, setUploadedImage] = useState<string | null>(null);
   const [referenceImages, setReferenceImages] = useState<ReferenceImage[]>([]);
   const [prompt, setPrompt] = useState(() => {
     return sessionStorage.getItem(PROMPT_KEY) || '';
   });
   const [isGenerating, setIsGenerating] = useState(() => isGeneratingActive());
-  const [generatedImage, setGeneratedImage] = useState<string | null>(() => {
-    return sessionStorage.getItem(GENERATED_IMAGE_KEY);
-  });
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [brushSize, setBrushSize] = useState(20);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isDragging, setIsDragging] = useState(false);
+  const [isLoadingImages, setIsLoadingImages] = useState(true);
+
+  // Load images from IndexedDB on mount
+  useEffect(() => {
+    const loadImages = async () => {
+      try {
+        const [uploaded, generated] = await Promise.all([
+          loadImageFromStorage(UPLOADED_IMAGE_KEY),
+          loadImageFromStorage(GENERATED_IMAGE_KEY)
+        ]);
+        if (uploaded) setUploadedImage(uploaded);
+        if (generated) setGeneratedImage(generated);
+      } catch (error) {
+        console.warn('Failed to load images from storage:', error);
+      } finally {
+        setIsLoadingImages(false);
+      }
+    };
+    loadImages();
+  }, []);
+
+  // Save images to IndexedDB when they change
+  const saveImages = useCallback(async (uploaded: string | null, generated: string | null) => {
+    await Promise.all([
+      saveImageToStorage(UPLOADED_IMAGE_KEY, uploaded),
+      saveImageToStorage(GENERATED_IMAGE_KEY, generated)
+    ]);
+  }, []);
+
+  // Persist prompt to sessionStorage (small data, OK for sessionStorage)
+  useEffect(() => {
+    if (prompt) {
+      sessionStorage.setItem(PROMPT_KEY, prompt);
+    } else {
+      sessionStorage.removeItem(PROMPT_KEY);
+    }
+  }, [prompt]);
 
   // Sincronizar isGenerating com sessionStorage
   useEffect(() => {
@@ -120,24 +124,30 @@ const Inpaint = () => {
     console.log("📸 uploadedImage mudou para:", uploadedImage ? `tem imagem (${uploadedImage.length} chars)` : "null");
   }, [uploadedImage]);
 
-  // Persistir imagem e prompt no sessionStorage
+  // Save images to IndexedDB when they change (debounced effect)
   useEffect(() => {
-    saveInpaintState(uploadedImage, generatedImage, prompt);
-  }, [uploadedImage, generatedImage, prompt]);
+    if (isLoadingImages) return; // Don't save while loading
+    saveImages(uploadedImage, generatedImage);
+  }, [uploadedImage, generatedImage, saveImages, isLoadingImages]);
 
-  // Restaurar estado ao voltar para a aba
+  // Restore state when returning to tab
   useEffect(() => {
-    const handleVisibilityChange = () => {
+    const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible') {
-        const saved = loadInpaintState();
-        if (saved.uploaded && !uploadedImage) {
-          setUploadedImage(saved.uploaded);
+        const [savedUploaded, savedGenerated] = await Promise.all([
+          loadImageFromStorage(UPLOADED_IMAGE_KEY),
+          loadImageFromStorage(GENERATED_IMAGE_KEY)
+        ]);
+        const savedPrompt = sessionStorage.getItem(PROMPT_KEY) || '';
+        
+        if (savedUploaded && !uploadedImage) {
+          setUploadedImage(savedUploaded);
         }
-        if (saved.generated && !generatedImage) {
-          setGeneratedImage(saved.generated);
+        if (savedGenerated && !generatedImage) {
+          setGeneratedImage(savedGenerated);
         }
-        if (saved.prompt && !prompt) {
-          setPrompt(saved.prompt);
+        if (savedPrompt && !prompt) {
+          setPrompt(savedPrompt);
         }
       }
     };
@@ -461,7 +471,9 @@ const Inpaint = () => {
     setHistory([]);
     setHistoryIndex(-1);
     setPrompt("");
-    clearInpaintState();
+    // Clear from IndexedDB
+    clearImagesFromStorage([UPLOADED_IMAGE_KEY, GENERATED_IMAGE_KEY]);
+    sessionStorage.removeItem(PROMPT_KEY);
   };
 
   const handleDragOver = (e: React.DragEvent) => {
