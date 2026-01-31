@@ -13,6 +13,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { ImageCompareSlider } from "@/components/ImageCompareSlider";
 import { PurchaseCreditsModal } from "@/components/PurchaseCreditsModal";
 import { cn } from "@/lib/utils";
+import { saveImageToStorage, loadImageFromStorage, clearImagesFromStorage } from "@/utils/imageStorage";
 
 const UserProfile = lazy(() => import("@/components/UserProfile"));
 
@@ -23,6 +24,10 @@ const setLoadingActive = (active: boolean) => {
 };
 const isLoadingActive = () => sessionStorage.getItem(LOADING_STATE_KEY) === 'true';
 
+// IndexedDB keys for image persistence
+const ORIGINAL_IMAGE_KEY = 'skinenhancer_original_image';
+const ENHANCED_IMAGE_KEY = 'skinenhancer_enhanced_image';
+
 export default function SkinEnhancer() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
@@ -32,6 +37,7 @@ export default function SkinEnhancer() {
   const [enhancedImage, setEnhancedImage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(() => isLoadingActive());
   const [isDragging, setIsDragging] = useState(false);
+  const [isLoadingImages, setIsLoadingImages] = useState(true);
   
   // Settings
   const [sharpen, setSharpen] = useState([0]);
@@ -41,6 +47,58 @@ export default function SkinEnhancer() {
   useEffect(() => {
     setLoadingActive(isLoading);
   }, [isLoading]);
+
+  // Carregar imagens do IndexedDB ao montar
+  useEffect(() => {
+    const loadImages = async () => {
+      try {
+        const [savedOriginal, savedEnhanced] = await Promise.all([
+          loadImageFromStorage(ORIGINAL_IMAGE_KEY),
+          loadImageFromStorage(ENHANCED_IMAGE_KEY)
+        ]);
+        if (savedOriginal) setOriginalImage(savedOriginal);
+        if (savedEnhanced) setEnhancedImage(savedEnhanced);
+      } catch (error) {
+        console.warn('Failed to load images from storage:', error);
+      } finally {
+        setIsLoadingImages(false);
+      }
+    };
+    loadImages();
+  }, []);
+
+  // Persistir imagens no IndexedDB quando mudarem
+  useEffect(() => {
+    if (isLoadingImages) return;
+    saveImageToStorage(ORIGINAL_IMAGE_KEY, originalImage);
+  }, [originalImage, isLoadingImages]);
+
+  useEffect(() => {
+    if (isLoadingImages) return;
+    saveImageToStorage(ENHANCED_IMAGE_KEY, enhancedImage);
+  }, [enhancedImage, isLoadingImages]);
+
+  // Restaurar estado ao voltar para a aba
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        const [savedOriginal, savedEnhanced] = await Promise.all([
+          loadImageFromStorage(ORIGINAL_IMAGE_KEY),
+          loadImageFromStorage(ENHANCED_IMAGE_KEY)
+        ]);
+        
+        if (savedOriginal && !originalImage) {
+          setOriginalImage(savedOriginal);
+        }
+        if (savedEnhanced && !enhancedImage) {
+          setEnhancedImage(savedEnhanced);
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [originalImage, enhancedImage]);
 
   const handleSignOut = async () => {
     await signOut();
@@ -157,6 +215,8 @@ export default function SkinEnhancer() {
   const handleReset = () => {
     setOriginalImage(null);
     setEnhancedImage(null);
+    // Limpar do IndexedDB
+    clearImagesFromStorage([ORIGINAL_IMAGE_KEY, ENHANCED_IMAGE_KEY]);
   };
 
   return (
