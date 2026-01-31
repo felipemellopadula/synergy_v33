@@ -12,7 +12,7 @@ import UserProfile from "@/components/UserProfile";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PurchaseCreditsModal } from "@/components/PurchaseCreditsModal";
-
+import { saveImageToStorage, loadImageFromStorage, clearImagesFromStorage } from "@/utils/imageStorage";
 interface SavedAvatar {
   id: string;
   image_path: string;
@@ -39,6 +39,9 @@ const setProcessingActive = (active: boolean) => {
 };
 const isProcessingActive = () => sessionStorage.getItem(PROCESSING_STATE_KEY) === 'true';
 
+// IndexedDB keys for image persistence
+const UPLOADED_IMAGE_KEY = 'aiavatar_uploaded_image';
+const GENERATED_AVATAR_KEY = 'aiavatar_generated_avatar';
 const AIAvatar = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -52,8 +55,9 @@ const AIAvatar = () => {
   const [savedAvatars, setSavedAvatars] = useState<SavedAvatar[]>([]);
   const [isLoadingAvatars, setIsLoadingAvatars] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoadingImages, setIsLoadingImages] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
   // Sincronizar isProcessing com sessionStorage
   useEffect(() => {
     setProcessingActive(isProcessing);
@@ -69,6 +73,57 @@ const AIAvatar = () => {
     }
   }, [user]);
 
+  // Carregar imagens do IndexedDB ao montar
+  useEffect(() => {
+    const loadImages = async () => {
+      try {
+        const [savedUploaded, savedGenerated] = await Promise.all([
+          loadImageFromStorage(UPLOADED_IMAGE_KEY),
+          loadImageFromStorage(GENERATED_AVATAR_KEY)
+        ]);
+        if (savedUploaded) setUploadedImage(savedUploaded);
+        if (savedGenerated) setGeneratedAvatar(savedGenerated);
+      } catch (error) {
+        console.warn('Failed to load images from storage:', error);
+      } finally {
+        setIsLoadingImages(false);
+      }
+    };
+    loadImages();
+  }, []);
+
+  // Persistir imagens no IndexedDB quando mudarem
+  useEffect(() => {
+    if (isLoadingImages) return;
+    saveImageToStorage(UPLOADED_IMAGE_KEY, uploadedImage);
+  }, [uploadedImage, isLoadingImages]);
+
+  useEffect(() => {
+    if (isLoadingImages) return;
+    saveImageToStorage(GENERATED_AVATAR_KEY, generatedAvatar);
+  }, [generatedAvatar, isLoadingImages]);
+
+  // Restaurar estado ao voltar para a aba
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        const [savedUploaded, savedGenerated] = await Promise.all([
+          loadImageFromStorage(UPLOADED_IMAGE_KEY),
+          loadImageFromStorage(GENERATED_AVATAR_KEY)
+        ]);
+        
+        if (savedUploaded && !uploadedImage) {
+          setUploadedImage(savedUploaded);
+        }
+        if (savedGenerated && !generatedAvatar) {
+          setGeneratedAvatar(savedGenerated);
+        }
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [uploadedImage, generatedAvatar]);
   const loadSavedAvatars = async () => {
     if (!user) return;
     
@@ -118,6 +173,8 @@ const AIAvatar = () => {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    // Limpar do IndexedDB
+    clearImagesFromStorage([UPLOADED_IMAGE_KEY, GENERATED_AVATAR_KEY]);
   }, []);
 
   const handleDownload = useCallback(() => {
@@ -281,6 +338,42 @@ const AIAvatar = () => {
     }
   };
 
+  // Drag and drop handlers
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+
+    const file = e.dataTransfer.files[0];
+    if (!file || !file.type.startsWith("image/")) {
+      toast.error("Por favor, arraste uma imagem válida");
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("A imagem deve ter no máximo 10MB");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      setUploadedImage(event.target?.result as string);
+      setGeneratedAvatar(null);
+    };
+    reader.readAsDataURL(file);
+  }, []);
   const displayImage = generatedAvatar || uploadedImage;
 
   return (
@@ -363,15 +456,31 @@ const AIAvatar = () => {
             </div>
           ) : (
             <div
-              className="w-full max-w-md aspect-square border-2 border-dashed border-border rounded-2xl flex flex-col items-center justify-center gap-4 cursor-pointer hover:border-primary/50 transition-colors bg-muted/30"
+              className={`w-full max-w-md aspect-square border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-4 cursor-pointer transition-colors bg-muted/30 ${
+                isDragging 
+                  ? "border-primary bg-primary/10" 
+                  : "border-border hover:border-primary/50"
+              }`}
               onClick={() => fileInputRef.current?.click()}
+              onDragOver={handleDragOver}
+              onDragLeave={handleDragLeave}
+              onDrop={handleDrop}
             >
-              <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+              <div className={`w-20 h-20 rounded-full flex items-center justify-center ${
+                isDragging 
+                  ? "bg-primary" 
+                  : "bg-gradient-to-br from-purple-500 to-pink-500"
+              }`}>
                 <Upload className="h-8 w-8 text-white" />
               </div>
               <div className="text-center">
-                <p className="text-foreground font-medium">Faça upload de uma foto</p>
-                <p className="text-sm text-muted-foreground mt-1">PNG, JPG até 10MB</p>
+                <p className="text-foreground font-medium">
+                  {isDragging ? "Solte a imagem aqui" : "Faça upload de uma foto"}
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {isDragging ? "" : "Arraste ou clique para selecionar"}
+                </p>
+                <p className="text-sm text-muted-foreground">PNG, JPG até 10MB</p>
               </div>
             </div>
           )}
