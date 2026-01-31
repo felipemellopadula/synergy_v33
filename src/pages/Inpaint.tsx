@@ -40,6 +40,7 @@ const GENERATING_STATE_KEY = 'inpaint_generating_active';
 const UPLOADED_IMAGE_KEY = 'inpaint_uploaded_image';
 const GENERATED_IMAGE_KEY = 'inpaint_generated_image';
 const PROMPT_KEY = 'inpaint_prompt';
+const CANVAS_STATE_KEY = 'inpaint_canvas_state';
 
 const setGeneratingActive = (active: boolean) => {
   active ? sessionStorage.setItem(GENERATING_STATE_KEY, 'true') : sessionStorage.removeItem(GENERATING_STATE_KEY);
@@ -69,17 +70,23 @@ const Inpaint = () => {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isDragging, setIsDragging] = useState(false);
   const [isLoadingImages, setIsLoadingImages] = useState(true);
+  const isRestoringCanvas = useRef(false);
 
   // Load images from IndexedDB on mount
   useEffect(() => {
     const loadImages = async () => {
       try {
-        const [uploaded, generated] = await Promise.all([
+        const [uploaded, generated, canvasState] = await Promise.all([
           loadImageFromStorage(UPLOADED_IMAGE_KEY),
-          loadImageFromStorage(GENERATED_IMAGE_KEY)
+          loadImageFromStorage(GENERATED_IMAGE_KEY),
+          loadImageFromStorage(CANVAS_STATE_KEY)
         ]);
         if (uploaded) setUploadedImage(uploaded);
         if (generated) setGeneratedImage(generated);
+        // Canvas state will be restored after canvas is ready
+        if (canvasState) {
+          sessionStorage.setItem('temp_canvas_state', canvasState);
+        }
       } catch (error) {
         console.warn('Failed to load images from storage:', error);
       } finally {
@@ -134,9 +141,10 @@ const Inpaint = () => {
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible') {
-        const [savedUploaded, savedGenerated] = await Promise.all([
+        const [savedUploaded, savedGenerated, savedCanvasState] = await Promise.all([
           loadImageFromStorage(UPLOADED_IMAGE_KEY),
-          loadImageFromStorage(GENERATED_IMAGE_KEY)
+          loadImageFromStorage(GENERATED_IMAGE_KEY),
+          loadImageFromStorage(CANVAS_STATE_KEY)
         ]);
         const savedPrompt = sessionStorage.getItem(PROMPT_KEY) || '';
         
@@ -149,12 +157,25 @@ const Inpaint = () => {
         if (savedPrompt && !prompt) {
           setPrompt(savedPrompt);
         }
+        
+        // Restore canvas drawings if available
+        const canvas = fabricCanvasRef.current;
+        if (canvas && savedCanvasState && canvasReady) {
+          isRestoringCanvas.current = true;
+          canvas.loadFromJSON(JSON.parse(savedCanvasState)).then(() => {
+            canvas.renderAll();
+            isRestoringCanvas.current = false;
+            console.log("🎨 Canvas restored on visibility change");
+          }).catch(() => {
+            isRestoringCanvas.current = false;
+          });
+        }
       }
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [uploadedImage, generatedImage, prompt]);
+  }, [uploadedImage, generatedImage, prompt, canvasReady]);
 
   // Initialize Fabric canvas - create canvas element dynamically
   useEffect(() => {
@@ -198,6 +219,14 @@ const Inpaint = () => {
 
         fabricCanvasRef.current = canvas;
         setCanvasReady(true);
+
+        // Save canvas state when user draws
+        canvas.on('path:created', () => {
+          if (isRestoringCanvas.current) return;
+          const canvasJson = JSON.stringify(canvas.toJSON());
+          saveImageToStorage(CANVAS_STATE_KEY, canvasJson);
+          console.log("🎨 Canvas state saved");
+        });
 
         // Handle resize
         resizeHandler = () => {
@@ -273,6 +302,33 @@ const Inpaint = () => {
       canvas.isDrawingMode = false;
     }
   }, [activeTool, canvasReady, brushSize]);
+
+  // Restore canvas state from storage after canvas is ready
+  useEffect(() => {
+    const canvas = fabricCanvasRef.current;
+    if (!canvas || !canvasReady || !uploadedImage) return;
+    
+    const savedCanvasState = sessionStorage.getItem('temp_canvas_state');
+    if (!savedCanvasState) return;
+    
+    // Remove temp state to avoid re-applying
+    sessionStorage.removeItem('temp_canvas_state');
+    
+    // Wait a bit for the image to load first
+    const timer = setTimeout(() => {
+      isRestoringCanvas.current = true;
+      canvas.loadFromJSON(JSON.parse(savedCanvasState)).then(() => {
+        canvas.renderAll();
+        isRestoringCanvas.current = false;
+        console.log("🎨 Canvas state restored from storage");
+      }).catch(err => {
+        console.warn("Failed to restore canvas state:", err);
+        isRestoringCanvas.current = false;
+      });
+    }, 500);
+    
+    return () => clearTimeout(timer);
+  }, [canvasReady, uploadedImage]);
 
   // Load uploaded image onto canvas
   useEffect(() => {
@@ -426,6 +482,9 @@ const Inpaint = () => {
       console.log("📁 FileReader carregou imagem, tamanho do base64:", result?.length);
       setUploadedImage(result);
       setGeneratedImage(null);
+      // Clear saved canvas state when uploading new image
+      saveImageToStorage(CANVAS_STATE_KEY, null);
+      sessionStorage.removeItem('temp_canvas_state');
     };
     reader.onerror = (err) => {
       console.error("📁 Erro no FileReader:", err);
@@ -471,9 +530,10 @@ const Inpaint = () => {
     setHistory([]);
     setHistoryIndex(-1);
     setPrompt("");
-    // Clear from IndexedDB
-    clearImagesFromStorage([UPLOADED_IMAGE_KEY, GENERATED_IMAGE_KEY]);
+    // Clear from IndexedDB - including canvas state
+    clearImagesFromStorage([UPLOADED_IMAGE_KEY, GENERATED_IMAGE_KEY, CANVAS_STATE_KEY]);
     sessionStorage.removeItem(PROMPT_KEY);
+    sessionStorage.removeItem('temp_canvas_state');
   };
 
   const handleDragOver = (e: React.DragEvent) => {
